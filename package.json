@@ -1,7 +1,14 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "okr-performance-system",
+  "version": "1.0.0",
   "private": true,
+  "description": "OKR绩效考核系统 - 企业级目标与关键结果管理平台",
+  "author": "wsuo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wsuo/okr-h5.git"
+  },
+  "keywords": ["OKR", "绩效考核", "目标管理", "企业管理", "Next.js", "React"],
   "scripts": {
     "build": "next build",
     "dev": "next dev",
