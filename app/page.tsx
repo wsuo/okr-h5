@@ -10,53 +10,32 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Building2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { authService } from "@/lib/auth"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const { login, isLoading, error, clearError, isAuthenticated } = useAuth()
   const router = useRouter()
 
   // 检查是否已登录
   useEffect(() => {
-    const token = localStorage.getItem("token")
-    const userInfo = localStorage.getItem("userInfo")
-    if (token && userInfo) {
-      const user = JSON.parse(userInfo)
-      router.push(`/${user.role}`)
+    if (isAuthenticated) {
+      const defaultRoute = authService.getDefaultRoute()
+      router.push(defaultRoute)
     }
-  }, [router])
+  }, [isAuthenticated, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError("")
+    clearError()
 
-    // 模拟登录API调用
-    setTimeout(() => {
-      // 模拟用户数据
-      const users = {
-        admin: { name: "系统管理员", role: "admin", id: "admin" },
-        boss: { name: "公司老板", role: "boss", id: "boss" },
-        zhangsan: { name: "张三", role: "employee", id: "zhangsan", leaderId: "lisi" },
-        lisi: { name: "李四", role: "lead", id: "lisi", department: "技术部" },
-        wangwu: { name: "王五", role: "employee", id: "wangwu", leaderId: "lisi" },
-        zhaoliu: { name: "赵六", role: "lead", id: "zhaoliu", department: "市场部" },
-      }
-
-      const user = users[username as keyof typeof users]
-
-      if (user && password === "123456") {
-        const token = `token_${username}_${Date.now()}`
-        localStorage.setItem("token", token)
-        localStorage.setItem("userInfo", JSON.stringify(user))
-        router.push(`/${user.role}`)
-      } else {
-        setError("用户名或密码错误")
-      }
-      setLoading(false)
-    }, 1000)
+    const success = await login(username, password)
+    if (success) {
+      const defaultRoute = authService.getDefaultRoute()
+      router.push(defaultRoute)
+    }
   }
 
   return (
@@ -98,8 +77,8 @@ export default function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               登录
             </Button>
           </form>

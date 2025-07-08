@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Settings, Users, Calendar, BarChart3 } from "lucide-react"
@@ -8,24 +7,13 @@ import AdminHeader from "@/components/admin-header"
 import AssessmentManagement from "@/components/assessment-management"
 import TemplateManagement from "@/components/template-management"
 import UserManagement from "@/components/user-management"
+import { AdminGuard } from "@/components/auth-guard"
 
 export default function AdminDashboard() {
-  const [userInfo, setUserInfo] = useState<any>(null)
-
-  useEffect(() => {
-    const user = localStorage.getItem("userInfo")
-    if (user) {
-      setUserInfo(JSON.parse(user))
-    }
-  }, [])
-
-  if (!userInfo) {
-    return <div>Loading...</div>
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader userInfo={userInfo} />
+    <AdminGuard>
+      <div className="min-h-screen bg-gray-50">
+        <AdminHeader />
 
       <div className="container mx-auto p-4 max-w-6xl">
         <div className="mb-6">
@@ -103,5 +91,6 @@ export default function AdminDashboard() {
         </Tabs>
       </div>
     </div>
+    </AdminGuard>
   )
 }

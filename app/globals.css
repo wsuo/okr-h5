@@ -92,3 +92,8 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+.password-mask {
+  -webkit-text-security: disc;
+  text-security: disc;
+}

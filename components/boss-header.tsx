@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { LogOut, Crown } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 interface BossHeaderProps {
-  userInfo: {
+  userInfo?: {
     name: string
     role: string
   }
@@ -14,11 +15,18 @@ interface BossHeaderProps {
 
 export default function BossHeader({ userInfo }: BossHeaderProps) {
   const router = useRouter()
+  const { logout, user } = useAuth()
 
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("userInfo")
-    router.push("/")
+  const currentUser = userInfo || user
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/")
+    } catch (error) {
+      console.error('Logout failed:', error)
+      router.push("/")
+    }
   }
 
   return (
@@ -36,11 +44,13 @@ export default function BossHeader({ userInfo }: BossHeaderProps) {
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-sm font-medium text-gray-900">{userInfo.name}</p>
+            <p className="text-sm font-medium text-gray-900">{currentUser?.name}</p>
             <p className="text-xs text-gray-500">公司老板</p>
           </div>
           <Avatar>
-            <AvatarFallback className="bg-yellow-100 text-yellow-600">{userInfo.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="bg-yellow-100 text-yellow-600">
+              {currentUser?.name?.charAt(0)}
+            </AvatarFallback>
           </Avatar>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="w-4 h-4" />
