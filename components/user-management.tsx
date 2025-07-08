@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Plus, Users, Edit, Trash2, Key, Building2 } from "lucide-react"
+import DepartmentManagement from "./department-management-simple"
 
 interface User {
   id: string
@@ -566,131 +567,7 @@ export default function UserManagement() {
           </TabsContent>
 
           <TabsContent value="departments">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">部门列表</h3>
-              <Dialog open={isDepartmentDialogOpen} onOpenChange={setIsDepartmentDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    添加部门
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>添加新部门</DialogTitle>
-                    <DialogDescription>创建一个新的部门</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="deptName">部门名称</Label>
-                      <Input
-                        id="deptName"
-                        placeholder="请输入部门名称"
-                        value={newDepartment.name}
-                        onChange={(e) => setNewDepartment({ ...newDepartment, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="deptDesc">部门描述</Label>
-                      <Input
-                        id="deptDesc"
-                        placeholder="请输入部门描述"
-                        value={newDepartment.description}
-                        onChange={(e) => setNewDepartment({ ...newDepartment, description: e.target.value })}
-                      />
-                    </div>
-                    <Button onClick={handleAddDepartment} className="w-full" disabled={!newDepartment.name}>
-                      添加部门
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {departments.map((department) => (
-                <div key={department.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <Building2 className="w-8 h-8 text-blue-600" />
-                      <div>
-                        <h3 className="font-semibold text-lg">{department.name}</h3>
-                        <p className="text-sm text-gray-600">{department.description}</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline">{department.employeeCount}人</Badge>
-                  </div>
-
-                  <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" onClick={() => handleEditDepartment(department)}>
-                      <Edit className="w-4 h-4 mr-1" />
-                      编辑
-                    </Button>
-                    {/* 添加编辑部门对话框 */}
-                    <Dialog open={isEditDepartmentDialogOpen} onOpenChange={setIsEditDepartmentDialogOpen}>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>编辑部门信息</DialogTitle>
-                          <DialogDescription>修改部门的基本信息</DialogDescription>
-                        </DialogHeader>
-                        {editingDepartment && (
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-dept-name">部门名称</Label>
-                              <Input
-                                id="edit-dept-name"
-                                placeholder="请输入部门名称"
-                                value={editingDepartment.name}
-                                onChange={(e) => setEditingDepartment({ ...editingDepartment, name: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-dept-desc">部门描述</Label>
-                              <Input
-                                id="edit-dept-desc"
-                                placeholder="请输入部门描述"
-                                value={editingDepartment.description}
-                                onChange={(e) =>
-                                  setEditingDepartment({ ...editingDepartment, description: e.target.value })
-                                }
-                              />
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">当前员工数量：</span>
-                                <span className="font-medium">{editingDepartment.employeeCount} 人</span>
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-4">
-                              <Button variant="outline" onClick={() => setIsEditDepartmentDialogOpen(false)}>
-                                取消
-                              </Button>
-                              <Button onClick={handleUpdateDepartment} disabled={!editingDepartment.name}>
-                                保存修改
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteDepartment(department.id)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                      disabled={department.employeeCount > 0}
-                    >
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      删除
-                    </Button>
-                  </div>
-
-                  {department.employeeCount > 0 && (
-                    <p className="text-xs text-gray-500 mt-2">* 该部门有员工，无法删除</p>
-                  )}
-                </div>
-              ))}
-            </div>
+            <DepartmentManagement />
           </TabsContent>
         </Tabs>
       </CardContent>
