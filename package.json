@@ -13,7 +13,10 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "test:template": "node scripts/test-template-management.js",
+    "test:e2e": "node scripts/test-template-management.js",
+    "test:quick": "node scripts/quick-test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
