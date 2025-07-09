@@ -266,12 +266,12 @@ export default function TemplateManagement() {
           self_evaluation: {
             enabled: true,
             description: "员工自我评估",
-            weight_in_final: 0.3
+            weight_in_final: 0.4
           },
           leader_evaluation: {
             enabled: true,
             description: "直属领导评估",
-            weight_in_final: 0.7
+            weight_in_final: 0.6
           },
           calculation_method: "weighted_average"
         },
@@ -279,6 +279,25 @@ export default function TemplateManagement() {
         usage_instructions: {
           for_leaders: [],
           for_employees: []
+        },
+        // 公共评分标准配置
+        scoring_criteria: {
+          excellent: {
+            min: 90,
+            description: "优秀：超额完成目标，表现突出"
+          },
+          good: {
+            min: 80,
+            description: "良好：完成目标，表现符合预期"
+          },
+          average: {
+            min: 70,
+            description: "一般：基本完成目标，表现一般"
+          },
+          poor: {
+            min: 0,
+            description: "较差：未完成目标，表现不佳"
+          }
         }
       },
       is_default: 0
