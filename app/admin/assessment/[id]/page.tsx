@@ -206,17 +206,8 @@ export default function AssessmentDetailPage() {
       const validation = validationResponse.data
       setPublishValidation(validation)
       
-      // 如果检查失败，显示错误信息
-      if (!validation.canPublish) {
-        const errorMessage = validation.errors.join('\n')
-        toast.error('无法发布考核', {
-          description: errorMessage,
-          duration: 5000
-        })
-        return
-      }
-      
-      // 如果有警告或者可以发布，显示确认对话框
+      // 显示确认对话框，无论是否可以发布
+      // 对话框中会显示错误信息或警告信息
       setShowPublishDialog(true)
       
     } catch (error: any) {
@@ -727,8 +718,26 @@ export default function AssessmentDetailPage() {
           
           {publishValidation && (
             <div className="space-y-4">
-              {/* 预检查结果 */}
-              {publishValidation.warnings.length > 0 && (
+              {/* 错误信息显示 */}
+              {publishValidation.errors && publishValidation.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <h4 className="font-medium text-red-800 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    发布检查失败
+                  </h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {publishValidation.errors.map((error, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-red-500 mt-0.5">•</span>
+                        {error}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* 警告信息显示 */}
+              {publishValidation.warnings && publishValidation.warnings.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <h4 className="font-medium text-yellow-800 mb-2 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
@@ -745,28 +754,30 @@ export default function AssessmentDetailPage() {
                 </div>
               )}
               
-              {/* 检查项目状态 */}
-              <div className="bg-gray-50 rounded-lg p-3">
-                <h4 className="font-medium text-gray-800 mb-2">发布检查项</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.title ? 'text-green-500' : 'text-red-500'}`} />
-                    <span>标题配置</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.dateConfig ? 'text-green-500' : 'text-red-500'}`} />
-                    <span>时间配置</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.template ? 'text-green-500' : 'text-red-500'}`} />
-                    <span>模板配置</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.participants ? 'text-green-500' : 'text-red-500'}`} />
-                    <span>参与者配置</span>
+              {/* 检查项目状态 - 仅在有 checks 字段且可以发布时显示 */}
+              {publishValidation.checks && publishValidation.canPublish && (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <h4 className="font-medium text-gray-800 mb-2">发布检查项</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className={`w-4 h-4 ${publishValidation.checks.title ? 'text-green-500' : 'text-red-500'}`} />
+                      <span>标题配置</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className={`w-4 h-4 ${publishValidation.checks.dateConfig ? 'text-green-500' : 'text-red-500'}`} />
+                      <span>时间配置</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className={`w-4 h-4 ${publishValidation.checks.template ? 'text-green-500' : 'text-red-500'}`} />
+                      <span>模板配置</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className={`w-4 h-4 ${publishValidation.checks.participants ? 'text-green-500' : 'text-red-500'}`} />
+                      <span>参与者配置</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
           
@@ -774,11 +785,11 @@ export default function AssessmentDetailPage() {
             <AlertDialogCancel disabled={publishing}>取消</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmPublishAssessment} 
-              disabled={publishing}
+              disabled={publishing || (publishValidation && !publishValidation.canPublish)}
               className="bg-green-600 hover:bg-green-700"
             >
               {publishing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              确认发布
+              {publishValidation && !publishValidation.canPublish ? '无法发布' : '确认发布'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
