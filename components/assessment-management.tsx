@@ -319,6 +319,7 @@ export default function AssessmentManagement() {
         toast.error('预检查失败', {
           description: validationResponse.message || '无法获取考核状态'
         })
+        setPublishingId(null)
         return
       }
       
@@ -334,7 +335,6 @@ export default function AssessmentManagement() {
       toast.error('预检查失败', {
         description: error.message || '服务器错误，请稍后重试'
       })
-    } finally {
       setPublishingId(null)
     }
   }
@@ -342,9 +342,7 @@ export default function AssessmentManagement() {
   const confirmPublishAssessment = async () => {
     if (!publishValidation || publishingId === null) return
     
-    try {
-      setPublishingId(publishingId)
-      
+    try {      
       // 执行发布操作
       const response = await assessmentService.publishAssessment(publishingId)
       
@@ -356,9 +354,10 @@ export default function AssessmentManagement() {
         // 重新加载考核列表
         await loadData()
         
-        // 关闭对话框
+        // 关闭对话框并重置状态
         setShowPublishDialog(false)
         setPublishValidation(null)
+        setPublishingId(null)
       } else {
         toast.error('发布失败', {
           description: response.message || '无法发布该考核'
@@ -369,9 +368,13 @@ export default function AssessmentManagement() {
       toast.error('发布失败', {
         description: error.message || '服务器错误，请稍后重试'
       })
-    } finally {
-      setPublishingId(null)
     }
+  }
+
+  const handlePublishDialogClose = () => {
+    setShowPublishDialog(false)
+    setPublishValidation(null)
+    setPublishingId(null)
   }
 
   const handleEditClick = async (assessment: AssessmentListItem) => {
@@ -1044,7 +1047,7 @@ export default function AssessmentManagement() {
       </CardContent>
       
       {/* 发布确认对话框 */}
-      <AlertDialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+      <AlertDialog open={showPublishDialog} onOpenChange={handlePublishDialogClose}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -1122,7 +1125,7 @@ export default function AssessmentManagement() {
           )}
           
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={publishingId !== null}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={publishingId !== null} onClick={handlePublishDialogClose}>取消</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmPublishAssessment} 
               disabled={publishingId !== null || (publishValidation && !publishValidation.canPublish)}
