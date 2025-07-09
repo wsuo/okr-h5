@@ -56,6 +56,17 @@ class ApiClient {
     try {
       const response = await fetch(url, config)
       
+      // 处理成功的空响应（如删除操作返回204 No Content）
+      if (response.ok && (response.status === 204 || response.headers.get('content-length') === '0')) {
+        return {
+          code: 200, // 统一返回200表示成功
+          message: 'success',
+          data: undefined as any,
+          timestamp: new Date().toISOString(),
+          path: endpoint
+        }
+      }
+
       // 处理非 JSON 响应（如文件下载）
       if (!response.headers.get('content-type')?.includes('application/json')) {
         if (response.ok) {
@@ -69,7 +80,38 @@ class ApiClient {
         }
       }
 
-      const data: ApiResponse<T> = await response.json()
+      // 尝试解析JSON响应
+      let data: ApiResponse<T>
+      try {
+        const text = await response.text()
+        if (text) {
+          data = JSON.parse(text)
+        } else {
+          // 空响应体但状态码表示成功
+          if (response.ok) {
+            return {
+              code: 200,
+              message: 'success',
+              data: undefined as any,
+              timestamp: new Date().toISOString(),
+              path: endpoint
+            }
+          }
+          throw new Error(`Empty response with status: ${response.status}`)
+        }
+      } catch (parseError) {
+        if (response.ok) {
+          // 成功但无法解析JSON，可能是空响应
+          return {
+            code: 200,
+            message: 'success',
+            data: undefined as any,
+            timestamp: new Date().toISOString(),
+            path: endpoint
+          }
+        }
+        throw new Error(`Failed to parse response: ${parseError}`)
+      }
 
       // 处理 401 未授权错误
       if (response.status === 401) {

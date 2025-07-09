@@ -6,53 +6,35 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Calendar, Users, CheckCircle, Download, AlertTriangle, BarChart3, FileText } from "lucide-react"
+import { ArrowLeft, Calendar, Users, CheckCircle, Download, AlertTriangle, BarChart3, FileText, Loader2, Edit, Send } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import AdminHeader from "@/components/admin-header"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-
-interface AssessmentDetail {
-  id: string
-  title: string
-  period: string
-  status: "active" | "completed" | "ended"
-  deadline: string
-  createdAt: string
-  participants: Array<{
-    id: string
-    name: string
-    department: string
-    position: string
-    selfCompleted: boolean
-    leaderCompleted: boolean
-    finalScore?: number
-    selfScore?: number
-    leaderScore?: number
-  }>
-  statistics: {
-    totalParticipants: number
-    selfCompletedCount: number
-    leaderCompletedCount: number
-    fullyCompletedCount: number
-    averageScore: number
-    highestScore: number
-    lowestScore: number
-  }
-}
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
+import { assessmentService, Assessment, assessmentUtils, ScorePreviewResult, PublishValidationResult } from "@/lib/assessment"
 
 export default function AssessmentDetailPage() {
   const router = useRouter()
   const params = useParams()
   const [userInfo, setUserInfo] = useState<any>(null)
-  const [assessmentDetail, setAssessmentDetail] = useState<AssessmentDetail | null>(null)
-  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false)
+  const [assessmentDetail, setAssessmentDetail] = useState<Assessment | null>(null)
+  const [scorePreview, setScorePreview] = useState<ScorePreviewResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [scoreLoading, setScoreLoading] = useState(false)
+  const [ending, setEnding] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishValidation, setPublishValidation] = useState<PublishValidationResult | null>(null)
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
 
   useEffect(() => {
     const user = localStorage.getItem("userInfo")
@@ -60,112 +42,74 @@ export default function AssessmentDetailPage() {
       setUserInfo(JSON.parse(user))
     }
 
-    // 模拟加载考核详情数据
-    const mockAssessmentDetail: AssessmentDetail = {
-      id: params.id as string,
-      title: params.id === "2024-01" ? "2024年1月绩效考核" : "2023年12月绩效考核",
-      period: params.id as string,
-      status: params.id === "2024-01" ? "active" : "completed",
-      deadline: params.id === "2024-01" ? "2024-01-31" : "2023-12-31",
-      createdAt: params.id === "2024-01" ? "2024-01-01" : "2023-12-01",
-      participants: [
-        {
-          id: "zhangsan",
-          name: "张三",
-          department: "技术部",
-          position: "前端工程师",
-          selfCompleted: true,
-          leaderCompleted: params.id === "2024-01" ? false : true,
-          finalScore: params.id === "2024-01" ? undefined : 87.5,
-          selfScore: 85.2,
-          leaderScore: params.id === "2024-01" ? undefined : 88.9,
-        },
-        {
-          id: "wangwu",
-          name: "王五",
-          department: "技术部",
-          position: "后端工程师",
-          selfCompleted: true,
-          leaderCompleted: params.id === "2024-01" ? false : true,
-          finalScore: params.id === "2024-01" ? undefined : 90.2,
-          selfScore: 88.1,
-          leaderScore: params.id === "2024-01" ? undefined : 91.5,
-        },
-        {
-          id: "lisi",
-          name: "李四",
-          department: "技术部",
-          position: "技术经理",
-          selfCompleted: true,
-          leaderCompleted: params.id === "2024-01" ? false : true,
-          finalScore: params.id === "2024-01" ? undefined : 92.1,
-          selfScore: 90.5,
-          leaderScore: params.id === "2024-01" ? undefined : 93.2,
-        },
-        {
-          id: "zhaoliu",
-          name: "赵六",
-          department: "市场部",
-          position: "市场经理",
-          selfCompleted: true,
-          leaderCompleted: params.id === "2024-01" ? false : true,
-          finalScore: params.id === "2024-01" ? undefined : 87.3,
-          selfScore: 85.8,
-          leaderScore: params.id === "2024-01" ? undefined : 88.4,
-        },
-      ],
-      statistics: {
-        totalParticipants: 4,
-        selfCompletedCount: 4,
-        leaderCompletedCount: params.id === "2024-01" ? 0 : 4,
-        fullyCompletedCount: params.id === "2024-01" ? 0 : 4,
-        averageScore: params.id === "2024-01" ? 0 : 89.3,
-        highestScore: params.id === "2024-01" ? 0 : 92.1,
-        lowestScore: params.id === "2024-01" ? 0 : 87.3,
-      },
-    }
-
-    setAssessmentDetail(mockAssessmentDetail)
+    loadAssessmentDetail()
   }, [params.id])
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">进行中</Badge>
-      case "completed":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">已完成</Badge>
-      case "ended":
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">已结束</Badge>
-      default:
-        return <Badge variant="outline">未知</Badge>
+  const loadAssessmentDetail = async () => {
+    try {
+      setLoading(true)
+      
+      const response = await assessmentService.getAssessmentById(parseInt(params.id as string))
+      
+      if (response.code === 200 && response.data) {
+        setAssessmentDetail(response.data)
+      } else {
+        toast.error('加载失败', {
+          description: response.message || '无法获取考核详情'
+        })
+        router.push('/admin')
+      }
+    } catch (error: any) {
+      console.error('加载考核详情失败:', error)
+      toast.error('加载失败', {
+        description: error.message || '服务器错误，请稍后重试'
+      })
+      router.push('/admin')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const loadScorePreview = async () => {
+    if (!assessmentDetail) return
+    
+    try {
+      setScoreLoading(true)
+      
+      const response = await assessmentService.scorePreview(assessmentDetail.id)
+      
+      if (response.code === 200 && response.data) {
+        setScorePreview(response.data)
+      } else {
+        toast.error('加载失败', {
+          description: response.message || '无法获取得分预览'
+        })
+      }
+    } catch (error: any) {
+      console.error('加载得分预览失败:', error)
+      toast.error('加载失败', {
+        description: error.message || '服务器错误，请稍后重试'
+      })
+    } finally {
+      setScoreLoading(false)
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusStyle = assessmentUtils.getStatusStyle(status as any)
+    const statusText = assessmentUtils.getStatusText(status as any)
+    return <Badge className={statusStyle}>{statusText}</Badge>
   }
 
   const getCompletionRate = () => {
     if (!assessmentDetail) return 0
-    return (assessmentDetail.statistics.fullyCompletedCount / assessmentDetail.statistics.totalParticipants) * 100
+    return assessmentUtils.calculateCompletionRate(assessmentDetail.statistics)
   }
 
   const handleExportData = () => {
     if (!assessmentDetail) return
 
-    // 模拟导出数据
-    const csvContent = [
-      ["姓名", "部门", "职位", "自评完成", "领导评分完成", "自评得分", "领导得分", "最终得分"],
-      ...assessmentDetail.participants.map((p) => [
-        p.name,
-        p.department,
-        p.position,
-        p.selfCompleted ? "是" : "否",
-        p.leaderCompleted ? "是" : "否",
-        p.selfScore?.toString() || "",
-        p.leaderScore?.toString() || "",
-        p.finalScore?.toString() || "",
-      ]),
-    ]
-      .map((row) => row.join(","))
-      .join("\n")
-
+    const csvContent = assessmentUtils.generateCSVData(assessmentDetail)
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
@@ -175,22 +119,192 @@ export default function AssessmentDetailPage() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    
+    toast.success('导出成功', {
+      description: '考核数据已导出为CSV文件'
+    })
   }
 
-  const handleEndAssessment = () => {
+  const handleEndAssessment = async () => {
     if (!assessmentDetail) return
 
-    // 模拟结束考核
-    setAssessmentDetail({
-      ...assessmentDetail,
-      status: "ended",
-    })
-    setIsEndDialogOpen(false)
-    alert("考核已结束")
+    try {
+      setEnding(true)
+      
+      // 先进行预检查
+      const validationResponse = await assessmentService.endValidation(assessmentDetail.id)
+      
+      if (validationResponse.code !== 200) {
+        toast.error('预检查失败', {
+          description: validationResponse.message || '无法获取考核状态'
+        })
+        return
+      }
+      
+      const validation = validationResponse.data
+      
+      // 如果检查失败，显示错误信息
+      if (!validation.canEnd) {
+        const errorMessage = validation.errors.join('\n')
+        toast.error('无法结束考核', {
+          description: errorMessage,
+          duration: 5000
+        })
+        return
+      }
+      
+      // 如果有警告，显示警告信息
+      if (validation.warnings.length > 0) {
+        const warningMessage = validation.warnings.join('\n')
+        toast.warning('注意事项', {
+          description: warningMessage,
+          duration: 4000
+        })
+      }
+      
+      // 如果检查通过，执行结束操作
+      const response = await assessmentService.endAssessment(assessmentDetail.id)
+      
+      if (response.code === 200) {
+        toast.success('考核已结束', {
+          description: '已自动计算最终得分'
+        })
+        
+        // 重新加载考核详情
+        await loadAssessmentDetail()
+      } else {
+        toast.error('结束失败', {
+          description: response.message || '无法结束该考核'
+        })
+      }
+    } catch (error: any) {
+      console.error('结束考核失败:', error)
+      toast.error('结束失败', {
+        description: error.message || '服务器错误，请稍后重试'
+      })
+    } finally {
+      setEnding(false)
+    }
   }
 
-  if (!userInfo || !assessmentDetail) {
+  const handlePublishAssessment = async () => {
+    if (!assessmentDetail) return
+
+    try {
+      setPublishing(true)
+      
+      // 先进行发布前校验
+      const validationResponse = await assessmentService.publishValidation(assessmentDetail.id)
+      
+      if (validationResponse.code !== 200) {
+        toast.error('预检查失败', {
+          description: validationResponse.message || '无法获取考核状态'
+        })
+        return
+      }
+      
+      const validation = validationResponse.data
+      setPublishValidation(validation)
+      
+      // 如果检查失败，显示错误信息
+      if (!validation.canPublish) {
+        const errorMessage = validation.errors.join('\n')
+        toast.error('无法发布考核', {
+          description: errorMessage,
+          duration: 5000
+        })
+        return
+      }
+      
+      // 如果有警告或者可以发布，显示确认对话框
+      setShowPublishDialog(true)
+      
+    } catch (error: any) {
+      console.error('发布预检查失败:', error)
+      toast.error('预检查失败', {
+        description: error.message || '服务器错误，请稍后重试'
+      })
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const confirmPublishAssessment = async () => {
+    if (!assessmentDetail || !publishValidation) return
+    
+    try {
+      setPublishing(true)
+      
+      // 执行发布操作
+      const response = await assessmentService.publishAssessment(assessmentDetail.id)
+      
+      if (response.code === 200) {
+        toast.success('发布成功', {
+          description: '考核已发布，参与者可以开始评估'
+        })
+        
+        // 重新加载考核详情
+        await loadAssessmentDetail()
+        
+        // 关闭对话框
+        setShowPublishDialog(false)
+        setPublishValidation(null)
+      } else {
+        toast.error('发布失败', {
+          description: response.message || '无法发布该考核'
+        })
+      }
+    } catch (error: any) {
+      console.error('发布考核失败:', error)
+      toast.error('发布失败', {
+        description: error.message || '服务器错误，请稍后重试'
+      })
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const handleEditAssessment = () => {
+    if (!assessmentDetail) return
+    
+    // 跳转到管理页面并打开编辑对话框
+    // 这里可以通过URL参数传递编辑ID，或者使用状态管理
+    router.push(`/admin?edit=${assessmentDetail.id}`)
+  }
+
+  if (!userInfo) {
     return <div>Loading...</div>
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <AdminHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-6xl">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <span className="ml-2 text-gray-600">加载考核详情中...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!assessmentDetail) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <AdminHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-6xl">
+          <div className="text-center py-12">
+            <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p className="text-gray-600">考核不存在或已被删除</p>
+            <Button variant="outline" onClick={() => router.push('/admin')} className="mt-4">
+              返回管理后台
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -214,31 +328,57 @@ export default function AssessmentDetailPage() {
                 <Download className="w-4 h-4 mr-2" />
                 导出数据
               </Button>
-              {assessmentDetail.status === "active" && (
-                <Dialog open={isEndDialogOpen} onOpenChange={setIsEndDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 bg-transparent">
-                      <AlertTriangle className="w-4 h-4 mr-2" />
+              
+              {assessmentUtils.canEdit(assessmentDetail.status) && (
+                <Button 
+                  variant="outline" 
+                  onClick={handleEditAssessment}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  编辑考核
+                </Button>
+              )}
+              
+              {assessmentUtils.canPublish(assessmentDetail.status) && (
+                <Button 
+                  variant="outline" 
+                  onClick={handlePublishAssessment}
+                  disabled={publishing}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  {publishing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                  发布考核
+                </Button>
+              )}
+              
+              {assessmentUtils.canEnd(assessmentDetail.status) && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="text-orange-600 border-orange-200 hover:bg-orange-50 bg-transparent"
+                      disabled={ending}
+                    >
+                      {ending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
                       结束考核
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>确认结束考核</DialogTitle>
-                      <DialogDescription>
-                        结束考核后，未完成的评分将无法继续进行。此操作不可撤销，请确认是否继续？
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex justify-end gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setIsEndDialogOpen(false)}>
-                        取消
-                      </Button>
-                      <Button variant="destructive" onClick={handleEndAssessment}>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>确认结束考核</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        结束考核后，未完成的评分将无法继续进行，系统将自动计算最终得分。此操作不可撤销，请确认是否继续？
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={ending}>取消</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleEndAssessment} disabled={ending}>
                         确认结束
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
           </div>
@@ -262,7 +402,7 @@ export default function AssessmentDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">参与人数</p>
-                  <p className="text-2xl font-bold">{assessmentDetail.statistics.totalParticipants}</p>
+                  <p className="text-2xl font-bold">{assessmentDetail.statistics.total_participants}</p>
                 </div>
                 <Users className="w-8 h-8 text-green-600" />
               </div>
@@ -285,7 +425,7 @@ export default function AssessmentDetailPage() {
                 <div>
                   <p className="text-sm text-gray-600">平均得分</p>
                   <p className="text-2xl font-bold text-orange-600">
-                    {assessmentDetail.statistics.averageScore || "--"}
+                    {assessmentDetail.statistics.average_score || "--"}
                   </p>
                 </div>
                 <BarChart3 className="w-8 h-8 text-orange-600" />
@@ -296,9 +436,16 @@ export default function AssessmentDetailPage() {
 
         {/* 详细信息 */}
         <Tabs defaultValue="participants" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="participants">参与人员</TabsTrigger>
             <TabsTrigger value="statistics">数据统计</TabsTrigger>
+            <TabsTrigger 
+              value="score-preview" 
+              onClick={loadScorePreview}
+              disabled={!assessmentDetail || (assessmentDetail.status !== 'active' && assessmentDetail.status !== 'completed')}
+            >
+              得分预览
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="participants">
@@ -313,13 +460,13 @@ export default function AssessmentDetailPage() {
                     <div key={participant.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <h3 className="font-semibold text-lg">{participant.name}</h3>
+                          <h3 className="font-semibold text-lg">{participant.user.name}</h3>
                           <p className="text-sm text-gray-600">
-                            {participant.department} · {participant.position}
+                            {participant.user.department?.name || '未分配部门'} · {participant.user.position || '未设置职位'}
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          {participant.selfCompleted && participant.leaderCompleted ? (
+                          {participant.self_completed && participant.leader_completed ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200">已完成</Badge>
                           ) : (
                             <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">进行中</Badge>
@@ -330,31 +477,31 @@ export default function AssessmentDetailPage() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
                         <div>
                           <span className="text-gray-600">自评状态：</span>
-                          <span className={participant.selfCompleted ? "text-green-600 font-medium" : "text-red-600"}>
-                            {participant.selfCompleted ? "已完成" : "未完成"}
+                          <span className={participant.self_completed ? "text-green-600 font-medium" : "text-red-600"}>
+                            {participant.self_completed ? "已完成" : "未完成"}
                           </span>
                         </div>
                         <div>
                           <span className="text-gray-600">领导评分：</span>
-                          <span className={participant.leaderCompleted ? "text-green-600 font-medium" : "text-red-600"}>
-                            {participant.leaderCompleted ? "已完成" : "未完成"}
+                          <span className={participant.leader_completed ? "text-green-600 font-medium" : "text-red-600"}>
+                            {participant.leader_completed ? "已完成" : "未完成"}
                           </span>
                         </div>
-                        {participant.selfScore && (
+                        {participant.self_score && (
                           <div>
                             <span className="text-gray-600">自评得分：</span>
-                            <span className="font-medium">{participant.selfScore}</span>
+                            <span className="font-medium">{participant.self_score}</span>
                           </div>
                         )}
-                        {participant.finalScore && (
+                        {participant.final_score && (
                           <div>
                             <span className="text-gray-600">最终得分：</span>
-                            <span className="font-medium text-blue-600">{participant.finalScore}</span>
+                            <span className="font-medium text-blue-600">{participant.final_score}</span>
                           </div>
                         )}
                       </div>
 
-                      {participant.selfCompleted && participant.leaderCompleted && (
+                      {participant.self_completed && participant.leader_completed && (
                         <div className="mt-3">
                           <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                             <span>完成进度</span>
@@ -382,13 +529,13 @@ export default function AssessmentDetailPage() {
                       <span>自评完成</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">
-                          {assessmentDetail.statistics.selfCompletedCount}/
-                          {assessmentDetail.statistics.totalParticipants}
+                          {assessmentDetail.statistics.self_completed_count}/
+                          {assessmentDetail.statistics.total_participants}
                         </span>
                         <Progress
                           value={
-                            (assessmentDetail.statistics.selfCompletedCount /
-                              assessmentDetail.statistics.totalParticipants) *
+                            (assessmentDetail.statistics.self_completed_count /
+                              assessmentDetail.statistics.total_participants) *
                             100
                           }
                           className="w-20 h-2"
@@ -399,13 +546,13 @@ export default function AssessmentDetailPage() {
                       <span>领导评分完成</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">
-                          {assessmentDetail.statistics.leaderCompletedCount}/
-                          {assessmentDetail.statistics.totalParticipants}
+                          {assessmentDetail.statistics.leader_completed_count}/
+                          {assessmentDetail.statistics.total_participants}
                         </span>
                         <Progress
                           value={
-                            (assessmentDetail.statistics.leaderCompletedCount /
-                              assessmentDetail.statistics.totalParticipants) *
+                            (assessmentDetail.statistics.leader_completed_count /
+                              assessmentDetail.statistics.total_participants) *
                             100
                           }
                           className="w-20 h-2"
@@ -416,8 +563,8 @@ export default function AssessmentDetailPage() {
                       <span>全部完成</span>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">
-                          {assessmentDetail.statistics.fullyCompletedCount}/
-                          {assessmentDetail.statistics.totalParticipants}
+                          {assessmentDetail.statistics.fully_completed_count}/
+                          {assessmentDetail.statistics.total_participants}
                         </span>
                         <Progress value={getCompletionRate()} className="w-20 h-2" />
                       </div>
@@ -436,19 +583,19 @@ export default function AssessmentDetailPage() {
                       <div className="flex items-center justify-between">
                         <span>平均得分</span>
                         <span className="text-lg font-bold text-blue-600">
-                          {assessmentDetail.statistics.averageScore}
+                          {assessmentDetail.statistics.average_score || '--'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>最高得分</span>
                         <span className="text-lg font-bold text-green-600">
-                          {assessmentDetail.statistics.highestScore}
+                          {assessmentDetail.statistics.highest_score || '--'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span>最低得分</span>
                         <span className="text-lg font-bold text-orange-600">
-                          {assessmentDetail.statistics.lowestScore}
+                          {assessmentDetail.statistics.lowest_score || '--'}
                         </span>
                       </div>
                     </div>
@@ -462,8 +609,180 @@ export default function AssessmentDetailPage() {
               </Card>
             </div>
           </TabsContent>
+
+          <TabsContent value="score-preview">
+            <Card>
+              <CardHeader>
+                <CardTitle>得分计算预览</CardTitle>
+                <CardDescription>查看每位参与者的得分计算详情</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {scoreLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                    <span className="ml-2 text-gray-600">加载得分预览中...</span>
+                  </div>
+                ) : scorePreview ? (
+                  <div className="space-y-6">
+                    {/* 计算规则说明 */}
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <h4 className="font-medium text-blue-900 mb-2">评分权重配置</h4>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-blue-700">自评权重：</span>
+                          <span className="font-medium">{(scorePreview.templateConfig.evaluatorWeights.self * 100).toFixed(0)}%</span>
+                        </div>
+                        <div>
+                          <span className="text-blue-700">领导评分权重：</span>
+                          <span className="font-medium">{(scorePreview.templateConfig.evaluatorWeights.leader * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 参与者得分详情 */}
+                    <div className="space-y-4">
+                      {scorePreview.participants.map((participant) => (
+                        <div key={participant.userId} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-lg">{participant.userName}</h4>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-blue-600">
+                                {participant.calculatedFinalScore.toFixed(1)}
+                              </div>
+                              <div className="text-sm text-gray-500">最终得分</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div className="text-center p-3 bg-green-50 rounded-lg">
+                              <div className="text-lg font-bold text-green-600">{participant.selfScore.toFixed(1)}</div>
+                              <div className="text-sm text-gray-600">自评得分</div>
+                            </div>
+                            <div className="text-center p-3 bg-purple-50 rounded-lg">
+                              <div className="text-lg font-bold text-purple-600">{participant.leaderScore.toFixed(1)}</div>
+                              <div className="text-sm text-gray-600">领导评分</div>
+                            </div>
+                            <div className="text-center p-3 bg-blue-50 rounded-lg">
+                              <div className="text-lg font-bold text-blue-600">{participant.calculatedFinalScore.toFixed(1)}</div>
+                              <div className="text-sm text-gray-600">加权平均</div>
+                            </div>
+                          </div>
+
+                          {/* 分类得分详情 */}
+                          <div className="space-y-2">
+                            <h5 className="font-medium text-gray-700">分类得分详情</h5>
+                            <div className="space-y-2">
+                              {participant.scoreBreakdown.map((category) => (
+                                <div key={category.category} className="bg-gray-50 rounded p-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-medium">{category.categoryName}</span>
+                                    <span className="text-sm text-gray-500">权重: {category.categoryWeight}%</span>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2 text-sm">
+                                    <div>
+                                      <span className="text-gray-600">自评：</span>
+                                      <span className="font-medium">{category.selfScore.toFixed(1)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">领导：</span>
+                                      <span className="font-medium">{category.leaderScore.toFixed(1)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">最终：</span>
+                                      <span className="font-medium text-blue-600">{category.categoryScore.toFixed(1)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>点击"得分预览"标签页加载得分计算详情</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+      
+      {/* 发布确认对话框 */}
+      <AlertDialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-green-600" />
+              确认发布考核
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              发布后考核将进入进行中状态，参与者可以开始评估。发布后将无法再编辑基本信息。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {publishValidation && (
+            <div className="space-y-4">
+              {/* 预检查结果 */}
+              {publishValidation.warnings.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <h4 className="font-medium text-yellow-800 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    注意事项
+                  </h4>
+                  <ul className="text-sm text-yellow-700 space-y-1">
+                    {publishValidation.warnings.map((warning, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-yellow-500 mt-0.5">•</span>
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* 检查项目状态 */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-medium text-gray-800 mb-2">发布检查项</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.title ? 'text-green-500' : 'text-red-500'}`} />
+                    <span>标题配置</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.dateConfig ? 'text-green-500' : 'text-red-500'}`} />
+                    <span>时间配置</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.template ? 'text-green-500' : 'text-red-500'}`} />
+                    <span>模板配置</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className={`w-4 h-4 ${publishValidation.checks.participants ? 'text-green-500' : 'text-red-500'}`} />
+                    <span>参与者配置</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={publishing}>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmPublishAssessment} 
+              disabled={publishing}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {publishing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              确认发布
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
