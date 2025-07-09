@@ -46,6 +46,7 @@ export default function AssessmentManagement() {
   const [submitting, setSubmitting] = useState(false)
   const [editingAssessment, setEditingAssessment] = useState<AssessmentListItem | null>(null)
   const [publishingId, setPublishingId] = useState<number | null>(null)
+  const [currentPublishAssessment, setCurrentPublishAssessment] = useState<AssessmentListItem | null>(null)
   const [publishValidation, setPublishValidation] = useState<PublishValidationResult | null>(null)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   
@@ -311,6 +312,7 @@ export default function AssessmentManagement() {
   const handlePublishAssessment = async (assessment: AssessmentListItem) => {
     try {
       setPublishingId(assessment.id)
+      setCurrentPublishAssessment(assessment)
       
       // 先进行发布前校验
       const validationResponse = await assessmentService.publishValidation(assessment.id)
@@ -320,6 +322,7 @@ export default function AssessmentManagement() {
           description: validationResponse.message || '无法获取考核状态'
         })
         setPublishingId(null)
+        setCurrentPublishAssessment(null)
         return
       }
       
@@ -330,21 +333,27 @@ export default function AssessmentManagement() {
       // 对话框中会显示错误信息或警告信息
       setShowPublishDialog(true)
       
+      // 校验完成后重置加载状态，允许用户操作对话框
+      setPublishingId(null)
+      
     } catch (error: any) {
       console.error('发布预检查失败:', error)
       toast.error('预检查失败', {
         description: error.message || '服务器错误，请稍后重试'
       })
       setPublishingId(null)
+      setCurrentPublishAssessment(null)
     }
   }
 
   const confirmPublishAssessment = async () => {
-    if (!publishValidation || publishingId === null) return
+    if (!publishValidation || !publishValidation.canPublish || !currentPublishAssessment) return
     
-    try {      
+    try {
+      setPublishingId(currentPublishAssessment.id) // 设置加载状态
+      
       // 执行发布操作
-      const response = await assessmentService.publishAssessment(publishingId)
+      const response = await assessmentService.publishAssessment(currentPublishAssessment.id)
       
       if (response.code === 200) {
         toast.success('发布成功', {
@@ -355,9 +364,7 @@ export default function AssessmentManagement() {
         await loadData()
         
         // 关闭对话框并重置状态
-        setShowPublishDialog(false)
-        setPublishValidation(null)
-        setPublishingId(null)
+        handlePublishDialogClose()
       } else {
         toast.error('发布失败', {
           description: response.message || '无法发布该考核'
@@ -368,12 +375,15 @@ export default function AssessmentManagement() {
       toast.error('发布失败', {
         description: error.message || '服务器错误，请稍后重试'
       })
+    } finally {
+      setPublishingId(null)
     }
   }
 
   const handlePublishDialogClose = () => {
     setShowPublishDialog(false)
     setPublishValidation(null)
+    setCurrentPublishAssessment(null)
     setPublishingId(null)
   }
 
