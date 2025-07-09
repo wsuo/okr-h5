@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -15,411 +16,1728 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Settings, Edit, Trash2, AlertTriangle } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Plus, Settings, Edit, Trash2, AlertTriangle, ChevronDown, ChevronRight, Star, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
-interface TemplateItem {
-  id: string
-  name: string
-  weight: number
-  leaderOnly: boolean
-  subItems: string[]
-}
+import { Template, templateService, templateUtils, TemplateListQuery, CreateTemplateDto, UpdateTemplateDto } from "@/lib/template"
+import { User, userService } from "@/lib/user"
 
 export default function TemplateManagement() {
-  const [template, setTemplate] = useState<TemplateItem[]>([
-    {
-      id: "work-performance",
-      name: "工作绩效",
-      weight: 60,
-      leaderOnly: false,
-      subItems: ["工作饱和度", "工作执行度", "工作完成度", "工作效率", "工作质量"],
-    },
-    {
-      id: "daily-management",
-      name: "日常管理",
-      weight: 30,
-      leaderOnly: false,
-      subItems: ["工作态度", "审批流程", "日常出勤", "工作汇报", "团队活动", "办公室环境维护", "规章制度遵守"],
-    },
-    {
-      id: "leader-evaluation",
-      name: "领导评价",
-      weight: 10,
-      leaderOnly: true,
-      subItems: ["交代的专项按时完成并及时反馈"],
-    },
-  ])
-
-  // 添加编辑状态管理
-  const [editingItem, setEditingItem] = useState<TemplateItem | null>(null)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [newItem, setNewItem] = useState({
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [expandedTemplates, setExpandedTemplates] = useState<Set<number>>(new Set())
+  
+  // 对话框状态
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null)
+  
+  // 搜索和筛选状态
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedType, setSelectedType] = useState<string>("all")
+  const [selectedStatus, setSelectedStatus] = useState<string>("all")
+  const [selectedIsDefault, setSelectedIsDefault] = useState<string>("all")
+  const [selectedCreatedBy, setSelectedCreatedBy] = useState<string>("all")
+  
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  
+  // 新建模板表单数据
+  const [formData, setFormData] = useState<CreateTemplateDto>({
     name: "",
-    weight: 0,
-    leaderOnly: false,
-    subItems: [""],
+    description: "",
+    type: "okr",
+    config: {
+      version: "1.0",
+      categories: [],
+      description: "",
+      total_score: 100,
+      scoring_rules: {
+        self_evaluation: {
+          enabled: true,
+          description: "员工自我评估",
+          weight_in_final: 0.4
+        },
+        leader_evaluation: {
+          enabled: true,
+          description: "直属领导评估",
+          weight_in_final: 0.6
+        },
+        calculation_method: "weighted_average"
+      },
+      scoring_method: "weighted",
+      usage_instructions: {
+        for_leaders: [],
+        for_employees: []
+      },
+      // 公共评分标准配置
+      scoring_criteria: {
+        excellent: {
+          min: 90,
+          description: "优秀：超额完成目标，表现突出"
+        },
+        good: {
+          min: 80,
+          description: "良好：完成目标，表现符合预期"
+        },
+        average: {
+          min: 70,
+          description: "一般：基本完成目标，表现一般"
+        },
+        poor: {
+          min: 0,
+          description: "较差：未完成目标，表现不佳"
+        }
+      }
+    },
+    is_default: 0
   })
 
-  const totalWeight = template.reduce((sum, item) => sum + item.weight, 0)
-  const isWeightValid = totalWeight === 100
-
-  const handleAddSubItem = (itemId: string) => {
-    setTemplate(template.map((item) => (item.id === itemId ? { ...item, subItems: [...item.subItems, ""] } : item)))
+  // 获取模板列表
+  const fetchTemplates = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      
+      const queryParams: TemplateListQuery = {
+        page: currentPage,
+        limit: 10,
+      }
+      
+      if (searchQuery && searchQuery.trim()) {
+        queryParams.name = searchQuery.trim()
+      }
+      
+      if (selectedType && selectedType !== "all") {
+        queryParams.type = selectedType
+      }
+      
+      if (selectedStatus && selectedStatus !== "all") {
+        queryParams.status = parseInt(selectedStatus)
+      }
+      
+      if (selectedIsDefault && selectedIsDefault !== "all") {
+        queryParams.is_default = parseInt(selectedIsDefault)
+      }
+      
+      if (selectedCreatedBy && selectedCreatedBy !== "all") {
+        queryParams.created_by = parseInt(selectedCreatedBy)
+      }
+      
+      const response = await templateService.getTemplates(queryParams)
+      if (response.data) {
+        setTemplates(response.data.items || [])
+        setTotalPages(response.data.totalPages || 1)
+        
+        // 默认展开第一个模板
+        if (response.data.items && response.data.items.length > 0) {
+          setExpandedTemplates(new Set([response.data.items[0].id]))
+        }
+      }
+    } catch (error: any) {
+      console.error('Fetch templates error:', error)
+      setError(error.message || "获取模板列表失败")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleRemoveSubItem = (itemId: string, index: number) => {
-    setTemplate(
-      template.map((item) =>
-        item.id === itemId ? { ...item, subItems: item.subItems.filter((_, i) => i !== index) } : item,
-      ),
-    )
+  // 获取管理员用户列表（用于创建者筛选）
+  const fetchUsers = async () => {
+    try {
+      const response = await userService.getUsers({ limit: 100 }) // 获取前100个用户
+      if (response.data) {
+        // 只显示管理员角色的用户
+        const adminUsers = response.data.items?.filter(user => 
+          user.roles && user.roles.some(role => role.code === 'admin')
+        ) || []
+        setUsers(adminUsers)
+      }
+    } catch (error: any) {
+      console.error('Fetch users error:', error)
+    }
   }
 
-  const handleUpdateSubItem = (itemId: string, index: number, value: string) => {
-    setTemplate(
-      template.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              subItems: item.subItems.map((subItem, i) => (i === index ? value : subItem)),
-            }
-          : item,
-      ),
-    )
+  useEffect(() => {
+    fetchTemplates()
+  }, [currentPage])
+
+  // 初始化时获取用户列表
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  // 筛选条件变化时重置到第一页并立即搜索
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedType, selectedStatus, selectedIsDefault, selectedCreatedBy])
+
+  // 当页码变化时获取模板数据
+  useEffect(() => {
+    fetchTemplates()
+  }, [currentPage])
+
+  // 筛选条件变化时立即搜索
+  useEffect(() => {
+    if (currentPage === 1) {
+      fetchTemplates()
+    }
+  }, [selectedType, selectedStatus, selectedIsDefault, selectedCreatedBy])
+
+  // 搜索功能
+  const handleSearch = () => {
+    setCurrentPage(1)
+    fetchTemplates()
   }
 
-  const handleUpdateWeight = (itemId: string, weight: number) => {
-    setTemplate(template.map((item) => (item.id === itemId ? { ...item, weight } : item)))
+  // 重置搜索条件
+  const handleReset = () => {
+    setSearchQuery("")
+    setSelectedType("all")
+    setSelectedStatus("all")
+    setSelectedIsDefault("all")
+    setSelectedCreatedBy("all")
+    setCurrentPage(1)
+    setTimeout(() => {
+      fetchTemplates()
+    }, 0)
   }
 
-  const handleToggleLeaderOnly = (itemId: string) => {
-    setTemplate(template.map((item) => (item.id === itemId ? { ...item, leaderOnly: !item.leaderOnly } : item)))
+  // 切换模板展开状态
+  const toggleTemplateExpansion = (templateId: number) => {
+    const newExpanded = new Set(expandedTemplates)
+    if (newExpanded.has(templateId)) {
+      newExpanded.delete(templateId)
+    } else {
+      newExpanded.add(templateId)
+    }
+    setExpandedTemplates(newExpanded)
   }
 
-  const handleAddNewItem = () => {
-    const newTemplateItem: TemplateItem = {
-      id: `item-${Date.now()}`,
-      name: newItem.name,
-      weight: newItem.weight,
-      leaderOnly: newItem.leaderOnly,
-      subItems: newItem.subItems.filter((item) => item.trim() !== ""),
+  // 删除模板
+  const handleDeleteTemplate = async (template: Template) => {
+    try {
+      setError("")
+      await templateService.deleteTemplate(template.id)
+      fetchTemplates()
+    } catch (error: any) {
+      console.error('Delete template error:', error)
+      setError(error.message || "删除模板失败")
+    }
+  }
+
+  // 设置默认模板
+  const handleSetDefault = async (template: Template) => {
+    try {
+      setError("")
+      await templateService.setDefaultTemplate(template.id)
+      fetchTemplates()
+    } catch (error: any) {
+      console.error('Set default template error:', error)
+      setError(error.message || "设置默认模板失败")
+    }
+  }
+
+  // 重置表单
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      type: "okr",
+      config: {
+        version: "1.0",
+        categories: [],
+        description: "",
+        total_score: 100,
+        scoring_rules: {
+          self_evaluation: {
+            enabled: true,
+            description: "员工自我评估",
+            weight_in_final: 0.3
+          },
+          leader_evaluation: {
+            enabled: true,
+            description: "直属领导评估",
+            weight_in_final: 0.7
+          },
+          calculation_method: "weighted_average"
+        },
+        scoring_method: "weighted",
+        usage_instructions: {
+          for_leaders: [],
+          for_employees: []
+        }
+      },
+      is_default: 0
+    })
+  }
+
+  // 创建模板
+  const handleCreateTemplate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim()) {
+      setError("模板名称不能为空")
+      return
     }
 
-    setTemplate([...template, newTemplateItem])
-    setNewItem({ name: "", weight: 0, leaderOnly: false, subItems: [""] })
-    setIsDialogOpen(false)
+    try {
+      setSubmitting(true)
+      setError("")
+      await templateService.createTemplate(formData)
+      setIsCreateDialogOpen(false)
+      resetForm()
+      fetchTemplates()
+    } catch (error: any) {
+      console.error('Create template error:', error)
+      setError(error.message || "创建模板失败")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleDeleteItem = (itemId: string) => {
-    setTemplate(template.filter((item) => item.id !== itemId))
+  // 开始编辑模板
+  const handleEditTemplate = (template: Template) => {
+    setEditingTemplateId(template.id)
+    if (!expandedTemplates.has(template.id)) {
+      setExpandedTemplates(new Set([...expandedTemplates, template.id]))
+    }
   }
 
-  // 更新编辑按钮的点击事件
-  const handleEditItem = (item: TemplateItem) => {
-    setEditingItem(item)
-    setIsEditDialogOpen(true)
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setEditingTemplateId(null)
   }
 
-  // 添加更新项目的函数
-  const handleUpdateItem = () => {
-    if (!editingItem) return
+  // 保存模板编辑
+  const handleSaveTemplate = async (template: Template) => {
+    // 验证权重
+    const validation = validateWeights(template)
+    if (!validation.isValid) {
+      setError("权重验证失败：\n" + validation.errors.join("\n"))
+      return
+    }
 
-    setTemplate(template.map((item) => (item.id === editingItem.id ? editingItem : item)))
-    setEditingItem(null)
-    setIsEditDialogOpen(false)
+    try {
+      setSubmitting(true)
+      setError("")
+      
+      const updateData: UpdateTemplateDto = {
+        name: template.name,
+        description: template.description,
+        type: template.type,
+        config: template.config,
+        is_default: template.is_default,
+        status: template.status
+      }
+      
+      await templateService.updateTemplate(template.id, updateData)
+      setEditingTemplateId(null)
+      fetchTemplates()
+    } catch (error: any) {
+      console.error('Update template error:', error)
+      setError(error.message || "更新模板失败")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 添加新分类
+  const handleAddCategory = (template: Template) => {
+    const newCategory = {
+      id: `category_${Date.now()}`,
+      name: "新分类",
+      weight: 0,
+      description: "新分类描述",
+      items: [],
+      evaluator_types: ["self", "leader"]
+    }
+    
+    const updatedTemplate = {
+      ...template,
+      config: {
+        ...template.config,
+        categories: [...template.config.categories, newCategory]
+      }
+    }
+    
+    updateTemplateInState(updatedTemplate)
+  }
+
+  // 添加新评估项目
+  const handleAddItem = (template: Template, categoryId: string) => {
+    const newItem = {
+      id: `item_${Date.now()}`,
+      name: "新评估项目",
+      weight: 0,
+      max_score: 100,
+      description: "新评估项目描述"
+      // 不再需要独立的 scoring_criteria，使用公共配置
+    }
+    
+    const updatedTemplate = {
+      ...template,
+      config: {
+        ...template.config,
+        categories: template.config.categories.map(cat =>
+          cat.id === categoryId
+            ? { ...cat, items: [...cat.items, newItem] }
+            : cat
+        )
+      }
+    }
+    
+    updateTemplateInState(updatedTemplate)
+  }
+
+  // 删除分类
+  const handleDeleteCategory = (template: Template, categoryId: string) => {
+    const updatedTemplate = {
+      ...template,
+      config: {
+        ...template.config,
+        categories: template.config.categories.filter(cat => cat.id !== categoryId)
+      }
+    }
+    
+    updateTemplateInState(updatedTemplate)
+  }
+
+  // 删除评估项目
+  const handleDeleteItem = (template: Template, categoryId: string, itemId: string) => {
+    const updatedTemplate = {
+      ...template,
+      config: {
+        ...template.config,
+        categories: template.config.categories.map(cat =>
+          cat.id === categoryId
+            ? { ...cat, items: cat.items.filter(item => item.id !== itemId) }
+            : cat
+        )
+      }
+    }
+    
+    updateTemplateInState(updatedTemplate)
+  }
+
+  // 更新分类信息
+  const handleUpdateCategory = (template: Template, categoryId: string, updates: any) => {
+    const updatedTemplate = {
+      ...template,
+      config: {
+        ...template.config,
+        categories: template.config.categories.map(cat =>
+          cat.id === categoryId ? { ...cat, ...updates } : cat
+        )
+      }
+    }
+    
+    updateTemplateInState(updatedTemplate)
+  }
+
+  // 更新评估项目信息
+  const handleUpdateItem = (template: Template, categoryId: string, itemId: string, updates: any) => {
+    const updatedTemplate = {
+      ...template,
+      config: {
+        ...template.config,
+        categories: template.config.categories.map(cat =>
+          cat.id === categoryId
+            ? {
+                ...cat,
+                items: cat.items.map(item =>
+                  item.id === itemId ? { ...item, ...updates } : item
+                )
+              }
+            : cat
+        )
+      }
+    }
+    
+    updateTemplateInState(updatedTemplate)
+  }
+
+  // 在状态中更新模板
+  const updateTemplateInState = (updatedTemplate: Template) => {
+    setTemplates(templates.map(t =>
+      t.id === updatedTemplate.id ? updatedTemplate : t
+    ))
+  }
+
+  // 计算分类权重总和
+  const calculateCategoryWeightSum = (categories: any[]) => {
+    return categories.reduce((sum, category) => sum + (category.weight || 0), 0)
+  }
+
+  // 计算项目权重总和
+  const calculateItemWeightSum = (items: any[]) => {
+    return items.reduce((sum, item) => sum + (item.weight || 0), 0)
+  }
+
+  // 验证权重
+  const validateWeights = (template: Template) => {
+    const { config } = template
+    if (!config || !config.categories) return { isValid: true, errors: [] }
+
+    const errors: string[] = []
+    
+    // 检查分类权重总和
+    const categoryWeightSum = calculateCategoryWeightSum(config.categories)
+    if (categoryWeightSum !== 100) {
+      errors.push(`分类权重总和为 ${categoryWeightSum}%，应为 100%`)
+    }
+
+    // 检查每个分类的项目权重总和
+    config.categories.forEach((category, index) => {
+      if (category.items && category.items.length > 0) {
+        const itemWeightSum = calculateItemWeightSum(category.items)
+        if (itemWeightSum !== 100) {
+          errors.push(`"${category.name}" 分类下项目权重总和为 ${itemWeightSum}%，应为 100%`)
+        }
+      }
+    })
+
+    // 检查评分规则权重总和
+    if (config.scoring_rules) {
+      const selfWeight = (config.scoring_rules.self_evaluation?.weight_in_final || 0) * 100
+      const leaderWeight = (config.scoring_rules.leader_evaluation?.weight_in_final || 0) * 100
+      const scoringRulesWeightSum = Math.round(selfWeight + leaderWeight)
+      if (scoringRulesWeightSum !== 100) {
+        errors.push(`评分规则权重总和为 ${scoringRulesWeightSum}%，应为 100%`)
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    }
+  }
+
+  // 渲染可编辑的模板配置
+  const renderEditableTemplateConfig = (template: Template) => {
+    const { config } = template
+    const isEditing = editingTemplateId === template.id
+    
+    // 防御性检查
+    if (!config || !config.categories || !Array.isArray(config.categories)) {
+      return (
+        <div className="space-y-4 pl-4 border-l-2 border-gray-200">
+          <div className="text-sm text-gray-600">
+            模板配置信息不完整或格式错误
+          </div>
+        </div>
+      )
+    }
+
+    // 计算权重统计
+    const categoryWeightSum = calculateCategoryWeightSum(config.categories)
+    const validation = validateWeights(template)
+    
+    return (
+      <div className="space-y-4 pl-4 border-l-2 border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="text-sm text-gray-600">
+              {templateUtils.getTemplateConfigSummary(config)}
+            </div>
+            {isEditing && (
+              <div className="flex items-center gap-4 text-xs">
+                <span className={`font-medium ${categoryWeightSum === 100 ? 'text-green-600' : 'text-red-600'}`}>
+                  分类权重总和: {categoryWeightSum}%
+                </span>
+                {!validation.isValid && (
+                  <span className="text-red-600">⚠️ 权重配置有误</span>
+                )}
+              </div>
+            )}
+          </div>
+          {isEditing ? (
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                onClick={() => handleAddCategory(template)}
+                className="text-xs"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                添加大项
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={handleCancelEdit}
+                className="text-xs"
+              >
+                取消
+              </Button>
+              <Button 
+                size="sm" 
+                onClick={() => handleSaveTemplate(template)}
+                disabled={submitting || !validation.isValid}
+                className="text-xs"
+              >
+                {submitting && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                保存
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        
+        {config.categories.map((category) => {
+          const itemWeightSum = category.items ? calculateItemWeightSum(category.items) : 0
+          const categoryValid = !category.items || category.items.length === 0 || itemWeightSum === 100
+          
+          return (
+            <div key={category.id} className="border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3 flex-1">
+                  {isEditing ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        value={category.name}
+                        onChange={(e) => handleUpdateCategory(template, category.id, { name: e.target.value })}
+                        className="font-semibold max-w-40"
+                      />
+                      <Input
+                        type="number"
+                        value={category.weight}
+                        onChange={(e) => handleUpdateCategory(template, category.id, { weight: parseInt(e.target.value) || 0 })}
+                        className="w-16"
+                        min="0"
+                        max="100"
+                      />
+                      <span className="text-sm">%</span>
+                      {category.items && category.items.length > 0 && (
+                        <span className={`text-xs ${categoryValid ? 'text-green-600' : 'text-red-600'}`}>
+                          (小项: {itemWeightSum}%)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <h4 className="font-semibold">{category.name}</h4>
+                      <Badge variant="outline">{category.weight}%</Badge>
+                    </>
+                  )}
+                  {category.special_attributes?.leader_only && (
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-200">仅限领导评分</Badge>
+                  )}
+                </div>
+                {isEditing && (
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAddItem(template, category.id)}
+                      className="text-xs"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      添加小项
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteCategory(template, category.id)}
+                      className="text-xs text-red-600"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            
+              {isEditing && (
+                <div className="mb-3">
+                  <Input
+                    value={category.description}
+                    onChange={(e) => handleUpdateCategory(template, category.id, { description: e.target.value })}
+                    placeholder="分类描述"
+                    className="text-sm"
+                  />
+                </div>
+              )}
+              
+              {!isEditing && (
+                <div className="text-sm text-gray-600 mb-3">
+                  {category.description}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  评估项目 ({category.items && Array.isArray(category.items) ? category.items.length : 0}项):
+                </Label>
+                <div className="space-y-2">
+                  {category.items && Array.isArray(category.items) ? category.items.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                      {isEditing ? (
+                        <>
+                          <Input
+                            value={item.name}
+                            onChange={(e) => handleUpdateItem(template, category.id, item.id, { name: e.target.value })}
+                            className="flex-1 text-sm"
+                            placeholder="项目名称"
+                          />
+                          <Input
+                            type="number"
+                            value={item.weight}
+                            onChange={(e) => handleUpdateItem(template, category.id, item.id, { weight: parseInt(e.target.value) || 0 })}
+                            className="w-16 text-sm"
+                            min="0"
+                            max="100"
+                          />
+                          <span className="text-xs">%</span>
+                          <Input
+                            value={item.description}
+                            onChange={(e) => handleUpdateItem(template, category.id, item.id, { description: e.target.value })}
+                            className="flex-1 text-sm"
+                            placeholder="项目描述"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteItem(template, category.id, item.id)}
+                            className="text-xs text-red-600"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="flex-1 flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{item.name}</span>
+                            <Badge variant="outline" className="text-xs">{item.weight}%</Badge>
+                          </div>
+                          {item.description && (
+                            <span className="text-xs text-gray-500">{item.description}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )) : (
+                    <div className="text-sm text-gray-500">暂无评估项目</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        
+        <div className="flex items-center gap-4 text-sm text-gray-600">
+          <div>
+            <span className="font-medium">总分:</span> {config.total_score}分
+          </div>
+          <div>
+            <span className="font-medium">版本:</span> {config.version}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                模板管理
-              </CardTitle>
-              <CardDescription>配置绩效考核模板的大项、子项和权重</CardDescription>
-            </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  添加大项
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>添加考核大项</DialogTitle>
-                  <DialogDescription>创建一个新的考核大项</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">大项名称</Label>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              模板管理
+            </CardTitle>
+            <CardDescription>管理绩效考核模板配置</CardDescription>
+          </div>
+          {/* 新建模板按钮 - 仅管理员可见 */}
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => resetForm()}>
+                <Plus className="w-4 h-4 mr-2" />
+                新建模板
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>新建模板</DialogTitle>
+                <DialogDescription>创建一个新的绩效评估模板</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreateTemplate} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name">模板名称 *</Label>
                     <Input
                       id="name"
-                      placeholder="例如：工作绩效"
-                      value={newItem.name}
-                      onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="请输入模板名称"
+                      required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">权重 (%)</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={newItem.weight}
-                      onChange={(e) => setNewItem({ ...newItem, weight: Number.parseInt(e.target.value) || 0 })}
-                    />
+                  <div>
+                    <Label htmlFor="type">模板类型 *</Label>
+                    <Select
+                      value={formData.type}
+                      onValueChange={(value) => setFormData({ ...formData, type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择模板类型" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="okr">OKR模板</SelectItem>
+                        <SelectItem value="assessment">考核模板</SelectItem>
+                        <SelectItem value="evaluation">评估模板</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="leader-only"
-                      checked={newItem.leaderOnly}
-                      onCheckedChange={(checked) => setNewItem({ ...newItem, leaderOnly: checked })}
-                    />
-                    <Label htmlFor="leader-only">仅限领导评分</Label>
+                </div>
+                <div>
+                  <Label htmlFor="description">模板描述</Label>
+                  <Input
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="请输入模板描述"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="is_default"
+                    checked={formData.is_default === 1}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_default: checked ? 1 : 0 })}
+                  />
+                  <Label htmlFor="is_default">设为默认模板</Label>
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    取消
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    创建模板
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {/* 搜索和筛选区域 */}
+        <div className="space-y-4 mb-6">
+          {/* 第一行：搜索框和操作按钮 */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <Input
+              placeholder="搜索模板..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1"
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            />
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleSearch}
+                disabled={loading}
+                className="flex-1 sm:flex-none"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "搜索"}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleReset}
+                disabled={loading}
+                className="flex-1 sm:flex-none"
+              >
+                重置
+              </Button>
+            </div>
+          </div>
+          
+          {/* 第二行：筛选条件 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+            <Select value={selectedType} onValueChange={setSelectedType}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="筛选类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部类型</SelectItem>
+                <SelectItem value="okr">OKR模板</SelectItem>
+                <SelectItem value="assessment">考核模板</SelectItem>
+                <SelectItem value="evaluation">评估模板</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="筛选状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部状态</SelectItem>
+                <SelectItem value="1">启用</SelectItem>
+                <SelectItem value="0">禁用</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={selectedIsDefault} onValueChange={setSelectedIsDefault}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="是否默认" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部模板</SelectItem>
+                <SelectItem value="1">默认模板</SelectItem>
+                <SelectItem value="0">非默认模板</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select value={selectedCreatedBy} onValueChange={setSelectedCreatedBy}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="创建者（管理员）" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部管理员</SelectItem>
+                {users && users.map((user) => (
+                  <SelectItem key={user.id} value={user.id.toString()}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* 模板列表 */}
+        <div className="space-y-4">
+          {templates && templates.length > 0 ? templates.map((template) => (
+            <div key={template.id} className="border rounded-lg">
+              {/* 模板头部 - 始终可见 */}
+              <div className="p-4 cursor-pointer hover:bg-gray-50" onClick={() => toggleTemplateExpansion(template.id)}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Button variant="ghost" size="sm" className="p-0 h-auto">
+                      {expandedTemplates.has(template.id) ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </Button>
+                    <div>
+                      <h3 className="font-semibold text-lg flex items-center gap-2">
+                        {template.name}
+                        {template.is_default === 1 && (
+                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                        )}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>子项列表</Label>
-                    {newItem.subItems.map((subItem, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Input
-                          placeholder="输入子项名称"
-                          value={subItem}
-                          onChange={(e) => {
-                            const updatedSubItems = [...newItem.subItems]
-                            updatedSubItems[index] = e.target.value
-                            setNewItem({ ...newItem, subItems: updatedSubItems })
-                          }}
-                        />
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {templateUtils.formatTemplateType(template.type)}
+                    </Badge>
+                    <Badge variant={template.status === 1 ? "default" : "destructive"}>
+                      {templateUtils.formatTemplateStatus(template.status)}
+                    </Badge>
+                    <div className="flex gap-1 ml-2">
+                      {template.is_default !== 1 && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            const updatedSubItems = newItem.subItems.filter((_, i) => i !== index)
-                            setNewItem({ ...newItem, subItems: updatedSubItems })
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleSetDefault(template)
                           }}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Star className="w-4 h-4" />
                         </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setNewItem({ ...newItem, subItems: [...newItem.subItems, ""] })}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      添加子项
-                    </Button>
-                  </div>
-                  <Button onClick={handleAddNewItem} className="w-full" disabled={!newItem.name || newItem.weight <= 0}>
-                    添加大项
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {!isWeightValid && (
-            <Alert className="mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>权重总和必须等于100%，当前总和为 {totalWeight}%</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="space-y-6">
-            {template.map((item) => (
-              <div key={item.id} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg">{item.name}</h3>
-                    <Badge variant="outline">{item.weight}%</Badge>
-                    {item.leaderOnly && (
-                      <Badge className="bg-purple-100 text-purple-800 border-purple-200">仅限领导评分</Badge>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditItem(item)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`weight-${item.id}`}>权重:</Label>
-                      <Input
-                        id={`weight-${item.id}`}
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={item.weight}
-                        onChange={(e) => handleUpdateWeight(item.id, Number.parseInt(e.target.value) || 0)}
-                        className="w-20"
-                      />
-                      <span>%</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id={`leader-only-${item.id}`}
-                        checked={item.leaderOnly}
-                        onCheckedChange={() => handleToggleLeaderOnly(item.id)}
-                      />
-                      <Label htmlFor={`leader-only-${item.id}`}>仅限领导评分</Label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">子项列表:</Label>
-                    <div className="mt-2 space-y-2">
-                      {item.subItems.map((subItem, index) => (
-                        <div key={index} className="flex gap-2">
-                          <Input
-                            value={subItem}
-                            onChange={(e) => handleUpdateSubItem(item.id, index, e.target.value)}
-                            placeholder="输入子项名称"
-                          />
-                          <Button variant="outline" size="sm" onClick={() => handleRemoveSubItem(item.id, index)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => handleAddSubItem(item.id)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        添加子项
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">权重总和:</span>
-              <span className={`text-lg font-bold ${isWeightValid ? "text-green-600" : "text-red-600"}`}>
-                {totalWeight}%
-              </span>
-            </div>
-            {isWeightValid && <p className="text-sm text-green-600 mt-1">✓ 权重配置正确</p>}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Edit dialog – stays outside the Card but inside the same React tree */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>编辑考核大项</DialogTitle>
-            <DialogDescription>修改考核大项的配置信息</DialogDescription>
-          </DialogHeader>
-
-          {editingItem && (
-            <div className="space-y-4">
-              {/* 名称 */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-name">大项名称</Label>
-                <Input
-                  id="edit-name"
-                  value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                />
-              </div>
-
-              {/* 权重 */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-weight">权重 (%)</Label>
-                <Input
-                  id="edit-weight"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={editingItem.weight}
-                  onChange={(e) => setEditingItem({ ...editingItem, weight: Number.parseInt(e.target.value) || 0 })}
-                />
-              </div>
-
-              {/* 仅领导评分开关 */}
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="edit-leader-only"
-                  checked={editingItem.leaderOnly}
-                  onCheckedChange={(checked) => setEditingItem({ ...editingItem, leaderOnly: checked })}
-                />
-                <Label htmlFor="edit-leader-only">仅限领导评分</Label>
-              </div>
-
-              {/* 子项编辑 */}
-              <div className="space-y-2">
-                <Label>子项列表</Label>
-                <div className="max-h-60 overflow-y-auto space-y-2">
-                  {editingItem.subItems.map((sub, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <Input
-                        value={sub}
-                        onChange={(e) => {
-                          const list = [...editingItem.subItems]
-                          list[idx] = e.target.value
-                          setEditingItem({ ...editingItem, subItems: list })
-                        }}
-                      />
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          setEditingItem({
-                            ...editingItem,
-                            subItems: editingItem.subItems.filter((_, i) => i !== idx),
-                          })
-                        }
-                        disabled={editingItem.subItems.length <= 1}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleEditTemplate(template)
+                        }}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Edit className="w-4 h-4" />
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                            }}
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>确认删除模板</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              您确定要删除模板 "{template.name}" 吗？此操作无法撤销，模板删除后将无法恢复。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteTemplate(template)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              删除
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
-                  ))}
+                  </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingItem({ ...editingItem, subItems: [...editingItem.subItems, ""] })}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  添加子项
-                </Button>
               </div>
 
-              {/* 操作按钮 */}
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  取消
-                </Button>
-                <Button onClick={handleUpdateItem} disabled={!editingItem.name || editingItem.weight <= 0}>
-                  保存修改
-                </Button>
-              </div>
+              {/* 模板详情 - 展开时显示 */}
+              {expandedTemplates.has(template.id) && (
+                <div className="px-4 pb-4">
+                  {editingTemplateId === template.id ? (
+                    // 编辑模式 - 模板基本信息
+                    <div className="space-y-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                      <h5 className="font-medium text-sm">模板基本信息</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="template-name" className="text-xs">模板名称 *</Label>
+                          <Input
+                            id="template-name"
+                            value={template.name}
+                            onChange={(e) => {
+                              const updatedTemplate = { ...template, name: e.target.value }
+                              updateTemplateInState(updatedTemplate)
+                            }}
+                            className="text-sm"
+                            placeholder="请输入模板名称"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="template-type" className="text-xs">模板类型 *</Label>
+                          <Select
+                            value={template.type}
+                            onValueChange={(value) => {
+                              const updatedTemplate = { ...template, type: value }
+                              updateTemplateInState(updatedTemplate)
+                            }}
+                          >
+                            <SelectTrigger className="text-sm">
+                              <SelectValue placeholder="选择模板类型" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="okr">OKR模板</SelectItem>
+                              <SelectItem value="assessment">考核模板</SelectItem>
+                              <SelectItem value="evaluation">评估模板</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label htmlFor="template-description" className="text-xs">模板描述</Label>
+                          <Input
+                            id="template-description"
+                            value={template.description}
+                            onChange={(e) => {
+                              const updatedTemplate = { ...template, description: e.target.value }
+                              updateTemplateInState(updatedTemplate)
+                            }}
+                            className="text-sm"
+                            placeholder="请输入模板描述"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">模板设置</Label>
+                          <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id="template-is-default"
+                                checked={template.is_default === 1}
+                                onCheckedChange={(checked) => {
+                                  const updatedTemplate = { ...template, is_default: checked ? 1 : 0 }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                              />
+                              <Label htmlFor="template-is-default" className="text-xs">默认模板</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id="template-status"
+                                checked={template.status === 1}
+                                onCheckedChange={(checked) => {
+                                  const updatedTemplate = { ...template, status: checked ? 1 : 0 }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                              />
+                              <Label htmlFor="template-status" className="text-xs">启用状态</Label>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">模板信息</Label>
+                          <div className="text-xs text-gray-600 mt-2 space-y-1">
+                            <div>创建者: {template.creator?.name || '未知'}</div>
+                            <div>创建时间: {templateUtils.formatTemplateDate(template.created_at)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {/* 公共评分标准配置 */}
+                  {editingTemplateId === template.id && (
+                    <div className="space-y-4 mb-6 p-4 bg-blue-50 rounded-lg">
+                      <h5 className="font-medium text-sm">公共评分标准配置</h5>
+                      <p className="text-xs text-gray-600">设置通用的评分等级标准，适用于所有评估项目</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 优秀等级 */}
+                        <div>
+                          <Label className="text-xs">优秀等级 (≥ 分数)</Label>
+                          <div className="flex gap-2 mt-1">
+                            <Input
+                              type="number"
+                              value={template.config.scoring_criteria?.excellent?.min || 90}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      ...template.config.scoring_criteria,
+                                      excellent: {
+                                        ...template.config.scoring_criteria?.excellent,
+                                        min: parseInt(e.target.value) || 90
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm w-20"
+                              placeholder="90"
+                            />
+                            <Input
+                              value={template.config.scoring_criteria?.excellent?.description || "优秀：超额完成目标，表现突出"}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      excellent: {
+                                        min: template.config.scoring_criteria?.excellent?.min || 90,
+                                        description: e.target.value
+                                      },
+                                      good: {
+                                        min: template.config.scoring_criteria?.good?.min || 80,
+                                        description: template.config.scoring_criteria?.good?.description || "良好：完成目标，表现符合预期"
+                                      },
+                                      average: {
+                                        min: template.config.scoring_criteria?.average?.min || 70,
+                                        description: template.config.scoring_criteria?.average?.description || "一般：基本完成目标，表现一般"
+                                      },
+                                      poor: {
+                                        min: template.config.scoring_criteria?.poor?.min || 0,
+                                        description: template.config.scoring_criteria?.poor?.description || "较差：未完成目标，表现不佳"
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm flex-1"
+                              placeholder="优秀等级描述"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* 良好等级 */}
+                        <div>
+                          <Label className="text-xs">良好等级 (≥ 分数)</Label>
+                          <div className="flex gap-2 mt-1">
+                            <Input
+                              type="number"
+                              value={template.config.scoring_criteria?.good?.min || 80}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      ...template.config.scoring_criteria,
+                                      good: {
+                                        ...template.config.scoring_criteria?.good,
+                                        min: parseInt(e.target.value) || 80
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm w-20"
+                              placeholder="80"
+                            />
+                            <Input
+                              value={template.config.scoring_criteria?.good?.description || "良好：完成目标，表现符合预期"}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      excellent: {
+                                        min: template.config.scoring_criteria?.excellent?.min || 90,
+                                        description: template.config.scoring_criteria?.excellent?.description || "优秀：超额完成目标，表现突出"
+                                      },
+                                      good: {
+                                        min: template.config.scoring_criteria?.good?.min || 80,
+                                        description: e.target.value
+                                      },
+                                      average: {
+                                        min: template.config.scoring_criteria?.average?.min || 70,
+                                        description: template.config.scoring_criteria?.average?.description || "一般：基本完成目标，表现一般"
+                                      },
+                                      poor: {
+                                        min: template.config.scoring_criteria?.poor?.min || 0,
+                                        description: template.config.scoring_criteria?.poor?.description || "较差：未完成目标，表现不佳"
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm flex-1"
+                              placeholder="良好等级描述"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* 一般等级 */}
+                        <div>
+                          <Label className="text-xs">一般等级 (≥ 分数)</Label>
+                          <div className="flex gap-2 mt-1">
+                            <Input
+                              type="number"
+                              value={template.config.scoring_criteria?.average?.min || 70}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      ...template.config.scoring_criteria,
+                                      average: {
+                                        ...template.config.scoring_criteria?.average,
+                                        min: parseInt(e.target.value) || 70
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm w-20"
+                              placeholder="70"
+                            />
+                            <Input
+                              value={template.config.scoring_criteria?.average?.description || "一般：基本完成目标，表现一般"}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      excellent: {
+                                        min: template.config.scoring_criteria?.excellent?.min || 90,
+                                        description: template.config.scoring_criteria?.excellent?.description || "优秀：超额完成目标，表现突出"
+                                      },
+                                      good: {
+                                        min: template.config.scoring_criteria?.good?.min || 80,
+                                        description: template.config.scoring_criteria?.good?.description || "良好：完成目标，表现符合预期"
+                                      },
+                                      average: {
+                                        min: template.config.scoring_criteria?.average?.min || 70,
+                                        description: e.target.value
+                                      },
+                                      poor: {
+                                        min: template.config.scoring_criteria?.poor?.min || 0,
+                                        description: template.config.scoring_criteria?.poor?.description || "较差：未完成目标，表现不佳"
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm flex-1"
+                              placeholder="一般等级描述"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* 较差等级 */}
+                        <div>
+                          <Label className="text-xs">较差等级 (≥ 分数)</Label>
+                          <div className="flex gap-2 mt-1">
+                            <Input
+                              type="number"
+                              value={template.config.scoring_criteria?.poor?.min || 0}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      ...template.config.scoring_criteria,
+                                      poor: {
+                                        ...template.config.scoring_criteria?.poor,
+                                        min: parseInt(e.target.value) || 0
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm w-20"
+                              placeholder="0"
+                            />
+                            <Input
+                              value={template.config.scoring_criteria?.poor?.description || "较差：未完成目标，表现不佳"}
+                              onChange={(e) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_criteria: {
+                                      excellent: {
+                                        min: template.config.scoring_criteria?.excellent?.min || 90,
+                                        description: template.config.scoring_criteria?.excellent?.description || "优秀：超额完成目标，表现突出"
+                                      },
+                                      good: {
+                                        min: template.config.scoring_criteria?.good?.min || 80,
+                                        description: template.config.scoring_criteria?.good?.description || "良好：完成目标，表现符合预期"
+                                      },
+                                      average: {
+                                        min: template.config.scoring_criteria?.average?.min || 70,
+                                        description: template.config.scoring_criteria?.average?.description || "一般：基本完成目标，表现一般"
+                                      },
+                                      poor: {
+                                        min: template.config.scoring_criteria?.poor?.min || 0,
+                                        description: e.target.value
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                              className="text-sm flex-1"
+                              placeholder="较差等级描述"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* 评分规则配置 */}
+                  {editingTemplateId === template.id && (
+                    <div className="space-y-4 mb-6 p-4 bg-green-50 rounded-lg">
+                      <h5 className="font-medium text-sm">评分规则配置</h5>
+                      <p className="text-xs text-gray-600">设置员工自评和领导评分的权重分配，总权重必须为100%</p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 员工自评配置 */}
+                        <div className="p-3 bg-white rounded border">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label className="text-sm font-medium">员工自我评估</Label>
+                            <Switch
+                              checked={template.config.scoring_rules?.self_evaluation?.enabled || false}
+                              onCheckedChange={(checked) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_rules: {
+                                      ...template.config.scoring_rules,
+                                      self_evaluation: {
+                                        enabled: checked,
+                                        description: template.config.scoring_rules?.self_evaluation?.description || "员工自我评估",
+                                        weight_in_final: template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs">描述</Label>
+                              <Input
+                                value={template.config.scoring_rules?.self_evaluation?.description || "员工自我评估"}
+                                onChange={(e) => {
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        self_evaluation: {
+                                          enabled: template.config.scoring_rules?.self_evaluation?.enabled || true,
+                                          description: e.target.value,
+                                          weight_in_final: template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                                className="text-sm"
+                                placeholder="员工自我评估"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">权重 (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={Math.round((template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4) * 100)}
+                                onChange={(e) => {
+                                  const percentage = parseInt(e.target.value) || 0
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        self_evaluation: {
+                                          enabled: template.config.scoring_rules?.self_evaluation?.enabled || true,
+                                          description: template.config.scoring_rules?.self_evaluation?.description || "员工自我评估",
+                                          weight_in_final: percentage / 100
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                                className="text-sm"
+                                placeholder="40"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* 领导评分配置 */}
+                        <div className="p-3 bg-white rounded border">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label className="text-sm font-medium">直属领导评估</Label>
+                            <Switch
+                              checked={template.config.scoring_rules?.leader_evaluation?.enabled || false}
+                              onCheckedChange={(checked) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_rules: {
+                                      ...template.config.scoring_rules,
+                                      leader_evaluation: {
+                                        enabled: checked,
+                                        description: template.config.scoring_rules?.leader_evaluation?.description || "直属领导评估",
+                                        weight_in_final: template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs">描述</Label>
+                              <Input
+                                value={template.config.scoring_rules?.leader_evaluation?.description || "直属领导评估"}
+                                onChange={(e) => {
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        leader_evaluation: {
+                                          enabled: template.config.scoring_rules?.leader_evaluation?.enabled || true,
+                                          description: e.target.value,
+                                          weight_in_final: template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                                className="text-sm"
+                                placeholder="直属领导评估"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">权重 (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={Math.round((template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6) * 100)}
+                                onChange={(e) => {
+                                  const percentage = parseInt(e.target.value) || 0
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        leader_evaluation: {
+                                          enabled: template.config.scoring_rules?.leader_evaluation?.enabled || true,
+                                          description: template.config.scoring_rules?.leader_evaluation?.description || "直属领导评估",
+                                          weight_in_final: percentage / 100
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                                className="text-sm"
+                                placeholder="60"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* 计算方法 */}
+                      <div>
+                        <Label className="text-xs">计算方法</Label>
+                        <Select
+                          value={template.config.scoring_rules?.calculation_method || "weighted_average"}
+                          onValueChange={(value) => {
+                            const updatedTemplate = {
+                              ...template,
+                              config: {
+                                ...template.config,
+                                scoring_rules: {
+                                  ...template.config.scoring_rules,
+                                  calculation_method: value
+                                }
+                              }
+                            }
+                            updateTemplateInState(updatedTemplate)
+                          }}
+                        >
+                          <SelectTrigger className="w-full text-sm">
+                            <SelectValue placeholder="选择计算方法" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="weighted_average">加权平均</SelectItem>
+                            <SelectItem value="simple_average">简单平均</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* 权重验证提示 */}
+                      {(() => {
+                        const selfWeight = (template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4) * 100
+                        const leaderWeight = (template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6) * 100
+                        const total = Math.round(selfWeight + leaderWeight)
+                        const isValid = total === 100
+                        
+                        if (!isValid) {
+                          return (
+                            <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                              权重总和为 {total}%，应为 100%
+                            </div>
+                          )
+                        } else {
+                          return (
+                            <div className="p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
+                              权重配置正确 ✓
+                            </div>
+                          )
+                        }
+                      })()}
+                    </div>
+                  )}
+                  
+                  {!editingTemplateId && (
+                    <>
+                      {/* 查看模式 - 模板基本信息 */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">创建者：</span>
+                          <span className="font-medium">{template.creator?.name || '未知'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">创建时间：</span>
+                          <span className="font-medium">{templateUtils.formatTemplateDate(template.created_at)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">默认模板：</span>
+                          <span className="font-medium">{templateUtils.formatIsDefault(template.is_default)}</span>
+                        </div>
+                      </div>
+                      
+                      {/* 查看模式 - 公共评分标准显示 */}
+                      {template.config.scoring_criteria && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                          <h6 className="font-medium text-sm mb-2">公共评分标准</h6>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            <div className="p-2 bg-white rounded border">
+                              <div className="font-medium text-green-700">优秀 (≥{template.config.scoring_criteria.excellent?.min || 90}分)</div>
+                              <div className="text-gray-600 mt-1">{template.config.scoring_criteria.excellent?.description || "优秀等级"}</div>
+                            </div>
+                            <div className="p-2 bg-white rounded border">
+                              <div className="font-medium text-blue-700">良好 (≥{template.config.scoring_criteria.good?.min || 80}分)</div>
+                              <div className="text-gray-600 mt-1">{template.config.scoring_criteria.good?.description || "良好等级"}</div>
+                            </div>
+                            <div className="p-2 bg-white rounded border">
+                              <div className="font-medium text-yellow-700">一般 (≥{template.config.scoring_criteria.average?.min || 70}分)</div>
+                              <div className="text-gray-600 mt-1">{template.config.scoring_criteria.average?.description || "一般等级"}</div>
+                            </div>
+                            <div className="p-2 bg-white rounded border">
+                              <div className="font-medium text-red-700">较差 (≥{template.config.scoring_criteria.poor?.min || 0}分)</div>
+                              <div className="text-gray-600 mt-1">{template.config.scoring_criteria.poor?.description || "较差等级"}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 查看模式 - 评分规则显示 */}
+                      {template.config.scoring_rules && (
+                        <div className="mb-4 p-3 bg-green-50 rounded-lg">
+                          <h6 className="font-medium text-sm mb-2">评分规则配置</h6>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {/* 员工自评 */}
+                            <div className="p-2 bg-white rounded border">
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="font-medium text-sm text-blue-700">员工自我评估</div>
+                                <div className={`text-xs px-2 py-1 rounded ${template.config.scoring_rules.self_evaluation?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                  {template.config.scoring_rules.self_evaluation?.enabled ? '启用' : '禁用'}
+                                </div>
+                              </div>
+                              <div className="text-gray-600 text-xs mb-1">
+                                {template.config.scoring_rules.self_evaluation?.description || "员工自我评估"}
+                              </div>
+                              <div className="text-sm font-medium">
+                                权重: {Math.round((template.config.scoring_rules.self_evaluation?.weight_in_final || 0.4) * 100)}%
+                              </div>
+                            </div>
+                            
+                            {/* 领导评分 */}
+                            <div className="p-2 bg-white rounded border">
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="font-medium text-sm text-purple-700">直属领导评估</div>
+                                <div className={`text-xs px-2 py-1 rounded ${template.config.scoring_rules.leader_evaluation?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                  {template.config.scoring_rules.leader_evaluation?.enabled ? '启用' : '禁用'}
+                                </div>
+                              </div>
+                              <div className="text-gray-600 text-xs mb-1">
+                                {template.config.scoring_rules.leader_evaluation?.description || "直属领导评估"}
+                              </div>
+                              <div className="text-sm font-medium">
+                                权重: {Math.round((template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.6) * 100)}%
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* 计算方法和权重验证 */}
+                          <div className="mt-3 flex items-center justify-between text-xs">
+                            <div>
+                              <span className="text-gray-600">计算方法: </span>
+                              <span className="font-medium">
+                                {template.config.scoring_rules.calculation_method === 'weighted_average' ? '加权平均' : '简单平均'}
+                              </span>
+                            </div>
+                            {(() => {
+                              const selfWeight = (template.config.scoring_rules.self_evaluation?.weight_in_final || 0.4) * 100
+                              const leaderWeight = (template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.6) * 100
+                              const total = Math.round(selfWeight + leaderWeight)
+                              const isValid = total === 100
+                              
+                              return (
+                                <div className={`px-2 py-1 rounded ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                  权重总计: {total}% {isValid ? '✓' : '⚠️'}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {renderEditableTemplateConfig(template)}
+                </div>
+              )}
+            </div>
+          )) : (
+            <div className="text-center py-8 text-gray-500">
+              {loading ? "加载中..." : "暂无模板数据"}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+
+        {/* 分页 */}
+        {totalPages > 1 && (
+          <div className="flex justify-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              上一页
+            </Button>
+            <span className="px-4 py-2 text-sm">
+              第 {currentPage} 页，共 {totalPages} 页
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              下一页
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -16,245 +17,360 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Users, Edit, Trash2, Key, Building2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Plus, Users, Edit, Trash2, Key, UserX, UserCheck, Loader2, RotateCcw } from "lucide-react"
 import DepartmentManagement from "./department-management-simple"
-
-interface User {
-  id: string
-  name: string
-  username: string
-  role: "admin" | "boss" | "lead" | "employee"
-  department?: string
-  leaderId?: string
-  leaderName?: string
-  joinDate?: string
-}
-
-interface Department {
-  id: string
-  name: string
-  description: string
-  employeeCount: number
-}
+import { User, userService, userUtils, CreateUserDto, UpdateUserDto } from "@/lib/user"
+import { Role, roleService } from "@/lib/role"
+import { Department, departmentService } from "@/lib/department"
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([
-    { id: "admin", name: "系统管理员", username: "admin", role: "admin", joinDate: "2023-01-01" },
-    { id: "boss", name: "公司老板", username: "boss", role: "boss", joinDate: "2022-01-01" },
-    { id: "lisi", name: "李四", username: "lisi", role: "lead", department: "技术部", joinDate: "2022-08-10" },
-    { id: "zhaoliu", name: "赵六", username: "zhaoliu", role: "lead", department: "市场部", joinDate: "2022-12-05" },
-    {
-      id: "zhangsan",
-      name: "张三",
-      username: "zhangsan",
-      role: "employee",
-      department: "技术部",
-      leaderId: "lisi",
-      leaderName: "李四",
-      joinDate: "2023-03-15",
-    },
-    {
-      id: "wangwu",
-      name: "王五",
-      username: "wangwu",
-      role: "employee",
-      department: "技术部",
-      leaderId: "lisi",
-      leaderName: "李四",
-      joinDate: "2023-05-20",
-    },
-  ])
+  const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [leaders, setLeaders] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  const [departments, setDepartments] = useState<Department[]>([
-    { id: "tech", name: "技术部", description: "负责产品研发和技术支持", employeeCount: 3 },
-    { id: "marketing", name: "市场部", description: "负责市场推广和销售", employeeCount: 1 },
-    { id: "hr", name: "人事部", description: "负责人力资源管理", employeeCount: 0 },
-    { id: "finance", name: "财务部", description: "负责财务管理和会计", employeeCount: 0 },
-  ])
-
-  const [newUser, setNewUser] = useState({
-    name: "",
-    username: "",
-    role: "employee" as const,
-    department: "",
-    leaderId: "",
-    joinDate: "",
-  })
-
-  const [newDepartment, setNewDepartment] = useState({
-    name: "",
-    description: "",
-  })
-
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
-  const [isDepartmentDialogOpen, setIsDepartmentDialogOpen] = useState(false)
-
-  // 添加编辑状态管理
+  // 对话框状态
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null)
-  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false)
-  const [isEditDepartmentDialogOpen, setIsEditDepartmentDialogOpen] = useState(false)
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false)
+  const [resetPasswordResult, setResetPasswordResult] = useState("")
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "admin":
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">管理员</Badge>
-      case "boss":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">老板</Badge>
-      case "lead":
-        return <Badge className="bg-purple-100 text-purple-800 border-purple-200">领导</Badge>
-      case "employee":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">员工</Badge>
-      default:
-        return <Badge variant="outline">未知</Badge>
+  // 表单数据
+  const [formData, setFormData] = useState<CreateUserDto>({
+    username: "",
+    password: "",
+    name: "",
+    email: "",
+    phone: "",
+    position: "",
+    department_id: undefined,
+    leader_id: undefined,
+    role_ids: [],
+    join_date: "",
+  })
+
+  // 分页和筛选
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedDepartment, setSelectedDepartment] = useState<number | undefined>()
+  const [selectedRole, setSelectedRole] = useState<string | undefined>()
+
+  // 手动搜索
+  const handleSearch = () => {
+    setCurrentPage(1)
+    fetchUsers()
+  }
+
+  // 重置搜索条件
+  const handleReset = () => {
+    setSearchQuery("")
+    setSelectedDepartment(undefined)
+    setSelectedRole(undefined)
+    setCurrentPage(1)
+    // 重置后立即获取所有用户
+    setTimeout(() => {
+      fetchUsers()
+    }, 0)
+  }
+
+  // 获取用户列表
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      
+      // 构建查询参数，过滤掉空值
+      const queryParams: any = {
+        page: currentPage,
+        limit: 10,
+      }
+      
+      if (searchQuery && searchQuery.trim()) {
+        queryParams.search = searchQuery.trim()
+      }
+      
+      if (selectedDepartment) {
+        queryParams.department_id = selectedDepartment
+      }
+      
+      if (selectedRole) {
+        queryParams.role = selectedRole
+      }
+      
+      const response = await userService.getUsers(queryParams)
+      if (response.data) {
+        setUsers(response.data.items || [])
+        setTotalPages(response.data.totalPages || 1)
+      }
+    } catch (error: any) {
+      console.error('Fetch users error:', error)
+      setError(error.message || "获取用户列表失败")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const getLeaders = () => {
-    return users.filter((user) => user.role === "lead")
-  }
-
-  const handleAddUser = () => {
-    const leaderName = newUser.leaderId ? users.find((u) => u.id === newUser.leaderId)?.name : undefined
-
-    const user: User = {
-      id: `user-${Date.now()}`,
-      name: newUser.name,
-      username: newUser.username,
-      role: newUser.role,
-      department: newUser.department || undefined,
-      leaderId: newUser.leaderId || undefined,
-      leaderName,
-      joinDate: newUser.joinDate,
+  // 获取角色列表
+  const fetchRoles = async () => {
+    try {
+      const response = await roleService.getRoles()
+      console.log('Roles API response:', response)
+      if (response.data) {
+        // 根据角色API的响应结构调整
+        const rolesData = response.data.data || response.data.items || response.data
+        console.log('Roles data:', rolesData)
+        setRoles(rolesData)
+      }
+    } catch (error: any) {
+      console.error('Fetch roles error:', error)
     }
+  }
 
-    setUsers([...users, user])
-
-    // 更新部门员工数量
-    if (newUser.department) {
-      setDepartments((prev) =>
-        prev.map((dept) =>
-          dept.name === newUser.department ? { ...dept, employeeCount: dept.employeeCount + 1 } : dept,
-        ),
-      )
+  // 获取领导列表
+  const fetchLeaders = async () => {
+    try {
+      const response = await userService.getLeaders()
+      console.log('Leaders API response:', response)
+      if (response.data) {
+        const leadersData = response.data.data || response.data
+        console.log('Leaders data:', leadersData)
+        setLeaders(leadersData)
+      }
+    } catch (error: any) {
+      console.error('Fetch leaders error:', error)
     }
-
-    setNewUser({ name: "", username: "", role: "employee", department: "", leaderId: "", joinDate: "" })
-    setIsUserDialogOpen(false)
   }
 
-  const handleDeleteUser = (userId: string) => {
-    const user = users.find((u) => u.id === userId)
-    if (user?.department) {
-      setDepartments((prev) =>
-        prev.map((dept) =>
-          dept.name === user.department ? { ...dept, employeeCount: Math.max(0, dept.employeeCount - 1) } : dept,
-        ),
-      )
+  // 获取部门列表
+  const fetchDepartments = async () => {
+    try {
+      const response = await departmentService.getDepartments()
+      if (response.data) {
+        setDepartments(response.data.data)
+      }
+    } catch (error: any) {
+      console.error('Fetch departments error:', error)
     }
-    setUsers(users.filter((user) => user.id !== userId))
   }
 
-  const handleResetPassword = (userId: string) => {
-    alert(`已重置用户 ${users.find((u) => u.id === userId)?.name} 的密码为：123456`)
-  }
+  // 初始化数据
+  useEffect(() => {
+    fetchRoles()
+    fetchLeaders()
+    fetchDepartments()
+  }, [])
 
-  const handleAddDepartment = () => {
-    const department: Department = {
-      id: `dept-${Date.now()}`,
-      name: newDepartment.name,
-      description: newDepartment.description,
-      employeeCount: 0,
+  // 搜索条件变化时重置到第一页（部门和角色筛选立即触发）
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedDepartment, selectedRole])
+
+  // 当页码变化时获取用户数据
+  useEffect(() => {
+    fetchUsers()
+  }, [currentPage])
+
+  // 部门和角色筛选变化时立即搜索
+  useEffect(() => {
+    if (currentPage === 1) {
+      fetchUsers()
     }
+  }, [selectedDepartment, selectedRole])
 
-    setDepartments([...departments, department])
-    setNewDepartment({ name: "", description: "" })
-    setIsDepartmentDialogOpen(false)
+  // 重置表单
+  const resetForm = () => {
+    setFormData({
+      username: "",
+      password: "",
+      name: "",
+      email: "",
+      phone: "",
+      position: "",
+      department_id: undefined,
+      leader_id: undefined,
+      role_ids: [],
+      join_date: "",
+    })
+    setEditingUser(null)
   }
 
-  const handleDeleteDepartment = (departmentId: string) => {
-    const department = departments.find((d) => d.id === departmentId)
-    if (department && department.employeeCount > 0) {
-      alert(`无法删除部门"${department.name}"，该部门还有 ${department.employeeCount} 名员工`)
+  // 创建用户
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name.trim() || !formData.username.trim()) {
+      setError("姓名和用户名不能为空")
       return
     }
-    setDepartments(departments.filter((dept) => dept.id !== departmentId))
+
+    try {
+      setSubmitting(true)
+      setError("")
+      await userService.createUser(formData)
+      setIsCreateDialogOpen(false)
+      resetForm()
+      fetchUsers()
+    } catch (error: any) {
+      console.error('Create user error:', error)
+      setError(error.message || "创建用户失败")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  // 添加编辑用户的函数
-  const handleEditUser = (user: User) => {
-    setEditingUser(user)
-    setIsEditUserDialogOpen(true)
-  }
-
-  const handleUpdateUser = () => {
-    if (!editingUser) return
-
-    const originalUser = users.find((u) => u.id === editingUser.id)
-    const leaderName = editingUser.leaderId ? users.find((u) => u.id === editingUser.leaderId)?.name : undefined
-
-    // 处理部门变更
-    if (originalUser?.department !== editingUser.department) {
-      // 从原部门减少员工数
-      if (originalUser?.department) {
-        setDepartments((prev) =>
-          prev.map((dept) =>
-            dept.name === originalUser.department
-              ? { ...dept, employeeCount: Math.max(0, dept.employeeCount - 1) }
-              : dept,
-          ),
-        )
-      }
-      // 向新部门增加员工数
-      if (editingUser.department) {
-        setDepartments((prev) =>
-          prev.map((dept) =>
-            dept.name === editingUser.department ? { ...dept, employeeCount: dept.employeeCount + 1 } : dept,
-          ),
-        )
-      }
+  // 更新用户
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser || !formData.name.trim()) {
+      setError("姓名不能为空")
+      return
     }
 
-    setUsers(users.map((user) => (user.id === editingUser.id ? { ...editingUser, leaderName } : user)))
-    setEditingUser(null)
-    setIsEditUserDialogOpen(false)
+    try {
+      setSubmitting(true)
+      setError("")
+      const updateData: UpdateUserDto = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        position: formData.position,
+        department_id: formData.department_id,
+        leader_id: formData.leader_id,
+        role_ids: formData.role_ids,
+        join_date: formData.join_date,
+      }
+      await userService.updateUser(editingUser.id, updateData)
+      setIsEditDialogOpen(false)
+      fetchUsers()
+    } catch (error: any) {
+      console.error('Update user error:', error)
+      setError(error.message || "更新用户失败")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  // 添加编辑部门的函数
-  const handleEditDepartment = (department: Department) => {
-    setEditingDepartment(department)
-    setIsEditDepartmentDialogOpen(true)
+  // 删除用户
+  const handleDelete = async (user: User) => {
+    try {
+      setError("")
+      await userService.deleteUser(user.id)
+      fetchUsers()
+    } catch (error: any) {
+      console.error('Delete user error:', error)
+      setError(error.message || "删除用户失败")
+    }
   }
 
-  const handleUpdateDepartment = () => {
-    if (!editingDepartment) return
+  // 编辑用户
+  const handleEdit = (user: User) => {
+    console.log('Editing user:', user)
+    setEditingUser(user)
+    const editFormData = {
+      username: user.username,
+      password: "", // 编辑时不需要密码
+      name: user.name,
+      email: user.email || "",
+      phone: user.phone || "",
+      position: user.position || "",
+      department_id: user.department?.id,
+      leader_id: user.leader?.id,
+      role_ids: user.roles ? user.roles.map(role => role.id) : [],
+      join_date: user.join_date ? user.join_date.split('T')[0] : "",
+    }
+    console.log('Edit form data:', editFormData)
+    setFormData(editFormData)
+    setIsEditDialogOpen(true)
+  }
 
-    const originalDepartment = departments.find((d) => d.id === editingDepartment.id)
+  // 重置密码
+  const handleResetPassword = async (user: User) => {
+    try {
+      setError("")
+      await userService.resetPassword(user.id, { password: "123456" })
+      setResetPasswordResult(`已重置用户 ${user.name} 的密码为：123456`)
+      setIsResetPasswordDialogOpen(true)
+    } catch (error: any) {
+      console.error('Reset password error:', error)
+      setError(error.message || "重置密码失败")
+    }
+  }
 
-    // 如果部门名称发生变更，需要更新所有相关用户的部门信息
-    if (originalDepartment?.name !== editingDepartment.name) {
-      setUsers(
-        users.map((user) =>
-          user.department === originalDepartment?.name ? { ...user, department: editingDepartment.name } : user,
-        ),
+  // 切换用户状态
+  const handleToggleStatus = async (user: User) => {
+    try {
+      setError("")
+      await userService.toggleUserStatus(user.id)
+      fetchUsers()
+    } catch (error: any) {
+      console.error('Toggle status error:', error)
+      setError(error.message || "切换状态失败")
+    }
+  }
+
+  // 获取可选领导列表
+  const getAvailableLeaders = () => {
+    // 如果有从接口获取的领导数据，直接使用并按部门筛选
+    if (leaders && leaders.length > 0) {
+      return leaders.filter(leader => 
+        !formData.department_id || leader.department?.id === formData.department_id
       )
     }
+    
+    // 回退到原来的逻辑：从用户列表中筛选具有领导角色的用户
+    if (!users || users.length === 0) return []
+    return users.filter(user => 
+      user.roles && user.roles.length > 0 &&
+      user.roles.some(role => role.code === 'lead') && 
+      (!formData.department_id || user.department?.id === formData.department_id)
+    )
+  }
 
-    setDepartments(departments.map((dept) => (dept.id === editingDepartment.id ? editingDepartment : dept)))
-    setEditingDepartment(null)
-    setIsEditDepartmentDialogOpen(false)
+  // 获取角色Badge
+  const getRoleBadge = (roles: Role[]) => {
+    if (!roles || roles.length === 0) return <Badge variant="outline">无角色</Badge>
+    const primaryRole = roles[0]
+    return (
+      <Badge className={userUtils.getRoleBadgeStyle(primaryRole.code)}>
+        {primaryRole.name}
+      </Badge>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          用户管理
-        </CardTitle>
-        <CardDescription>管理系统用户账户、权限和部门信息</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            用户管理
+          </CardTitle>
+          <CardDescription>管理系统用户账户、权限和部门信息</CardDescription>
+        </CardHeader>
+        <CardContent>
         <Tabs defaultValue="users" className="space-y-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="users">用户管理</TabsTrigger>
@@ -262,315 +378,534 @@ export default function UserManagement() {
           </TabsList>
 
           <TabsContent value="users">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">用户列表</h3>
-              <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    添加用户
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>添加新用户</DialogTitle>
-                    <DialogDescription>创建一个新的系统用户账户</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">姓名</Label>
-                      <Input
-                        id="name"
-                        placeholder="请输入姓名"
-                        value={newUser.name}
-                        onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                      />
+            <div className="space-y-4">
+              {/* 顶部操作栏 */}
+              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+                {/* 搜索和筛选区域 */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 flex-1">
+                  <Input
+                    placeholder="搜索用户..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full sm:w-64"
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                    <Select value={selectedDepartment?.toString() || ""} onValueChange={(value) => setSelectedDepartment(value && value !== "all" ? parseInt(value) : undefined)}>
+                      <SelectTrigger className="w-full sm:w-48">
+                        <SelectValue placeholder="筛选部门" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部部门</SelectItem>
+                        {departments && departments.map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id.toString()}>
+                            {dept.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedRole || ""} onValueChange={(value) => setSelectedRole(value && value !== "all" ? value : undefined)}>
+                      <SelectTrigger className="w-full sm:w-48">
+                        <SelectValue placeholder="筛选角色" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部角色</SelectItem>
+                        {roles && roles.length > 0 ? roles.map((role) => (
+                          <SelectItem key={role.id} value={role.code}>
+                            {role.name}
+                          </SelectItem>
+                        )) : (
+                          <SelectItem value="no-roles" disabled>暂无角色数据</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {/* 操作按钮 */}
+                  <div className="flex gap-2 sm:gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleSearch}
+                      disabled={loading}
+                      className="flex-1 sm:flex-none"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "搜索"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleReset}
+                      disabled={loading}
+                      className="flex-1 sm:flex-none"
+                    >
+                      <RotateCcw className="w-4 h-4 sm:mr-1" />
+                      <span className="hidden sm:inline">重置</span>
+                    </Button>
+                  </div>
+                </div>
+                
+                {/* 添加用户按钮 */}
+                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => resetForm()} className="w-full lg:w-auto">
+                      <Plus className="w-4 h-4 mr-2" />
+                      添加用户
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>添加新用户</DialogTitle>
+                      <DialogDescription>创建一个新的系统用户账户</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreate} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="username">用户名 *</Label>
+                          <Input
+                            id="username"
+                            value={formData.username}
+                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                            placeholder="请输入用户名"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="password">密码 *</Label>
+                          <Input
+                            id="password"
+                            type="password"
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            placeholder="请输入密码"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="name">姓名 *</Label>
+                          <Input
+                            id="name"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            placeholder="请输入姓名"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="email">邮箱</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            placeholder="请输入邮箱"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="phone">电话</Label>
+                          <Input
+                            id="phone"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            placeholder="请输入电话"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="position">职位</Label>
+                          <Input
+                            id="position"
+                            value={formData.position}
+                            onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                            placeholder="请输入职位"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="department">部门</Label>
+                          <Select
+                            value={formData.department_id?.toString() || ""}
+                            onValueChange={(value) => setFormData({ ...formData, department_id: value && value !== "none" ? parseInt(value) : undefined, leader_id: undefined })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择部门" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">不选择部门</SelectItem>
+                              {departments && departments.map((dept) => (
+                                <SelectItem key={dept.id} value={dept.id.toString()}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="leader">直属领导</Label>
+                          <Select
+                            value={formData.leader_id?.toString() || ""}
+                            onValueChange={(value) => setFormData({ ...formData, leader_id: value && value !== "none" ? parseInt(value) : undefined })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择直属领导" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">不选择领导</SelectItem>
+                              {getAvailableLeaders().map((leader) => (
+                                <SelectItem key={leader.id} value={leader.id.toString()}>
+                                  {leader.name} ({leader.position || "未知职位"})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="roles">角色 *</Label>
+                          <Select
+                            value={formData.role_ids[0]?.toString() || ""}
+                            onValueChange={(value) => setFormData({ ...formData, role_ids: value ? [parseInt(value)] : [] })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择角色" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {roles && roles.map((role) => (
+                                <SelectItem key={role.id} value={role.id.toString()}>
+                                  {role.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="join_date">入职时间</Label>
+                          <Input
+                            id="join_date"
+                            type="date"
+                            value={formData.join_date}
+                            onChange={(e) => setFormData({ ...formData, join_date: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      {error && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                      )}
+                      <div className="flex justify-end space-x-2">
+                        <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                          取消
+                        </Button>
+                        <Button type="submit" disabled={submitting}>
+                          {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          创建
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {/* 用户列表 */}
+              <div className="space-y-4">
+                {users && users.length > 0 ? users.map((user) => (
+                  <div key={user.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold text-lg">{user.name}</h3>
+                        <p className="text-sm text-gray-600">@{user.username}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getRoleBadge(user.roles)}
+                        <Badge variant={user.status === 1 ? "default" : "destructive"}>
+                          {userUtils.formatUserStatus(user.status)}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="username">用户名</Label>
-                      <Input
-                        id="username"
-                        placeholder="请输入用户名（登录账号）"
-                        value={newUser.username}
-                        onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                      />
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
+                      {user.department && (
+                        <div>
+                          <span className="text-gray-600">部门：</span>
+                          <span className="font-medium">{user.department.name}</span>
+                        </div>
+                      )}
+                      {user.leader && (
+                        <div>
+                          <span className="text-gray-600">直属领导：</span>
+                          <span className="font-medium">{user.leader.name}</span>
+                        </div>
+                      )}
+                      {user.position && (
+                        <div>
+                          <span className="text-gray-600">职位：</span>
+                          <span className="font-medium">{user.position}</span>
+                        </div>
+                      )}
+                      {user.join_date && (
+                        <div>
+                          <span className="text-gray-600">入职时间：</span>
+                          <span className="font-medium">{userUtils.formatJoinDate(user.join_date)}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="joinDate">入职时间</Label>
-                      <Input
-                        id="joinDate"
-                        type="date"
-                        value={newUser.joinDate}
-                        onChange={(e) => setNewUser({ ...newUser, joinDate: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="role">角色</Label>
-                      <Select
-                        value={newUser.role}
-                        onValueChange={(value: any) => setNewUser({ ...newUser, role: value })}
+
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(user)}>
+                        <Edit className="w-4 h-4 mr-1" />
+                        编辑
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleResetPassword(user)}>
+                        <Key className="w-4 h-4 mr-1" />
+                        重置密码
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleToggleStatus(user)}
+                        className={user.status === 1 ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择角色" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="employee">员工</SelectItem>
-                          <SelectItem value="lead">部门领导</SelectItem>
-                          <SelectItem value="admin">管理员</SelectItem>
-                          <SelectItem value="boss">老板</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        {user.status === 1 ? (
+                          <>
+                            <UserX className="w-4 h-4 mr-1" />
+                            禁用
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            启用
+                          </>
+                        )}
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            删除
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>确认删除用户</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              您确定要删除用户 "{user.name}" 吗？此操作无法撤销。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(user)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              删除
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
-                    {(newUser.role === "lead" || newUser.role === "employee") && (
-                      <div className="space-y-2">
-                        <Label htmlFor="department">部门</Label>
+                  </div>
+                )) : (
+                  <div className="text-center py-8 text-gray-500">
+                    {loading ? "加载中..." : "暂无用户数据"}
+                  </div>
+                )}
+              </div>
+
+              {/* 分页 */}
+              {totalPages > 1 && (
+                <div className="flex justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    上一页
+                  </Button>
+                  <span className="px-4 py-2 text-sm">
+                    第 {currentPage} 页，共 {totalPages} 页
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* 编辑用户对话框 */}
+            {editingUser && (
+              <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+                setIsEditDialogOpen(open)
+                if (!open) {
+                  // 只有在关闭对话框时才重置表单
+                  resetForm()
+                }
+              }}>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>编辑用户信息</DialogTitle>
+                    <DialogDescription>修改用户的基本信息和权限设置</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleUpdate} className="space-y-4">
+                    {console.log('Rendering edit form with formData:', formData)}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-name">姓名 *</Label>
+                        <Input
+                          id="edit-name"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="请输入姓名"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-email">邮箱</Label>
+                        <Input
+                          id="edit-email"
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          placeholder="请输入邮箱"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-phone">电话</Label>
+                        <Input
+                          id="edit-phone"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="请输入电话"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-position">职位</Label>
+                        <Input
+                          id="edit-position"
+                          value={formData.position}
+                          onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                          placeholder="请输入职位"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-department">部门</Label>
                         <Select
-                          value={newUser.department}
-                          onValueChange={(value) => setNewUser({ ...newUser, department: value })}
+                          value={formData.department_id?.toString() || ""}
+                          onValueChange={(value) => setFormData({ ...formData, department_id: value && value !== "none" ? parseInt(value) : undefined, leader_id: undefined })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="选择部门" />
                           </SelectTrigger>
                           <SelectContent>
-                            {departments.map((dept) => (
-                              <SelectItem key={dept.id} value={dept.name}>
+                            <SelectItem value="none">不选择部门</SelectItem>
+                            {departments && departments.map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id.toString()}>
                                 {dept.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                    {newUser.role === "employee" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="leader">直属领导</Label>
+                      <div>
+                        <Label htmlFor="edit-leader">直属领导</Label>
                         <Select
-                          value={newUser.leaderId}
-                          onValueChange={(value) => setNewUser({ ...newUser, leaderId: value })}
+                          value={formData.leader_id?.toString() || ""}
+                          onValueChange={(value) => setFormData({ ...formData, leader_id: value && value !== "none" ? parseInt(value) : undefined })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="选择直属领导" />
                           </SelectTrigger>
                           <SelectContent>
-                            {getLeaders()
-                              .filter((leader) => leader.department === newUser.department)
-                              .map((leader) => (
-                                <SelectItem key={leader.id} value={leader.id}>
-                                  {leader.name} ({leader.department})
-                                </SelectItem>
-                              ))}
+                            <SelectItem value="none">不选择领导</SelectItem>
+                            {getAvailableLeaders().map((leader) => (
+                              <SelectItem key={leader.id} value={leader.id.toString()}>
+                                {leader.name} ({leader.position || "未知职位"})
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
+                      <div>
+                        <Label htmlFor="edit-roles">角色 *</Label>
+                        <Select
+                          value={formData.role_ids[0]?.toString() || ""}
+                          onValueChange={(value) => setFormData({ ...formData, role_ids: value ? [parseInt(value)] : [] })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择角色" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roles && roles.map((role) => (
+                              <SelectItem key={role.id} value={role.id.toString()}>
+                                {role.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-join_date">入职时间</Label>
+                        <Input
+                          id="edit-join_date"
+                          type="date"
+                          value={formData.join_date}
+                          onChange={(e) => setFormData({ ...formData, join_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
                     )}
-                    <Button
-                      onClick={handleAddUser}
-                      className="w-full"
-                      disabled={!newUser.name || !newUser.username || !newUser.joinDate}
-                    >
-                      添加用户
-                    </Button>
-                  </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                        取消
+                      </Button>
+                      <Button type="submit" disabled={submitting}>
+                        {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        保存修改
+                      </Button>
+                    </div>
+                  </form>
                 </DialogContent>
               </Dialog>
-            </div>
-
-            <div className="space-y-4">
-              {users.map((user) => (
-                <div key={user.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-lg">{user.name}</h3>
-                      <p className="text-sm text-gray-600">@{user.username}</p>
-                    </div>
-                    <div className="flex items-center gap-2">{getRoleBadge(user.role)}</div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
-                    {user.department && (
-                      <div>
-                        <span className="text-gray-600">部门：</span>
-                        <span className="font-medium">{user.department}</span>
-                      </div>
-                    )}
-                    {user.leaderName && (
-                      <div>
-                        <span className="text-gray-600">直属领导：</span>
-                        <span className="font-medium">{user.leaderName}</span>
-                      </div>
-                    )}
-                    {user.joinDate && (
-                      <div>
-                        <span className="text-gray-600">入职时间：</span>
-                        <span className="font-medium">{user.joinDate}</span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-gray-600">角色：</span>
-                      <span className="font-medium">
-                        {user.role === "admin"
-                          ? "管理员"
-                          : user.role === "boss"
-                            ? "老板"
-                            : user.role === "lead"
-                              ? "部门领导"
-                              : "员工"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEditUser(user)}>
-                      <Edit className="w-4 h-4 mr-1" />
-                      编辑
-                    </Button>
-                    {/* 添加编辑用户对话框 */}
-                    <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>编辑用户信息</DialogTitle>
-                          <DialogDescription>修改用户的基本信息和权限设置</DialogDescription>
-                        </DialogHeader>
-                        {editingUser && (
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-name">姓名</Label>
-                              <Input
-                                id="edit-name"
-                                placeholder="请输入姓名"
-                                value={editingUser.name}
-                                onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-username">用户名</Label>
-                              <Input
-                                id="edit-username"
-                                placeholder="请输入用户名（登录账号）"
-                                value={editingUser.username}
-                                onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-joinDate">入职时间</Label>
-                              <Input
-                                id="edit-joinDate"
-                                type="date"
-                                value={editingUser.joinDate || ""}
-                                onChange={(e) => setEditingUser({ ...editingUser, joinDate: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-role">角色</Label>
-                              <Select
-                                value={editingUser.role}
-                                onValueChange={(value: any) =>
-                                  setEditingUser({
-                                    ...editingUser,
-                                    role: value,
-                                    department:
-                                      value === "admin" || value === "boss" ? undefined : editingUser.department,
-                                    leaderId: value !== "employee" ? undefined : editingUser.leaderId,
-                                  })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="选择角色" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="employee">员工</SelectItem>
-                                  <SelectItem value="lead">部门领导</SelectItem>
-                                  <SelectItem value="admin">管理员</SelectItem>
-                                  <SelectItem value="boss">老板</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {(editingUser.role === "lead" || editingUser.role === "employee") && (
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-department">部门</Label>
-                                <Select
-                                  value={editingUser.department || ""}
-                                  onValueChange={(value) =>
-                                    setEditingUser({
-                                      ...editingUser,
-                                      department: value,
-                                      leaderId: editingUser.role === "employee" ? "" : editingUser.leaderId,
-                                    })
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="选择部门" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {departments.map((dept) => (
-                                      <SelectItem key={dept.id} value={dept.name}>
-                                        {dept.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            {editingUser.role === "employee" && editingUser.department && (
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-leader">直属领导</Label>
-                                <Select
-                                  value={editingUser.leaderId || ""}
-                                  onValueChange={(value) => setEditingUser({ ...editingUser, leaderId: value })}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="选择直属领导" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getLeaders()
-                                      .filter((leader) => leader.department === editingUser.department)
-                                      .map((leader) => (
-                                        <SelectItem key={leader.id} value={leader.id}>
-                                          {leader.name} ({leader.department})
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            <div className="flex justify-end gap-2 pt-4">
-                              <Button variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
-                                取消
-                              </Button>
-                              <Button onClick={handleUpdateUser} disabled={!editingUser.name || !editingUser.username}>
-                                保存修改
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                    <Button variant="outline" size="sm" onClick={() => handleResetPassword(user.id)}>
-                      <Key className="w-4 h-4 mr-1" />
-                      重置密码
-                    </Button>
-                    {user.role !== "admin" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 border-red-200 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        删除
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="departments">
             <DepartmentManagement />
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* 重置密码成功对话框 */}
+      <AlertDialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>密码重置成功</AlertDialogTitle>
+            <AlertDialogDescription>
+              {resetPasswordResult}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setIsResetPasswordDialogOpen(false)}>
+              确定
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
