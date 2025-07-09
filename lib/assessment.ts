@@ -63,6 +63,7 @@ export interface Assessment {
     name: string
     description?: string
   }
+  template_config?: any // 模板配置快照（已发布的考核会有此字段）
   participant_ids?: number[] // 参与者ID列表（用于表单回显）
   participants: AssessmentParticipant[]
   statistics: AssessmentStatistics
@@ -86,6 +87,7 @@ export interface AssessmentListItem {
     id: number
     name: string
   }
+  template_config?: any // 模板配置快照（已发布的考核会有此字段）
   statistics: AssessmentStatistics
   created_at: string
   updated_at: string
@@ -336,6 +338,14 @@ export const assessmentService = new AssessmentService()
 
 // 工具函数
 export const assessmentUtils = {
+  /**
+   * 获取考核的模板配置（支持快照功能）
+   * 优先使用 template_config（快照），降级到 template.config
+   */
+  getTemplateConfig(assessment: Assessment): any {
+    return assessment.template_config || assessment.template?.config || null
+  },
+
   /**
    * 获取状态显示文本
    */
