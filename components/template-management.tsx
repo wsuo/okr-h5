@@ -31,6 +31,7 @@ import { Plus, Settings, Edit, Trash2, AlertTriangle, ChevronDown, ChevronRight,
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Template, templateService, templateUtils, TemplateListQuery, CreateTemplateDto, UpdateTemplateDto } from "@/lib/template"
 import { User, userService } from "@/lib/user"
+import { toast } from "sonner"
 
 export default function TemplateManagement() {
   const [templates, setTemplates] = useState<Template[]>([])
@@ -233,9 +234,15 @@ export default function TemplateManagement() {
       setError("")
       await templateService.deleteTemplate(template.id)
       fetchTemplates()
+      toast.success("删除成功", {
+        description: `模板 "${template.name}" 已成功删除`
+      })
     } catch (error: any) {
       console.error('Delete template error:', error)
       setError(error.message || "删除模板失败")
+      toast.error("删除失败", {
+        description: error.message || "删除模板失败，请稍后重试"
+      })
     }
   }
 
@@ -245,9 +252,15 @@ export default function TemplateManagement() {
       setError("")
       await templateService.setDefaultTemplate(template.id)
       fetchTemplates()
+      toast.success("设置成功", {
+        description: `模板 "${template.name}" 已设置为默认模板`
+      })
     } catch (error: any) {
       console.error('Set default template error:', error)
       setError(error.message || "设置默认模板失败")
+      toast.error("设置失败", {
+        description: error.message || "设置默认模板失败，请稍后重试"
+      })
     }
   }
 
@@ -319,9 +332,15 @@ export default function TemplateManagement() {
       setIsCreateDialogOpen(false)
       resetForm()
       fetchTemplates()
+      toast.success("创建成功", {
+        description: `模板 "${formData.name}" 已成功创建`
+      })
     } catch (error: any) {
       console.error('Create template error:', error)
       setError(error.message || "创建模板失败")
+      toast.error("创建失败", {
+        description: error.message || "创建模板失败，请稍后重试"
+      })
     } finally {
       setSubmitting(false)
     }
@@ -365,9 +384,15 @@ export default function TemplateManagement() {
       await templateService.updateTemplate(template.id, updateData)
       setEditingTemplateId(null)
       fetchTemplates()
+      toast.success("保存成功", {
+        description: `模板 "${template.name}" 已成功更新`
+      })
     } catch (error: any) {
       console.error('Update template error:', error)
       setError(error.message || "更新模板失败")
+      toast.error("保存失败", {
+        description: error.message || "更新模板失败，请稍后重试"
+      })
     } finally {
       setSubmitting(false)
     }

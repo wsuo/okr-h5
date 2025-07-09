@@ -33,6 +33,7 @@ import DepartmentManagement from "./department-management-simple"
 import { User, userService, userUtils, CreateUserDto, UpdateUserDto } from "@/lib/user"
 import { Role, roleService } from "@/lib/role"
 import { Department, departmentService } from "@/lib/department"
+import { toast } from "sonner"
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
@@ -225,9 +226,15 @@ export default function UserManagement() {
       setIsCreateDialogOpen(false)
       resetForm()
       fetchUsers()
+      toast.success("创建成功", {
+        description: `用户 "${formData.name}" 已成功创建`
+      })
     } catch (error: any) {
       console.error('Create user error:', error)
       setError(error.message || "创建用户失败")
+      toast.error("创建失败", {
+        description: error.message || "创建用户失败，请稍后重试"
+      })
     } finally {
       setSubmitting(false)
     }
@@ -257,9 +264,15 @@ export default function UserManagement() {
       await userService.updateUser(editingUser.id, updateData)
       setIsEditDialogOpen(false)
       fetchUsers()
+      toast.success("更新成功", {
+        description: `用户 "${formData.name}" 信息已成功更新`
+      })
     } catch (error: any) {
       console.error('Update user error:', error)
       setError(error.message || "更新用户失败")
+      toast.error("更新失败", {
+        description: error.message || "更新用户失败，请稍后重试"
+      })
     } finally {
       setSubmitting(false)
     }
@@ -271,9 +284,15 @@ export default function UserManagement() {
       setError("")
       await userService.deleteUser(user.id)
       fetchUsers()
+      toast.success("删除成功", {
+        description: `用户 "${user.name}" 已成功删除`
+      })
     } catch (error: any) {
       console.error('Delete user error:', error)
       setError(error.message || "删除用户失败")
+      toast.error("删除失败", {
+        description: error.message || "删除用户失败，请稍后重试"
+      })
     }
   }
 
@@ -305,9 +324,15 @@ export default function UserManagement() {
       await userService.resetPassword(user.id, { password: "123456" })
       setResetPasswordResult(`已重置用户 ${user.name} 的密码为：123456`)
       setIsResetPasswordDialogOpen(true)
+      toast.success("重置成功", {
+        description: `用户 "${user.name}" 的密码已重置为 123456`
+      })
     } catch (error: any) {
       console.error('Reset password error:', error)
       setError(error.message || "重置密码失败")
+      toast.error("重置失败", {
+        description: error.message || "重置密码失败，请稍后重试"
+      })
     }
   }
 
@@ -317,9 +342,16 @@ export default function UserManagement() {
       setError("")
       await userService.toggleUserStatus(user.id)
       fetchUsers()
+      const newStatus = user.status === 1 ? "禁用" : "启用"
+      toast.success("状态更新成功", {
+        description: `用户 "${user.name}" 已${newStatus}`
+      })
     } catch (error: any) {
       console.error('Toggle status error:', error)
       setError(error.message || "切换状态失败")
+      toast.error("状态更新失败", {
+        description: error.message || "切换用户状态失败，请稍后重试"
+      })
     }
   }
 
