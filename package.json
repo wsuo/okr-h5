@@ -8,13 +8,21 @@
     "type": "git",
     "url": "https://github.com/wsuo/okr-h5.git"
   },
-  "keywords": ["OKR", "绩效考核", "目标管理", "企业管理", "Next.js", "React"],
+  "keywords": [
+    "OKR",
+    "绩效考核",
+    "目标管理",
+    "企业管理",
+    "Next.js",
+    "React"
+  ],
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "lint": "next lint",
     "start": "next start",
     "test:template": "node scripts/test-template-management.js",
+    "test:template:light": "node scripts/test-template-lightweight.js",
     "test:e2e": "node scripts/test-template-management.js",
     "test:quick": "node scripts/quick-test.js"
   },
@@ -57,6 +65,7 @@
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "next-themes": "^0.4.4",
+    "puppeteer": "^24.12.0",
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",

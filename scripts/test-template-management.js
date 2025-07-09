@@ -7,7 +7,7 @@ const puppeteer = require('puppeteer');
 
 // 测试配置
 const config = {
-  baseUrl: 'http://localhost:3000',
+  baseUrl: 'http://localhost:3001',
   credentials: {
     username: 'admin',
     password: '123456'

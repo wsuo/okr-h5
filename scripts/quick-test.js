@@ -7,7 +7,7 @@ const https = require('https');
 const http = require('http');
 
 const config = {
-  baseUrl: 'http://localhost:3000',
+  baseUrl: 'http://localhost:3001',
   timeout: 5000
 };
 

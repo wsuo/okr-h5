@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # 开发环境
-npm run dev        # 启动开发服务器 (localhost:3000)
+npm run dev        # 启动开发服务器 (localhost:3001)
 
 # 构建与生产
 npm run build      # 构建生产版本
@@ -20,7 +20,8 @@ npm run lint       # 代码检查
 
 ## 后端 API 配置
 
-- **API 基础地址**: `http://localhost:3000/api/v1`
+- **API 基础地址**: `http://localhost:3000/api/v1`（后端）
+- **前端地址**: `http://localhost:3001`
 - **认证方式**: Bearer Token (存储在 localStorage)
 - **API 客户端**: 统一使用 `lib/api.ts` 中的 `apiClient`
 
