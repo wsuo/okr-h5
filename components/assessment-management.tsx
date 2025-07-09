@@ -674,7 +674,7 @@ export default function AssessmentManagement() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="start_date">开始日期</Label>
+                    <Label htmlFor="start_date">考核周期开始时间</Label>
                     <Input
                       id="start_date"
                       type="date"
@@ -683,7 +683,7 @@ export default function AssessmentManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="end_date">结束日期</Label>
+                    <Label htmlFor="end_date">考核周期结束时间</Label>
                     <Input
                       id="end_date"
                       type="date"
