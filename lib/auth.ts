@@ -146,9 +146,14 @@ class AuthService {
     
     try {
       const userInfo = localStorage.getItem('userInfo')
-      return userInfo ? JSON.parse(userInfo) : null
+      if (!userInfo || userInfo === 'undefined') {
+        return null
+      }
+      return JSON.parse(userInfo)
     } catch (error) {
       console.error('Failed to parse user info:', error)
+      // 清除无效数据
+      localStorage.removeItem('userInfo')
       return null
     }
   }

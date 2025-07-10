@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -52,11 +52,33 @@ export default function EvaluationForm({
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [initialDataHash, setInitialDataHash] = useState<string>('')
+
+  // 创建数据哈希用于比较
+  const createDataHash = useCallback((scores: DetailedScore[], review: string, strengths: string, improvements: string) => {
+    const data = {
+      scores,
+      review: review.trim(),
+      strengths: strengths.trim(),
+      improvements: improvements.trim()
+    }
+    return JSON.stringify(data)
+  }, [])
+
+  // 检查数据是否发生变化
+  const checkIfDataChanged = useCallback(() => {
+    const currentHash = createDataHash(detailedScores, overallReview, strengths, improvements)
+    return currentHash !== initialDataHash
+  }, [detailedScores, overallReview, strengths, improvements, initialDataHash, createDataHash])
 
   // 获取当前用户可评分的分类
-  const evaluableCategories = template.categories.filter(category => 
-    category.evaluator_types.includes(type)
-  )
+  const evaluableCategories = useMemo(() => {
+    if (!template || !template.categories) return []
+    return template.categories.filter(category => 
+      category.evaluator_types.includes(type)
+    )
+  }, [template, type])
 
   const currentCategory = evaluableCategories[currentCategoryIndex]
   const totalCategories = evaluableCategories.length
@@ -66,12 +88,21 @@ export default function EvaluationForm({
   useEffect(() => {
     if (existingDraft) {
       // 加载现有草稿
-      setDetailedScores(existingDraft.detailed_scores || [])
-      setOverallReview(existingDraft.self_review || existingDraft.leader_review || '')
-      setStrengths(existingDraft.strengths || '')
-      setImprovements(existingDraft.improvements || '')
+      const scores = existingDraft.detailed_scores || []
+      const review = existingDraft.self_review || existingDraft.leader_review || ''
+      const strengthsValue = existingDraft.strengths || ''
+      const improvementsValue = existingDraft.improvements || ''
+      
+      setDetailedScores(scores)
+      setOverallReview(review)
+      setStrengths(strengthsValue)
+      setImprovements(improvementsValue)
       setDraftId(existingDraft.id)
-    } else {
+      
+      // 设置初始哈希值，此时数据还未被用户修改
+      setInitialDataHash(createDataHash(scores, review, strengthsValue, improvementsValue))
+      setIsDirty(false)
+    } else if (evaluableCategories.length > 0) {
       // 初始化空数据
       const initialScores: DetailedScore[] = evaluableCategories.map(category => ({
         categoryId: category.id,
@@ -83,52 +114,90 @@ export default function EvaluationForm({
         }))
       }))
       setDetailedScores(initialScores)
+      
+      // 设置初始哈希值
+      setInitialDataHash(createDataHash(initialScores, '', '', ''))
+      setIsDirty(false)
     }
-  }, [existingDraft, evaluableCategories])
+  }, [existingDraft, evaluableCategories, createDataHash])
 
   // 获取当前分类的评分数据
   const getCurrentCategoryScore = useCallback(() => {
-    return detailedScores.find(score => score.categoryId === currentCategory?.id) || {
-      categoryId: currentCategory?.id || '',
+    if (!currentCategory) return {
+      categoryId: '',
       categoryScore: 0,
-      items: currentCategory?.items.map(item => ({
+      items: []
+    }
+    
+    return detailedScores.find(score => score.categoryId === currentCategory.id) || {
+      categoryId: currentCategory.id,
+      categoryScore: 0,
+      items: currentCategory.items.map(item => ({
         itemId: item.id,
         score: 0,
         comment: ''
-      })) || []
+      }))
     }
-  }, [detailedScores, currentCategory])
+  }, [detailedScores, currentCategory?.id])
 
-  // 更新当前分类的评分数据
-  const updateCurrentCategoryScore = useCallback((categoryScore: DetailedScore) => {
-    setDetailedScores(prev => {
-      const updated = prev.filter(score => score.categoryId !== categoryScore.categoryId)
-      return [...updated, categoryScore]
-    })
-  }, [])
 
   // 更新评分项
   const updateScoreItem = useCallback((itemId: string, scoreItem: DetailedScoreItem) => {
-    const currentScore = getCurrentCategoryScore()
-    const updatedItems = currentScore.items.map(item => 
-      item.itemId === itemId ? scoreItem : item
-    )
+    if (!currentCategory) return
     
-    // 重新计算分类总分
-    const categoryScore = currentCategory ? 
-      evaluationUtils.calculateCategoryScore(updatedItems, currentCategory) : 0
-    
-    updateCurrentCategoryScore({
-      ...currentScore,
-      categoryScore,
-      items: updatedItems
+    setDetailedScores(prev => {
+      const currentScore = prev.find(score => score.categoryId === currentCategory.id) || {
+        categoryId: currentCategory.id,
+        categoryScore: 0,
+        items: currentCategory.items.map(item => ({
+          itemId: item.id,
+          score: 0,
+          comment: ''
+        }))
+      }
+      
+      const updatedItems = currentScore.items.map(item => 
+        item.itemId === itemId ? scoreItem : item
+      )
+      
+      // 重新计算分类总分
+      const categoryScore = evaluationUtils.calculateCategoryScore(updatedItems, currentCategory)
+      
+      const updatedScore = {
+        ...currentScore,
+        categoryScore,
+        items: updatedItems
+      }
+      
+      // 更新状态
+      const otherScores = prev.filter(score => score.categoryId !== currentCategory.id)
+      return [...otherScores, updatedScore]
     })
-  }, [getCurrentCategoryScore, currentCategory, updateCurrentCategoryScore])
+    
+    // 标记数据已修改（用户操作）
+    setIsDirty(true)
+  }, [currentCategory?.id])
 
   // 计算整体评分
   const calculateOverallScore = useCallback(() => {
     return evaluationUtils.calculateDetailedScore(detailedScores, template)
   }, [detailedScores, template])
+
+  // 处理用户输入的包装函数
+  const handleOverallReviewChange = useCallback((value: string) => {
+    setOverallReview(value)
+    setIsDirty(true)
+  }, [])
+
+  const handleStrengthsChange = useCallback((value: string) => {
+    setStrengths(value)
+    setIsDirty(true)
+  }, [])
+
+  const handleImprovementsChange = useCallback((value: string) => {
+    setImprovements(value)
+    setIsDirty(true)
+  }, [])
 
   // 自动保存草稿
   const autoSaveDraft = useCallback(async () => {
@@ -137,58 +206,153 @@ export default function EvaluationForm({
     try {
       setSaving(true)
       
+      // 准备草稿数据 - 清理和格式化
+      const cleanText = (text: string) => {
+        const trimmed = text.trim()
+        return trimmed.length > 0 ? trimmed : undefined
+      }
+      
       const draftData = {
-        self_review: type === 'self' ? overallReview : undefined,
-        leader_review: type === 'leader' ? overallReview : undefined,
-        strengths,
-        improvements,
-        detailed_scores: detailedScores
+        self_review: type === 'self' ? cleanText(overallReview) : undefined,
+        leader_review: type === 'leader' ? cleanText(overallReview) : undefined,
+        strengths: cleanText(strengths),
+        improvements: cleanText(improvements),
+        detailed_scores: detailedScores.length > 0 ? detailedScores : undefined
+      }
+      
+      // 验证是否有实际内容需要保存
+      const hasContent = draftData.self_review || 
+                        draftData.leader_review || 
+                        draftData.strengths || 
+                        draftData.improvements || 
+                        (draftData.detailed_scores && draftData.detailed_scores.length > 0)
+      
+      if (!hasContent && !draftId) {
+        console.log('没有内容需要保存，跳过创建草稿')
+        return
       }
 
+      let response
       if (draftId) {
         // 更新现有草稿
-        await evaluationService.updateEvaluationDraft(draftId, draftData)
+        console.log(`更新草稿 ID: ${draftId}`, draftData)
+        response = await evaluationService.updateEvaluationDraft(draftId, draftData)
+        
+        // 验证更新响应
+        if (!response || response.code !== 200) {
+          throw new Error(`更新草稿失败: ${response?.message || '未知错误'}`)
+        }
+        
+        console.log('草稿更新成功')
       } else {
-        // 创建新草稿
+        // 创建新草稿 - 验证必需参数
+        if (!assessmentId || !type) {
+          throw new Error('创建草稿失败: 缺少必需参数 (assessmentId 或 type)')
+        }
+        
+        // 验证领导评分时必须有 evaluateeId
+        if (type === 'leader' && !evaluateeId) {
+          throw new Error('创建草稿失败: 领导评分必须指定被评估员工ID')
+        }
+        
         const createData: CreateEvaluationDraftRequest = {
           assessment_id: assessmentId,
           type,
-          evaluatee_id: evaluateeId,
+          ...(evaluateeId && { evaluatee_id: evaluateeId }), // 只在有值时添加
           ...draftData
         }
-        const response = await evaluationService.createEvaluationDraft(createData)
-        if (response.code === 200 && response.data) {
-          setDraftId(response.data.id)
+        
+        console.log('创建新草稿', createData)
+        response = await evaluationService.createEvaluationDraft(createData)
+        
+        // 验证创建响应
+        if (!response || response.code !== 200) {
+          throw new Error(`创建草稿失败: ${response?.message || '未知错误'}`)
         }
+        
+        if (!response.data || !response.data.id) {
+          throw new Error('创建草稿失败: 服务器返回的数据格式无效')
+        }
+        
+        // 保存草稿ID
+        setDraftId(response.data.id)
+        console.log(`草稿创建成功，ID: ${response.data.id}`)
       }
       
+      // 更新状态 - 只有在成功后才更新
       setLastSaved(new Date())
+      setIsDirty(false) // 保存成功后重置脏状态
+      setInitialDataHash(createDataHash(detailedScores, overallReview, strengths, improvements)) // 更新初始哈希值
       onSaveDraft?.()
+      
     } catch (error: any) {
       console.error('自动保存草稿失败:', error)
+      
+      // 区分错误类型并提供相应的用户反馈
+      if (error.message?.includes('网络')) {
+        console.warn('网络错误，草稿保存失败，稍后会自动重试')
+      } else if (error.message?.includes('权限')) {
+        console.error('没有权限保存草稿，请重新登录')
+      } else {
+        console.error(`保存草稿时发生错误: ${error.message || '未知错误'}`)
+      }
+      
+      // 保存失败时不重置脏状态，让用户知道数据还没有保存
+      // isDirty 保持 true，让用户可以手动重试
+      
     } finally {
       setSaving(false)
     }
   }, [
     assessmentId, type, evaluateeId, overallReview, strengths, improvements, 
-    detailedScores, draftId, saving, submitting, onSaveDraft
+    detailedScores, draftId, saving, submitting, onSaveDraft, createDataHash
   ])
 
-  // 防抖自动保存
+  // 智能防抖自动保存 - 只在脏状态时保存
   useEffect(() => {
+    if (!isDirty || saving || submitting) return
+
     const timer = setTimeout(() => {
-      if (detailedScores.length > 0) {
+      if (isDirty && detailedScores.length > 0) {
         autoSaveDraft()
       }
-    }, 1000) // 1秒后自动保存
+    }, 3000) // 3秒后自动保存，增加防抖时间
 
     return () => clearTimeout(timer)
-  }, [detailedScores, overallReview, strengths, improvements, autoSaveDraft])
+  }, [isDirty, saving, submitting, detailedScores, autoSaveDraft])
+
+  // 页面离开前的保存提醒
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault()
+        e.returnValue = '您有未保存的修改，确定要离开吗？'
+        return '您有未保存的修改，确定要离开吗？'
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [isDirty])
 
   // 手动保存草稿
   const handleSaveDraft = async () => {
-    await autoSaveDraft()
-    toast.success('草稿已保存')
+    try {
+      await autoSaveDraft()
+      // 检查是否真的保存成功了（通过检查 isDirty 状态）
+      if (!isDirty) {
+        toast.success('草稿保存成功')
+      } else {
+        toast.error('草稿保存失败，请重试')
+      }
+    } catch (error: any) {
+      console.error('手动保存草稿失败:', error)
+      toast.error('保存失败', {
+        description: error.message || '请检查网络连接后重试'
+      })
+    }
   }
 
   // 提交评估
@@ -265,6 +429,18 @@ export default function EvaluationForm({
   // 跳转到指定分类
   const goToCategory = (index: number) => {
     setCurrentCategoryIndex(index)
+  }
+
+  // 早期检查：如果没有可评分分类，返回错误信息
+  if (evaluableCategories.length === 0) {
+    return (
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          未找到可评分的分类，请检查模板配置
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   const currentScore = getCurrentCategoryScore()
@@ -401,7 +577,7 @@ export default function EvaluationForm({
                 id="overall-review"
                 placeholder={type === 'self' ? '请简要总结本期工作表现...' : '请对该员工的工作表现进行评价...'}
                 value={overallReview}
-                onChange={(e) => setOverallReview(e.target.value)}
+                onChange={(e) => handleOverallReviewChange(e.target.value)}
                 disabled={submitting}
                 rows={4}
                 className="mt-1"
@@ -416,7 +592,7 @@ export default function EvaluationForm({
                 id="strengths"
                 placeholder="请列举主要优势和亮点..."
                 value={strengths}
-                onChange={(e) => setStrengths(e.target.value)}
+                onChange={(e) => handleStrengthsChange(e.target.value)}
                 disabled={submitting}
                 rows={3}
                 className="mt-1"
@@ -431,7 +607,7 @@ export default function EvaluationForm({
                 id="improvements"
                 placeholder="请提出改进建议和发展方向..."
                 value={improvements}
-                onChange={(e) => setImprovements(e.target.value)}
+                onChange={(e) => handleImprovementsChange(e.target.value)}
                 disabled={submitting}
                 rows={3}
                 className="mt-1"
@@ -480,11 +656,21 @@ export default function EvaluationForm({
             </div>
 
             <div className="flex items-center gap-2">
-              {lastSaved && (
-                <span className="text-xs text-gray-500">
-                  {saving ? '保存中...' : `已保存 ${lastSaved.toLocaleTimeString()}`}
-                </span>
-              )}
+              {/* 保存状态显示 */}
+              <span className="text-xs text-gray-500">
+                {saving ? (
+                  <span className="flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    保存中...
+                  </span>
+                ) : isDirty ? (
+                  <span className="text-amber-600">已修改</span>
+                ) : lastSaved ? (
+                  `已保存 ${lastSaved.toLocaleTimeString()}`
+                ) : (
+                  '未保存'
+                )}
+              </span>
               
               <Button
                 variant="outline"

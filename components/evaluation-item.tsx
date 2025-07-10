@@ -28,10 +28,13 @@ export default function EvaluationItemComponent({
   const [showCriteria, setShowCriteria] = useState(false)
 
   const handleScoreChange = (score: number) => {
-    onChange({
-      ...value,
-      score
-    })
+    // 避免不必要的更新
+    if (value.score !== score) {
+      onChange({
+        ...value,
+        score
+      })
+    }
   }
 
   const handleCommentChange = (comment: string) => {
@@ -48,7 +51,7 @@ export default function EvaluationItemComponent({
     return { level: 'poor', label: '较差', color: 'bg-red-100 text-red-800' }
   }
 
-  const currentLevel = getScoreLevel(value.score, item.scoring_criteria)
+  const currentLevel = getScoreLevel(value.score || 0, item.scoring_criteria)
 
   return (
     <Card className={`transition-all duration-200 ${disabled ? 'opacity-60' : ''}`}>
@@ -77,7 +80,7 @@ export default function EvaluationItemComponent({
               分数 (0-{item.max_score})
             </Label>
             <div className="text-right">
-              <span className="text-2xl font-bold text-blue-600">{value.score}</span>
+              <span className="text-2xl font-bold text-blue-600">{value.score || 0}</span>
               <span className="text-sm text-gray-500 ml-1">/ {item.max_score}</span>
             </div>
           </div>
@@ -89,8 +92,8 @@ export default function EvaluationItemComponent({
               min={0}
               max={item.max_score}
               step={1}
-              value={[value.score]}
-              onValueChange={(values) => handleScoreChange(values[0])}
+              value={[value.score || 0]}
+              onValueChange={(values) => handleScoreChange(values[0] || 0)}
               disabled={disabled}
               className="w-full"
             />
@@ -106,8 +109,8 @@ export default function EvaluationItemComponent({
               type="number"
               min={0}
               max={item.max_score}
-              value={value.score}
-              onChange={(e) => handleScoreChange(Number(e.target.value))}
+              value={value.score || 0}
+              onChange={(e) => handleScoreChange(Number(e.target.value) || 0)}
               disabled={disabled}
               className="w-20 text-center"
             />
