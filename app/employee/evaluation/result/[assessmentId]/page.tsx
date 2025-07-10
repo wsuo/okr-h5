@@ -10,6 +10,7 @@ import { ArrowLeft, TrendingUp, TrendingDown, Minus, Loader2, FileText, BarChart
 import EmployeeHeader from "@/components/employee-header"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
+import { useAuth } from "@/contexts/auth-context"
 import {
   evaluationService,
   EvaluationComparison,
@@ -20,31 +21,56 @@ export default function EmployeeEvaluationResultPage() {
   const router = useRouter()
   const params = useParams()
   const assessmentId = parseInt(params.assessmentId as string)
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   
-  const [userInfo, setUserInfo] = useState<any>(null)
   const [comparisonData, setComparisonData] = useState<EvaluationComparison | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
-    if (user) {
-      setUserInfo(JSON.parse(user))
+    if (authLoading) return
+
+    if (!isAuthenticated || !user) {
+      setError('请先登录')
+      setLoading(false)
+      return
+    }
+
+    const loadComparisonData = async () => {
+      try {
+        setLoading(true)
+        setError("")
+
+        const response = await evaluationService.getEvaluationComparison(assessmentId, user.id)
+        
+        if (response.code === 200 && response.data) {
+          setComparisonData(response.data)
+        } else {
+          throw new Error(response.message || '无法获取评估结果')
+        }
+
+      } catch (error: any) {
+        console.error('加载评估结果失败:', error)
+        setError(error.message || '服务器错误，请稍后重试')
+      } finally {
+        setLoading(false)
+      }
     }
     
     loadComparisonData()
-  }, [assessmentId])
+  }, [assessmentId, isAuthenticated, user, authLoading])
 
-  const loadComparisonData = async () => {
+  const reloadComparisonData = async () => {
+    if (!isAuthenticated || !user) {
+      setError('请先登录')
+      return
+    }
+
     try {
       setLoading(true)
       setError("")
 
-      if (!userInfo?.id) {
-        throw new Error('用户信息不完整')
-      }
-
-      const response = await evaluationService.getEvaluationComparison(assessmentId, userInfo.id)
+      const response = await evaluationService.getEvaluationComparison(assessmentId, user.id)
       
       if (response.code === 200 && response.data) {
         setComparisonData(response.data)
@@ -95,7 +121,7 @@ export default function EmployeeEvaluationResultPage() {
     return difference.toFixed(1)
   }
 
-  if (!userInfo) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="flex items-center justify-center py-12">
@@ -106,10 +132,25 @@ export default function EmployeeEvaluationResultPage() {
     )
   }
 
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">请先登录</p>
+            <Button onClick={() => router.push('/')}>
+              去登录
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <EmployeeHeader userInfo={userInfo} />
+        <EmployeeHeader userInfo={user} />
         <div className="container mx-auto p-4 max-w-6xl">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
@@ -123,7 +164,7 @@ export default function EmployeeEvaluationResultPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <EmployeeHeader userInfo={userInfo} />
+        <EmployeeHeader userInfo={user} />
         <div className="container mx-auto p-4 max-w-6xl">
           <div className="mb-6">
             <Button variant="ghost" onClick={handleBack} className="mb-4">
@@ -136,7 +177,7 @@ export default function EmployeeEvaluationResultPage() {
             <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">无法获取评估结果</h3>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button variant="outline" onClick={loadComparisonData}>
+            <Button variant="outline" onClick={reloadComparisonData}>
               重新加载
             </Button>
           </div>
@@ -148,7 +189,7 @@ export default function EmployeeEvaluationResultPage() {
   if (!comparisonData) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <EmployeeHeader userInfo={userInfo} />
+        <EmployeeHeader userInfo={user} />
         <div className="container mx-auto p-4 max-w-6xl">
           <div className="mb-6">
             <Button variant="ghost" onClick={handleBack} className="mb-4">
@@ -172,7 +213,7 @@ export default function EmployeeEvaluationResultPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <EmployeeHeader userInfo={userInfo} />
+      <EmployeeHeader userInfo={user} />
       
       <div className="container mx-auto p-4 max-w-6xl">
         <div className="mb-6">
