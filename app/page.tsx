@@ -32,9 +32,17 @@ export default function LoginPage() {
     clearError()
 
     const success = await login(username, password)
+    console.log('Login success:', success)
+    
     if (success) {
-      const defaultRoute = authService.getDefaultRoute()
-      router.push(defaultRoute)
+      // 添加延迟以确保用户信息已存储
+      setTimeout(() => {
+        const user = authService.getCurrentUser()
+        console.log('Current user after login:', user)
+        const defaultRoute = authService.getDefaultRoute()
+        console.log('Default route:', defaultRoute)
+        router.push(defaultRoute)
+      }, 100)
     }
   }
 

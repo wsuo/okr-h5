@@ -254,7 +254,7 @@ class AuthService {
     
     if (roles.includes('admin')) return '/admin'
     if (roles.includes('boss')) return '/boss'
-    if (roles.includes('lead')) return '/lead'
+    if (roles.includes('leader')) return '/lead'
     if (roles.includes('employee')) return '/employee'
     
     return '/'

@@ -235,7 +235,7 @@ export function usePermission() {
       permissions.some(permission => authService.hasPermission(permission)),
     isAdmin: () => authService.hasRole('admin'),
     isBoss: () => authService.hasRole('boss'),
-    isLead: () => authService.hasRole('lead'),
+    isLead: () => authService.hasRole('leader'),
     isEmployee: () => authService.hasRole('employee'),
   }
 }

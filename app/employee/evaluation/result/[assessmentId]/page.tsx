@@ -132,17 +132,88 @@ export default function EmployeeEvaluationResultPage() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-600"
-    if (score >= 80) return "text-blue-600"
-    if (score >= 70) return "text-yellow-600"
-    return "text-red-600"
+    return getOverallScoreLevel(score).color
+  }
+
+  // 根据评分标准动态匹配等级
+  const getScoreLevelFromCriteria = (score: number, criteria?: any) => {
+    if (!criteria) {
+      // 如果没有评分标准，使用默认等级
+      if (score >= 90) return { level: "优秀", color: "text-green-600", bgColor: "bg-green-100", borderColor: "border-green-200" }
+      if (score >= 80) return { level: "良好", color: "text-blue-600", bgColor: "bg-blue-100", borderColor: "border-blue-200" }
+      if (score >= 70) return { level: "合格", color: "text-yellow-600", bgColor: "bg-yellow-100", borderColor: "border-yellow-200" }
+      return { level: "待改进", color: "text-red-600", bgColor: "bg-red-100", borderColor: "border-red-200" }
+    }
+
+    // 根据评分标准匹配等级
+    const levels = [
+      { key: 'excellent', level: '优秀', color: 'text-green-600', bgColor: 'bg-green-100', borderColor: 'border-green-200' },
+      { key: 'good', level: '良好', color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-200' },
+      { key: 'average', level: '一般', color: 'text-yellow-600', bgColor: 'bg-yellow-100', borderColor: 'border-yellow-200' },
+      { key: 'poor', level: '不足', color: 'text-red-600', bgColor: 'bg-red-100', borderColor: 'border-red-200' }
+    ]
+
+    // 按分数从高到低排序标准
+    const sortedCriteria = levels
+      .filter(level => criteria[level.key])
+      .sort((a, b) => (criteria[b.key]?.min || 0) - (criteria[a.key]?.min || 0))
+
+    for (const levelInfo of sortedCriteria) {
+      const criterion = criteria[levelInfo.key]
+      if (criterion && score >= criterion.min) {
+        return {
+          level: levelInfo.level,
+          color: levelInfo.color,
+          bgColor: levelInfo.bgColor,
+          borderColor: levelInfo.borderColor,
+          description: criterion.description
+        }
+      }
+    }
+
+    // 如果没有匹配的等级，返回最低等级
+    const poorCriterion = criteria.poor
+    return {
+      level: '不足',
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
+      borderColor: 'border-red-200',
+      description: poorCriterion?.description || '分数过低'
+    }
+  }
+
+  // 获取总分等级（使用模板的整体评分标准）
+  const getOverallScoreLevel = (score: number) => {
+    if (!templateData?.categories?.length) {
+      return getScoreLevelFromCriteria(score)
+    }
+
+    // 可以使用第一个分类的评分标准作为总分标准，或者使用默认标准
+    // 这里使用默认标准，因为通常总分标准和分项标准可能不同
+    return getScoreLevelFromCriteria(score)
+  }
+
+  // 获取分项等级（使用对应项目的评分标准）
+  const getItemScoreLevel = (score: number, categoryId: string, itemId: string) => {
+    if (!templateData?.categories?.length) {
+      return getScoreLevelFromCriteria(score)
+    }
+
+    const category = templateData.categories.find(cat => cat.id === categoryId)
+    if (!category) {
+      return getScoreLevelFromCriteria(score)
+    }
+
+    const item = category.items.find(item => item.id === itemId)
+    if (!item?.scoring_criteria) {
+      return getScoreLevelFromCriteria(score)
+    }
+
+    return getScoreLevelFromCriteria(score, item.scoring_criteria)
   }
 
   const getScoreLevel = (score: number) => {
-    if (score >= 90) return "优秀"
-    if (score >= 80) return "良好"
-    if (score >= 70) return "合格"
-    return "待改进"
+    return getOverallScoreLevel(score).level
   }
 
   const getDifferenceIcon = (difference: number) => {
@@ -291,12 +362,23 @@ export default function EmployeeEvaluationResultPage() {
                   </div>
                   <div className="text-sm text-gray-600">自评得分</div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  {comparisonData.self_evaluation?.score 
-                    ? getScoreLevel(Number(comparisonData.self_evaluation.score))
-                    : '未完成'
-                  }
-                </div>
+                {comparisonData.self_evaluation?.score ? (
+                  <div className="space-y-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`${getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).bgColor} ${getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).color} ${getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).borderColor}`}
+                    >
+                      {getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).level}
+                    </Badge>
+                    {getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).description && (
+                      <div className="text-xs text-gray-500 max-w-32 mx-auto">
+                        {getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).description}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">未完成</div>
+                )}
                 {comparisonData.self_evaluation?.submitted_at && (
                   <div className="text-xs text-gray-400 mt-1">
                     {evaluationUtils.formatDateTime(comparisonData.self_evaluation.submitted_at)}
@@ -314,12 +396,23 @@ export default function EmployeeEvaluationResultPage() {
                   </div>
                   <div className="text-sm text-gray-600">领导评分</div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  {comparisonData.leader_evaluation?.score 
-                    ? getScoreLevel(Number(comparisonData.leader_evaluation.score))
-                    : '未完成'
-                  }
-                </div>
+                {comparisonData.leader_evaluation?.score ? (
+                  <div className="space-y-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`${getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).bgColor} ${getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).color} ${getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).borderColor}`}
+                    >
+                      {getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).level}
+                    </Badge>
+                    {getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).description && (
+                      <div className="text-xs text-gray-500 max-w-32 mx-auto">
+                        {getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).description}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">未完成</div>
+                )}
                 {comparisonData.leader_evaluation?.submitted_at && (
                   <div className="text-xs text-gray-400 mt-1">
                     {evaluationUtils.formatDateTime(comparisonData.leader_evaluation.submitted_at)}
@@ -407,29 +500,58 @@ export default function EmployeeEvaluationResultPage() {
                       {/* 详细项目对比 */}
                       <div className="space-y-3">
                         <h4 className="font-medium text-gray-700">详细项目对比</h4>
-                        {category.item_differences.map((item) => (
-                          <div key={item.itemId} className="bg-gray-50 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium">{item.item_name}</span>
-                              <div className="flex items-center gap-2">
-                                {getDifferenceIcon(item.difference)}
-                                <span className={`text-sm ${getDifferenceColor(item.difference)}`}>
-                                  {formatDifference(item.difference)}
-                                </span>
+                        {category.item_differences.map((item) => {
+                          const selfLevel = getItemScoreLevel(Number(item.self_score), category.categoryId, item.itemId)
+                          const leaderLevel = getItemScoreLevel(Number(item.leader_score), category.categoryId, item.itemId)
+                          return (
+                            <div key={item.itemId} className="bg-gray-50 rounded-lg p-3">
+                              <div className="flex items-center justify-between mb-3">
+                                <span className="font-medium">{item.item_name}</span>
+                                <div className="flex items-center gap-2">
+                                  {getDifferenceIcon(item.difference)}
+                                  <span className={`text-sm ${getDifferenceColor(item.difference)}`}>
+                                    {formatDifference(item.difference)}
+                                  </span>
+                                </div>
                               </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-gray-600 text-sm">自评：</span>
+                                    <span className="font-medium">{Number(item.self_score).toFixed(1)}</span>
+                                  </div>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${selfLevel.bgColor} ${selfLevel.color} ${selfLevel.borderColor}`}
+                                  >
+                                    {selfLevel.level}
+                                  </Badge>
+                                </div>
+                                
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-gray-600 text-sm">领导：</span>
+                                    <span className="font-medium">{Number(item.leader_score).toFixed(1)}</span>
+                                  </div>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${leaderLevel.bgColor} ${leaderLevel.color} ${leaderLevel.borderColor}`}
+                                  >
+                                    {leaderLevel.level}
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              {/* 等级差异提示 */}
+                              {selfLevel.level !== leaderLevel.level && (
+                                <div className="mt-2 text-xs text-gray-500 bg-yellow-50 p-2 rounded">
+                                  等级差异：自评为“{selfLevel.level}”，领导评价为“{leaderLevel.level}”
+                                </div>
+                              )}
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div>
-                                <span className="text-gray-600">自评：</span>
-                                <span className="font-medium">{Number(item.self_score).toFixed(1)}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-600">领导：</span>
-                                <span className="font-medium">{Number(item.leader_score).toFixed(1)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   ))}
@@ -480,21 +602,45 @@ export default function EmployeeEvaluationResultPage() {
                           </div>
                           
                           <div className="space-y-3">
-                            {category.items.map((item) => (
-                              <div key={item.itemId} className="bg-blue-50 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="font-medium">
-                                    {getItemName(category.categoryId, item.itemId)}
-                                  </span>
-                                  <span className="text-blue-600 font-medium">
-                                    {Number(item.score).toFixed(1)}
-                                  </span>
+                            {category.items.map((item) => {
+                              const itemLevel = getItemScoreLevel(Number(item.score), category.categoryId, item.itemId)
+                              return (
+                                <div key={item.itemId} className="bg-blue-50 rounded-lg p-3">
+                                  {/* 主要信息水平排列 */}
+                                  <div className="flex items-center justify-between gap-3 mb-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <span className="font-medium truncate">
+                                        {getItemName(category.categoryId, item.itemId)}
+                                      </span>
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs whitespace-nowrap ${itemLevel.bgColor} ${itemLevel.color} ${itemLevel.borderColor}`}
+                                      >
+                                        {itemLevel.level}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-right flex-shrink-0">
+                                      <span className="text-blue-600 font-medium text-lg">
+                                        {Number(item.score).toFixed(1)}
+                                      </span>
+                                      <span className="text-xs text-gray-500 ml-1">分</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 等级描述和评论 */}
+                                  <div className="space-y-1">
+                                    {itemLevel.description && (
+                                      <div className="text-xs text-gray-500 bg-white/50 px-2 py-1 rounded">
+                                        {itemLevel.description}
+                                      </div>
+                                    )}
+                                    {item.comment && (
+                                      <p className="text-sm text-gray-600 bg-white/50 px-2 py-1 rounded">{item.comment}</p>
+                                    )}
+                                  </div>
                                 </div>
-                                {item.comment && (
-                                  <p className="text-sm text-gray-600 mt-1">{item.comment}</p>
-                                )}
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       ))}
@@ -546,21 +692,45 @@ export default function EmployeeEvaluationResultPage() {
                           </div>
                           
                           <div className="space-y-3">
-                            {category.items.map((item) => (
-                              <div key={item.itemId} className="bg-purple-50 rounded-lg p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="font-medium">
-                                    {getItemName(category.categoryId, item.itemId)}
-                                  </span>
-                                  <span className="text-purple-600 font-medium">
-                                    {Number(item.score).toFixed(1)}
-                                  </span>
+                            {category.items.map((item) => {
+                              const itemLevel = getItemScoreLevel(Number(item.score), category.categoryId, item.itemId)
+                              return (
+                                <div key={item.itemId} className="bg-purple-50 rounded-lg p-3">
+                                  {/* 主要信息水平排列 */}
+                                  <div className="flex items-center justify-between gap-3 mb-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      <span className="font-medium truncate">
+                                        {getItemName(category.categoryId, item.itemId)}
+                                      </span>
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs whitespace-nowrap ${itemLevel.bgColor} ${itemLevel.color} ${itemLevel.borderColor}`}
+                                      >
+                                        {itemLevel.level}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-right flex-shrink-0">
+                                      <span className="text-purple-600 font-medium text-lg">
+                                        {Number(item.score).toFixed(1)}
+                                      </span>
+                                      <span className="text-xs text-gray-500 ml-1">分</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 等级描述和评论 */}
+                                  <div className="space-y-1">
+                                    {itemLevel.description && (
+                                      <div className="text-xs text-gray-500 bg-white/50 px-2 py-1 rounded">
+                                        {itemLevel.description}
+                                      </div>
+                                    )}
+                                    {item.comment && (
+                                      <p className="text-sm text-gray-600 bg-white/50 px-2 py-1 rounded">{item.comment}</p>
+                                    )}
+                                  </div>
                                 </div>
-                                {item.comment && (
-                                  <p className="text-sm text-gray-600 mt-1">{item.comment}</p>
-                                )}
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       ))}

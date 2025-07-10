@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Input } from "@/components/ui/input"
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Search, Calendar, User, Loader2, FileText, RefreshCw } from "lucide-react"
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Calendar, User, Loader2, FileText } from "lucide-react"
 import EmployeeHeader from "@/components/employee-header"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -15,15 +14,25 @@ import {
   evaluationService,
   EvaluationTask,
   Evaluation,
+  EvaluationComparison,
   evaluationUtils
 } from "@/lib/evaluation"
+
+// 评估状态分类接口
+interface EvaluationStatus {
+  selfOnly: EvaluationTask[]  // 只完成自评
+  fullCompleted: EvaluationTask[]  // 全部完成
+}
 
 export default function EmployeeEvaluationCenter() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [evaluationTasks, setEvaluationTasks] = useState<EvaluationTask[]>([])
   const [evaluationHistory, setEvaluationHistory] = useState<Evaluation[]>([])
+  const [evaluationStatus, setEvaluationStatus] = useState<EvaluationStatus>({
+    selfOnly: [],
+    fullCompleted: []
+  })
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("pending")
   const router = useRouter()
 
@@ -48,31 +57,51 @@ export default function EmployeeEvaluationCenter() {
 
       // 处理评估任务
       if (tasksResponse.code === 200 && tasksResponse.data) {
-        console.log('获取到的评估任务数据:', tasksResponse.data)
-        console.log('任务数量:', tasksResponse.data.length)
-        
-        // 分析任务状态分布
-        const statusCounts = tasksResponse.data.reduce((acc: any, task) => {
-          acc[task.status] = (acc[task.status] || 0) + 1
-          return acc
-        }, {})
-        console.log('任务状态分布:', statusCounts)
-        
-        // 特别检查completed状态的任务
-        const completedTasks = tasksResponse.data.filter(task => task.status === 'completed')
-        console.log('已完成任务:', completedTasks)
-        
         setEvaluationTasks(tasksResponse.data)
-      } else {
-        console.error('获取任务数据失败:', tasksResponse)
+        
+        // 分类已完成的评估任务
+        const completedTasks = tasksResponse.data.filter(task => task.status === 'completed')
+        
+        // 为已完成任务获取对比数据，判断是否全部完成
+        const statusPromises = completedTasks.map(async (task) => {
+          try {
+            const comparisonResponse = await evaluationService.getEvaluationComparison(
+              task.assessment_id, 
+              task.evaluatee_id
+            )
+            
+            if (comparisonResponse.code === 200 && comparisonResponse.data) {
+              const comparison = comparisonResponse.data
+              // 如果有领导评分，则是全部完成；否则只是自评完成
+              const hasLeaderEvaluation = comparison.leader_evaluation && comparison.leader_evaluation.score
+              return {
+                task,
+                isFullCompleted: hasLeaderEvaluation,
+                comparison
+              }
+            }
+          } catch (error) {
+            console.warn(`获取任务${task.id}对比数据失败:`, error)
+          }
+          
+          return {
+            task,
+            isFullCompleted: false,
+            comparison: undefined
+          }
+        })
+        
+        const statusResults = await Promise.all(statusPromises)
+        
+        const selfOnly = statusResults.filter(result => !result.isFullCompleted).map(result => result.task)
+        const fullCompleted = statusResults.filter(result => result.isFullCompleted).map(result => result.task)
+        
+        setEvaluationStatus({ selfOnly, fullCompleted })
       }
 
       // 处理评估历史
       if (historyResponse.code === 200 && historyResponse.data) {
-        console.log('获取到的评估历史数据:', historyResponse.data)
         setEvaluationHistory(historyResponse.data)
-      } else {
-        console.error('获取历史数据失败:', historyResponse)
       }
 
     } catch (error: any) {
@@ -113,42 +142,19 @@ export default function EmployeeEvaluationCenter() {
   }
 
   const filteredTasks = evaluationTasks.filter(task => {
-    const matchesSearch = task.assessment_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         task.evaluatee_name.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    let result = false
     switch (activeTab) {
       case 'pending':
-        result = matchesSearch && (task.status === 'pending' || task.status === 'in_progress')
-        break
+        return task.status === 'pending' || task.status === 'in_progress'
       case 'completed':
-        result = matchesSearch && task.status === 'completed'
-        break
+        return task.status === 'completed'
       case 'overdue':
-        result = matchesSearch && task.is_overdue
-        break
+        return task.is_overdue
       default:
-        result = matchesSearch
+        return true
     }
-    
-    // 调试：输出过滤结果
-    if (activeTab === 'completed') {
-      console.log(`任务 ${task.id} (${task.assessment_title}):`, {
-        status: task.status,
-        matchesSearch,
-        result,
-        statusMatch: task.status === 'completed'
-      })
-    }
-    
-    return result
   })
 
-  const filteredHistory = evaluationHistory.filter(evaluation => {
-    const matchesSearch = (evaluation.assessment_id?.toString() || '').includes(searchQuery) ||
-                         (evaluation.self_review && evaluation.self_review.toLowerCase().includes(searchQuery.toLowerCase()))
-    return matchesSearch
-  })
+  const filteredHistory = evaluationHistory
 
   const getTabCount = (tab: string) => {
     let count = 0
@@ -157,8 +163,7 @@ export default function EmployeeEvaluationCenter() {
         count = evaluationTasks.filter(task => task.status === 'pending' || task.status === 'in_progress').length
         break
       case 'completed':
-        count = evaluationTasks.filter(task => task.status === 'completed').length
-        console.log(`已完成任务计数: ${count}`, evaluationTasks.filter(task => task.status === 'completed'))
+        count = evaluationStatus.selfOnly.length + evaluationStatus.fullCompleted.length
         break
       case 'overdue':
         count = evaluationTasks.filter(task => task.is_overdue).length
@@ -167,7 +172,6 @@ export default function EmployeeEvaluationCenter() {
         count = 0
     }
     
-    console.log(`标签页 ${tab} 计数: ${count}`)
     return count
   }
 
@@ -207,33 +211,9 @@ export default function EmployeeEvaluationCenter() {
             返回个人中心
           </Button>
           
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">评估中心</h1>
-              <p className="text-gray-600">管理您的所有评估任务和历史记录</p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadData}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                刷新数据
-              </Button>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="搜索评估..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-            </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900">评估中心</h1>
+            <p className="text-gray-600">您的所有评估任务和历史记录</p>
           </div>
         </div>
 
@@ -348,59 +328,129 @@ export default function EmployeeEvaluationCenter() {
           </TabsContent>
 
           <TabsContent value="completed" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  已完成的评估任务
-                </CardTitle>
-                <CardDescription>
-                  您已完成的评估任务列表
-                </CardDescription>
-                {/* 调试信息 */}
-                <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800">
-                  调试信息: 总任务数 {evaluationTasks.length}, 已完成 {getTabCount('completed')}, 过滤后 {filteredTasks.length}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {filteredTasks.length > 0 ? (
-                  <div className="space-y-4">
-                    {filteredTasks.map((task) => (
-                      <div key={task.id} className="border rounded-lg p-4 bg-green-50 border-green-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h3 className="font-semibold text-lg">{task.assessment_title}</h3>
-                            <p className="text-sm text-gray-600">{task.assessment_period}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 已完成自评 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                    已完成自评
+                  </CardTitle>
+                  <CardDescription>
+                    等待领导评分的评估任务
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {evaluationStatus.selfOnly.length > 0 ? (
+                    <div className="space-y-4">
+                      {evaluationStatus.selfOnly.map((task) => (
+                        <div key={task.id} className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">{task.assessment_title}</h3>
+                              <p className="text-sm text-gray-600">{task.assessment_period}</p>
+                            </div>
+                            <Badge variant="outline" className="text-blue-600 border-blue-600">
+                              待领导评分
+                            </Badge>
                           </div>
-                          {getTaskStatusBadge(task)}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>截止：{evaluationUtils.formatDate(task.deadline)}</span>
+                          
+                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>截止：{evaluationUtils.formatDate(task.deadline)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <User className="w-4 h-4" />
+                              <span>被评估人：{task.evaluatee_name}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <User className="w-4 h-4" />
-                            <span>被评估人：{task.evaluatee_name}</span>
-                          </div>
-                        </div>
 
-                        <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg">
-                          <div className="flex items-center gap-2 text-green-700">
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="font-medium">评估已完成</span>
+                          <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                            <div className="flex items-center gap-2 text-blue-700">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="font-medium">自评已完成</span>
+                            </div>
+                            <p className="text-sm text-blue-600 mt-1">
+                              等待领导完成评分后可查看完整结果
+                            </p>
                           </div>
-                          <p className="text-sm text-green-600 mt-1">
-                            您可以查看评估结果和详细对比分析
-                          </p>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-500">
+                              提交时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/employee/evaluation/result/${task.assessment_id}`)}
+                            >
+                              查看详情
+                            </Button>
+                          </div>
                         </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-gray-500">
-                            完成时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Clock className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">暂无等待领导评分的评估</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* 已完成全部 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    已完成全部
+                  </CardTitle>
+                  <CardDescription>
+                    自评和领导评分都已完成
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {evaluationStatus.fullCompleted.length > 0 ? (
+                    <div className="space-y-4">
+                      {evaluationStatus.fullCompleted.map((task) => (
+                        <div key={task.id} className="border rounded-lg p-4 bg-green-50 border-green-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">{task.assessment_title}</h3>
+                              <p className="text-sm text-gray-600">{task.assessment_period}</p>
+                            </div>
+                            <Badge variant="outline" className="text-green-600 border-green-600">
+                              全部完成
+                            </Badge>
                           </div>
-                          <div className="flex gap-2">
+                          
+                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>截止：{evaluationUtils.formatDate(task.deadline)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <User className="w-4 h-4" />
+                              <span>被评估人：{task.evaluatee_name}</span>
+                            </div>
+                          </div>
+
+                          <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg">
+                            <div className="flex items-center gap-2 text-green-700">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="font-medium">全部评估已完成</span>
+                            </div>
+                            <p className="text-sm text-green-600 mt-1">
+                              可以查看完整评估结果和详细对比分析
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-500">
+                              完成时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
+                            </div>
                             <Button
                               variant="outline"
                               size="sm"
@@ -410,18 +460,17 @@ export default function EmployeeEvaluationCenter() {
                             </Button>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <CheckCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-medium mb-2">暂无已完成任务</h3>
-                    <p>完成评估任务后将在此显示</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <CheckCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">暂无完成的评估</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="overdue" className="space-y-4">
