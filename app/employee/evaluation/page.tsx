@@ -145,7 +145,7 @@ export default function EmployeeEvaluationCenter() {
   })
 
   const filteredHistory = evaluationHistory.filter(evaluation => {
-    const matchesSearch = evaluation.assessment_id.toString().includes(searchQuery) ||
+    const matchesSearch = (evaluation.assessment_id?.toString() || '').includes(searchQuery) ||
                          (evaluation.self_review && evaluation.self_review.toLowerCase().includes(searchQuery.toLowerCase()))
     return matchesSearch
   })
