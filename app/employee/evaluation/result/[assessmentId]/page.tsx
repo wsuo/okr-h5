@@ -244,13 +244,15 @@ export default function EmployeeEvaluationResultPage() {
               <div className="text-center">
                 <div className="mb-3">
                   <div className="text-3xl font-bold text-blue-600">
-                    {comparisonData.self_evaluation?.score.toFixed(1) || '--'}
+                    {comparisonData.self_evaluation?.score 
+                      ? Number(comparisonData.self_evaluation.score).toFixed(1)
+                      : '--'}
                   </div>
                   <div className="text-sm text-gray-600">自评得分</div>
                 </div>
                 <div className="text-sm text-gray-500">
                   {comparisonData.self_evaluation?.score 
-                    ? getScoreLevel(comparisonData.self_evaluation.score)
+                    ? getScoreLevel(Number(comparisonData.self_evaluation.score))
                     : '未完成'
                   }
                 </div>
@@ -265,13 +267,15 @@ export default function EmployeeEvaluationResultPage() {
               <div className="text-center">
                 <div className="mb-3">
                   <div className="text-3xl font-bold text-purple-600">
-                    {comparisonData.leader_evaluation?.score.toFixed(1) || '--'}
+                    {comparisonData.leader_evaluation?.score 
+                      ? Number(comparisonData.leader_evaluation.score).toFixed(1)
+                      : '--'}
                   </div>
                   <div className="text-sm text-gray-600">领导评分</div>
                 </div>
                 <div className="text-sm text-gray-500">
                   {comparisonData.leader_evaluation?.score 
-                    ? getScoreLevel(comparisonData.leader_evaluation.score)
+                    ? getScoreLevel(Number(comparisonData.leader_evaluation.score))
                     : '未完成'
                   }
                 </div>
@@ -287,7 +291,7 @@ export default function EmployeeEvaluationResultPage() {
                 <div className="mb-3">
                   <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${getDifferenceColor(comparisonData.comparison.overall_difference)}`}>
                     {getDifferenceIcon(comparisonData.comparison.overall_difference)}
-                    {Math.abs(comparisonData.comparison.overall_difference).toFixed(1)}
+                    {Math.abs(Number(comparisonData.comparison.overall_difference)).toFixed(1)}
                   </div>
                   <div className="text-sm text-gray-600">分差</div>
                 </div>
@@ -334,13 +338,13 @@ export default function EmployeeEvaluationResultPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="text-center p-3 bg-blue-50 rounded-lg">
                           <div className="text-2xl font-bold text-blue-600">
-                            {category.self_score.toFixed(1)}
+                            {Number(category.self_score).toFixed(1)}
                           </div>
                           <div className="text-sm text-gray-600">自评得分</div>
                         </div>
                         <div className="text-center p-3 bg-purple-50 rounded-lg">
                           <div className="text-2xl font-bold text-purple-600">
-                            {category.leader_score.toFixed(1)}
+                            {Number(category.leader_score).toFixed(1)}
                           </div>
                           <div className="text-sm text-gray-600">领导评分</div>
                         </div>
@@ -363,11 +367,11 @@ export default function EmployeeEvaluationResultPage() {
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <div>
                                 <span className="text-gray-600">自评：</span>
-                                <span className="font-medium">{item.self_score.toFixed(1)}</span>
+                                <span className="font-medium">{Number(item.self_score).toFixed(1)}</span>
                               </div>
                               <div>
                                 <span className="text-gray-600">领导：</span>
-                                <span className="font-medium">{item.leader_score.toFixed(1)}</span>
+                                <span className="font-medium">{Number(item.leader_score).toFixed(1)}</span>
                               </div>
                             </div>
                           </div>
@@ -396,10 +400,10 @@ export default function EmployeeEvaluationResultPage() {
                   <div className="space-y-6">
                     <div className="text-center">
                       <div className="text-4xl font-bold text-blue-600 mb-2">
-                        {comparisonData.self_evaluation.score.toFixed(1)}
+                        {Number(comparisonData.self_evaluation.score).toFixed(1)}
                       </div>
                       <div className="text-gray-600">
-                        {getScoreLevel(comparisonData.self_evaluation.score)}
+                        {getScoreLevel(Number(comparisonData.self_evaluation.score))}
                       </div>
                     </div>
 
@@ -413,7 +417,7 @@ export default function EmployeeEvaluationResultPage() {
                               )?.category_name || category.categoryId}
                             </h3>
                             <Badge variant="outline">
-                              {category.categoryScore.toFixed(1)}分
+                              {Number(category.categoryScore).toFixed(1)}分
                             </Badge>
                           </div>
                           
@@ -428,7 +432,7 @@ export default function EmployeeEvaluationResultPage() {
                                       ?.item_name || item.itemId}
                                   </span>
                                   <span className="text-blue-600 font-medium">
-                                    {item.score.toFixed(1)}
+                                    {Number(item.score).toFixed(1)}
                                   </span>
                                 </div>
                                 {item.comment && (
@@ -467,10 +471,10 @@ export default function EmployeeEvaluationResultPage() {
                   <div className="space-y-6">
                     <div className="text-center">
                       <div className="text-4xl font-bold text-purple-600 mb-2">
-                        {comparisonData.leader_evaluation.score.toFixed(1)}
+                        {Number(comparisonData.leader_evaluation.score).toFixed(1)}
                       </div>
                       <div className="text-gray-600">
-                        {getScoreLevel(comparisonData.leader_evaluation.score)}
+                        {getScoreLevel(Number(comparisonData.leader_evaluation.score))}
                       </div>
                     </div>
 
@@ -484,7 +488,7 @@ export default function EmployeeEvaluationResultPage() {
                               )?.category_name || category.categoryId}
                             </h3>
                             <Badge variant="outline">
-                              {category.categoryScore.toFixed(1)}分
+                              {Number(category.categoryScore).toFixed(1)}分
                             </Badge>
                           </div>
                           
@@ -499,7 +503,7 @@ export default function EmployeeEvaluationResultPage() {
                                       ?.item_name || item.itemId}
                                   </span>
                                   <span className="text-purple-600 font-medium">
-                                    {item.score.toFixed(1)}
+                                    {Number(item.score).toFixed(1)}
                                   </span>
                                 </div>
                                 {item.comment && (
