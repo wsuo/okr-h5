@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/auth-context"
 import {
   evaluationService,
   EvaluationComparison,
+  EvaluationTemplate,
   evaluationUtils
 } from "@/lib/evaluation"
 
@@ -24,6 +25,7 @@ export default function EmployeeEvaluationResultPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   
   const [comparisonData, setComparisonData] = useState<EvaluationComparison | null>(null)
+  const [templateData, setTemplateData] = useState<EvaluationTemplate | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -36,17 +38,27 @@ export default function EmployeeEvaluationResultPage() {
       return
     }
 
-    const loadComparisonData = async () => {
+    const loadData = async () => {
       try {
         setLoading(true)
         setError("")
 
-        const response = await evaluationService.getEvaluationComparison(assessmentId, user.id)
+        // 并行获取对比数据和模板数据
+        const [comparisonResponse, templateResponse] = await Promise.all([
+          evaluationService.getEvaluationComparison(assessmentId, user.id),
+          evaluationService.getEvaluationTemplate(assessmentId)
+        ])
         
-        if (response.code === 200 && response.data) {
-          setComparisonData(response.data)
+        if (comparisonResponse.code === 200 && comparisonResponse.data) {
+          setComparisonData(comparisonResponse.data)
         } else {
-          throw new Error(response.message || '无法获取评估结果')
+          throw new Error(comparisonResponse.message || '无法获取评估结果')
+        }
+
+        if (templateResponse.code === 200 && templateResponse.data) {
+          setTemplateData(templateResponse.data)
+        } else {
+          console.warn('获取模板数据失败，将使用ID作为显示名称')
         }
 
       } catch (error: any) {
@@ -57,10 +69,10 @@ export default function EmployeeEvaluationResultPage() {
       }
     }
     
-    loadComparisonData()
+    loadData()
   }, [assessmentId, isAuthenticated, user, authLoading])
 
-  const reloadComparisonData = async () => {
+  const reloadData = async () => {
     if (!isAuthenticated || !user) {
       setError('请先登录')
       return
@@ -70,12 +82,22 @@ export default function EmployeeEvaluationResultPage() {
       setLoading(true)
       setError("")
 
-      const response = await evaluationService.getEvaluationComparison(assessmentId, user.id)
+      // 并行获取对比数据和模板数据
+      const [comparisonResponse, templateResponse] = await Promise.all([
+        evaluationService.getEvaluationComparison(assessmentId, user.id),
+        evaluationService.getEvaluationTemplate(assessmentId)
+      ])
       
-      if (response.code === 200 && response.data) {
-        setComparisonData(response.data)
+      if (comparisonResponse.code === 200 && comparisonResponse.data) {
+        setComparisonData(comparisonResponse.data)
       } else {
-        throw new Error(response.message || '无法获取评估结果')
+        throw new Error(comparisonResponse.message || '无法获取评估结果')
+      }
+
+      if (templateResponse.code === 200 && templateResponse.data) {
+        setTemplateData(templateResponse.data)
+      } else {
+        console.warn('获取模板数据失败，将使用ID作为显示名称')
       }
 
     } catch (error: any) {
@@ -88,6 +110,25 @@ export default function EmployeeEvaluationResultPage() {
 
   const handleBack = () => {
     router.push('/employee/evaluation')
+  }
+
+  // 根据模板数据获取分类名称
+  const getCategoryName = (categoryId: string): string => {
+    if (!templateData) return categoryId
+    
+    const category = templateData.categories.find(cat => cat.id === categoryId)
+    return category?.name || categoryId
+  }
+
+  // 根据模板数据获取项目名称
+  const getItemName = (categoryId: string, itemId: string): string => {
+    if (!templateData) return itemId
+    
+    const category = templateData.categories.find(cat => cat.id === categoryId)
+    if (!category) return itemId
+    
+    const item = category.items.find(item => item.id === itemId)
+    return item?.name || itemId
   }
 
   const getScoreColor = (score: number) => {
@@ -177,7 +218,7 @@ export default function EmployeeEvaluationResultPage() {
             <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">无法获取评估结果</h3>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button variant="outline" onClick={reloadComparisonData}>
+            <Button variant="outline" onClick={reloadData}>
               重新加载
             </Button>
           </div>
@@ -431,9 +472,7 @@ export default function EmployeeEvaluationResultPage() {
                         <div key={category.categoryId} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold">
-                              {comparisonData.comparison?.category_differences?.find(
-                                c => c.categoryId === category.categoryId
-                              )?.category_name || category.categoryId}
+                              {getCategoryName(category.categoryId)}
                             </h3>
                             <Badge variant="outline">
                               {Number(category.categoryScore).toFixed(1)}分
@@ -445,10 +484,7 @@ export default function EmployeeEvaluationResultPage() {
                               <div key={item.itemId} className="bg-blue-50 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="font-medium">
-                                    {comparisonData.comparison?.category_differences
-                                      ?.find(c => c.categoryId === category.categoryId)
-                                      ?.item_differences?.find(i => i.itemId === item.itemId)
-                                      ?.item_name || item.itemId}
+                                    {getItemName(category.categoryId, item.itemId)}
                                   </span>
                                   <span className="text-blue-600 font-medium">
                                     {Number(item.score).toFixed(1)}
@@ -502,9 +538,7 @@ export default function EmployeeEvaluationResultPage() {
                         <div key={category.categoryId} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold">
-                              {comparisonData.comparison?.category_differences?.find(
-                                c => c.categoryId === category.categoryId
-                              )?.category_name || category.categoryId}
+                              {getCategoryName(category.categoryId)}
                             </h3>
                             <Badge variant="outline">
                               {Number(category.categoryScore).toFixed(1)}分
@@ -516,10 +550,7 @@ export default function EmployeeEvaluationResultPage() {
                               <div key={item.itemId} className="bg-purple-50 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="font-medium">
-                                    {comparisonData.comparison?.category_differences
-                                      ?.find(c => c.categoryId === category.categoryId)
-                                      ?.item_differences?.find(i => i.itemId === item.itemId)
-                                      ?.item_name || item.itemId}
+                                    {getItemName(category.categoryId, item.itemId)}
                                   </span>
                                   <span className="text-purple-600 font-medium">
                                     {Number(item.score).toFixed(1)}
