@@ -86,7 +86,7 @@ export default function EvaluationItemComponent({
           </div>
           
           {/* 滑块评分 */}
-          <div className="px-1">
+          <div className="px-2 py-1">
             <Slider
               id={`score-${item.id}`}
               min={0}
@@ -97,28 +97,31 @@ export default function EvaluationItemComponent({
               disabled={disabled}
               className="w-full"
             />
-            <div className="flex justify-between text-xs text-muted-foreground mt-2">
-              <span>0</span>
-              <span>{item.max_score}</span>
+            <div className="flex justify-between text-sm font-medium text-foreground mt-3 px-1">
+              <span className="bg-muted px-2 py-1 rounded-md">0</span>
+              <span className="bg-muted px-2 py-1 rounded-md">{item.max_score}</span>
             </div>
           </div>
           
-          {/* 数字输入 */}
-          <div className="flex items-center gap-3">
-            <Input
-              type="number"
-              min={0}
-              max={item.max_score}
-              value={value.score || 0}
-              onChange={(e) => handleScoreChange(Number(e.target.value) || 0)}
-              disabled={disabled}
-              className="w-24 sm:w-28 text-center font-medium touch-manipulation"
-              inputMode="numeric"
-            />
+          {/* 数字输入和操作按钮 */}
+          <div className="flex items-center justify-between gap-3 bg-muted/30 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium text-muted-foreground">精确输入:</Label>
+              <Input
+                type="number"
+                min={0}
+                max={item.max_score}
+                value={value.score || 0}
+                onChange={(e) => handleScoreChange(Number(e.target.value) || 0)}
+                disabled={disabled}
+                className="w-20 text-center font-bold bg-background border-border focus:border-primary"
+                inputMode="numeric"
+              />
+            </div>
             <button
               type="button"
               onClick={() => setShowCriteria(!showCriteria)}
-              className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors touch-manipulation min-h-[44px] px-2"
+              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors touch-manipulation min-h-[40px] px-3 py-2 rounded-md hover:bg-primary/10"
             >
               <Info className="w-4 h-4" />
               <span className="hidden sm:inline">评分标准</span>

@@ -206,22 +206,27 @@ export default function EmployeeSelfEvaluationPage() {
     <div className="min-h-screen bg-gray-50">
       <EmployeeHeader userInfo={userInfo} />
       
-      <div className="container mx-auto p-4 max-w-6xl">
-        <div className="mb-6">
-          <Button variant="ghost" onClick={handleBack} className="mb-4">
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <div className="mb-8">
+          <Button variant="ghost" onClick={handleBack} className="mb-6 hover:bg-accent">
             <ArrowLeft className="w-4 h-4 mr-2" />
             返回个人中心
           </Button>
           
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">{template.assessment_title}</h1>
-            <p className="text-gray-600 mt-1">
+          <div className="text-center bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl p-6 border border-border/50">
+            <h1 className="text-3xl font-bold text-foreground mb-2">{template.assessment_title}</h1>
+            <p className="text-muted-foreground text-lg mb-4">
               {template.assessment_period} · 自我评估
             </p>
-            <div className="mt-4 text-sm text-gray-500">
-              <span>自评权重: {template.scoring_rules.self_evaluation.weight_in_final}%</span>
-              <span className="mx-2">·</span>
-              <span>满分: {template.total_score}分</span>
+            <div className="flex flex-wrap justify-center gap-4 text-sm">
+              <div className="bg-background/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-border/30">
+                <span className="font-medium text-primary">自评权重:</span>
+                <span className="ml-1 font-bold">{(template.scoring_rules.self_evaluation.weight_in_final * 100).toFixed(0)}%</span>
+              </div>
+              <div className="bg-background/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-border/30">
+                <span className="font-medium text-primary">满分:</span>
+                <span className="ml-1 font-bold">{template.total_score}分</span>
+              </div>
             </div>
           </div>
         </div>

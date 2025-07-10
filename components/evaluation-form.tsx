@@ -502,17 +502,26 @@ export default function EvaluationForm({
                 <button
                   key={category.id}
                   onClick={() => goToCategory(index)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all whitespace-nowrap touch-manipulation min-h-[44px] ${
+                  className={`flex items-center gap-2 px-4 py-3 rounded-lg border transition-all whitespace-nowrap touch-manipulation min-h-[48px] font-medium ${
                     isCurrent 
-                      ? 'bg-primary text-primary-foreground border-primary' 
+                      ? 'bg-slate-800 text-white border-slate-700 shadow-md' 
                       : isCompleted
-                        ? 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100'
-                        : 'bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
+                        ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100 hover:border-green-400'
+                        : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
                   }`}
                 >
                   {isCompleted && <CheckCircle className="w-4 h-4" />}
                   <span className="font-medium text-sm">{category.name}</span>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs font-semibold ${
+                      isCurrent 
+                        ? 'bg-white/20 text-white border-white/30' 
+                        : isCompleted
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : 'bg-gray-100 text-gray-800 border-gray-300'
+                    }`}
+                  >
                     {categoryScore?.categoryScore.toFixed(1) || '0.0'}
                   </Badge>
                 </button>
