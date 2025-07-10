@@ -206,7 +206,7 @@ export default function EmployeeSelfEvaluationPage() {
     <div className="min-h-screen bg-gray-50">
       <EmployeeHeader userInfo={userInfo} />
       
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto p-4 max-w-6xl">
         <div className="mb-6">
           <Button variant="ghost" onClick={handleBack} className="mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />

@@ -472,10 +472,10 @@ export default function EvaluationForm({
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-primary">
                 {overallScore.toFixed(1)}
               </div>
-              <div className="text-sm text-gray-500">预估总分</div>
+              <div className="text-sm text-muted-foreground">预估总分</div>
             </div>
           </div>
           
@@ -492,7 +492,7 @@ export default function EvaluationForm({
       {/* 分类导航 */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-2 overflow-x-auto">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {evaluableCategories.map((category, index) => {
               const categoryScore = detailedScores.find(s => s.categoryId === category.id)
               const isCompleted = categoryScore && categoryScore.categoryScore > 0
@@ -502,16 +502,16 @@ export default function EvaluationForm({
                 <button
                   key={category.id}
                   onClick={() => goToCategory(index)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all whitespace-nowrap touch-manipulation min-h-[44px] ${
                     isCurrent 
-                      ? 'bg-blue-600 text-white border-blue-600' 
+                      ? 'bg-primary text-primary-foreground border-primary' 
                       : isCompleted
-                        ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                        ? 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100'
+                        : 'bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground'
                   }`}
                 >
                   {isCompleted && <CheckCircle className="w-4 h-4" />}
-                  <span className="font-medium">{category.name}</span>
+                  <span className="font-medium text-sm">{category.name}</span>
                   <Badge variant="outline" className="text-xs">
                     {categoryScore?.categoryScore.toFixed(1) || '0.0'}
                   </Badge>
@@ -531,10 +531,10 @@ export default function EvaluationForm({
               <p className="text-gray-600 mt-1">{currentCategory.description}</p>
             </div>
             <div className="text-right">
-              <div className="text-xl font-bold text-blue-600">
+              <div className="text-xl font-bold text-primary">
                 {currentScore.categoryScore.toFixed(1)}
               </div>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted-foreground">
                 权重: {currentCategory.weight}%
               </div>
             </div>
@@ -620,12 +620,13 @@ export default function EvaluationForm({
       {/* 操作按钮 */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 onClick={goToPrevious}
                 disabled={currentCategoryIndex === 0 || submitting}
+                className="touch-manipulation"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 上一项
@@ -635,6 +636,7 @@ export default function EvaluationForm({
                 <Button
                   onClick={goToNext}
                   disabled={submitting}
+                  className="touch-manipulation"
                 >
                   下一项
                   <ChevronRight className="w-4 h-4 ml-2" />
@@ -643,7 +645,7 @@ export default function EvaluationForm({
                 <Button
                   onClick={handleSubmit}
                   disabled={submitting || !overallReview.trim()}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-green-600 hover:bg-green-700 touch-manipulation"
                 >
                   {submitting ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -657,7 +659,7 @@ export default function EvaluationForm({
 
             <div className="flex items-center gap-2">
               {/* 保存状态显示 */}
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted-foreground">
                 {saving ? (
                   <span className="flex items-center gap-1">
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -677,13 +679,15 @@ export default function EvaluationForm({
                 size="sm"
                 onClick={handleSaveDraft}
                 disabled={saving || submitting}
+                className="touch-manipulation"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-1" />
                 )}
-                保存草稿
+                <span className="hidden sm:inline">保存草稿</span>
+                <span className="sm:hidden">保存</span>
               </Button>
             </div>
           </div>

@@ -80,13 +80,13 @@ export default function EvaluationItemComponent({
               分数 (0-{item.max_score})
             </Label>
             <div className="text-right">
-              <span className="text-2xl font-bold text-blue-600">{value.score || 0}</span>
-              <span className="text-sm text-gray-500 ml-1">/ {item.max_score}</span>
+              <span className="text-2xl font-bold text-primary">{value.score || 0}</span>
+              <span className="text-sm text-muted-foreground ml-1">/ {item.max_score}</span>
             </div>
           </div>
           
           {/* 滑块评分 */}
-          <div className="px-2">
+          <div className="px-1">
             <Slider
               id={`score-${item.id}`}
               min={0}
@@ -97,14 +97,14 @@ export default function EvaluationItemComponent({
               disabled={disabled}
               className="w-full"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-muted-foreground mt-2">
               <span>0</span>
               <span>{item.max_score}</span>
             </div>
           </div>
           
           {/* 数字输入 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Input
               type="number"
               min={0}
@@ -112,15 +112,17 @@ export default function EvaluationItemComponent({
               value={value.score || 0}
               onChange={(e) => handleScoreChange(Number(e.target.value) || 0)}
               disabled={disabled}
-              className="w-20 text-center"
+              className="w-24 sm:w-28 text-center font-medium touch-manipulation"
+              inputMode="numeric"
             />
             <button
               type="button"
               onClick={() => setShowCriteria(!showCriteria)}
-              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+              className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors touch-manipulation min-h-[44px] px-2"
             >
               <Info className="w-4 h-4" />
-              评分标准
+              <span className="hidden sm:inline">评分标准</span>
+              <span className="sm:hidden">标准</span>
             </button>
           </div>
         </div>
