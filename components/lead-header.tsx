@@ -14,15 +14,21 @@ interface LeadHeaderProps {
     role: string
     id?: number
   }
+  pendingTasksCount?: number  // 可选的待办任务数量
 }
 
-export default function LeadHeader({ userInfo }: LeadHeaderProps) {
+export default function LeadHeader({ userInfo, pendingTasksCount: propPendingTasksCount }: LeadHeaderProps) {
   const router = useRouter()
   const [pendingTasksCount, setPendingTasksCount] = useState(0)
 
   useEffect(() => {
-    loadPendingTasksCount()
-  }, [])
+    // 如果从props传入了数量，使用传入的值；否则自己获取
+    if (propPendingTasksCount !== undefined) {
+      setPendingTasksCount(propPendingTasksCount)
+    } else {
+      loadPendingTasksCount()
+    }
+  }, [propPendingTasksCount])
 
   const loadPendingTasksCount = async () => {
     try {

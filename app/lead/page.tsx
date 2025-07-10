@@ -58,21 +58,26 @@ export default function LeadDashboard() {
       // 获取需要我评分的评估任务
       const tasksResponse = await evaluationService.getEvaluationsToGive()
       if (tasksResponse.code === 200 && tasksResponse.data) {
-        setEvaluationTasks(tasksResponse.data.map(evaluation => ({
-          id: `leader_${evaluation.assessment_id}_${evaluation.evaluatee_id}`,
-          assessment_id: evaluation.assessment_id,
-          assessment_title: evaluation.assessment?.title || `评估 #${evaluation.assessment_id}`,
-          assessment_period: evaluation.assessment?.period || evaluationUtils.formatDate(evaluation.created_at),
-          type: 'leader' as const,
-          evaluatee_id: evaluation.evaluatee_id,
-          evaluatee_name: evaluation.evaluatee?.name || `用户 #${evaluation.evaluatee_id}`,
-          evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
-          status: evaluation.status === 'submitted' ? 'completed' as const : 'pending' as const,
-          deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          is_overdue: false,
-          evaluation_id: evaluation.id,
-          last_updated: evaluation.updated_at
-        })))
+        setEvaluationTasks(tasksResponse.data.map(evaluation => {
+          const assessmentId = evaluation.assessment?.id
+          const evaluateeId = evaluation.evaluatee?.id
+          
+          return {
+            id: `leader_${assessmentId}_${evaluateeId}`,
+            assessment_id: assessmentId,
+            assessment_title: evaluation.assessment?.title || `评估 #${assessmentId}`,
+            assessment_period: evaluation.assessment?.period || evaluationUtils.formatDate(evaluation.created_at),
+            type: 'leader' as const,
+            evaluatee_id: evaluateeId,
+            evaluatee_name: evaluation.evaluatee?.name || `用户 #${evaluateeId}`,
+            evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
+            status: evaluation.status === 'submitted' ? 'completed' as const : 'pending' as const,
+            deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            is_overdue: false,
+            evaluation_id: evaluation.id,
+            last_updated: evaluation.updated_at
+          }
+        }))
       }
 
       // 获取当前活跃的考核
@@ -188,9 +193,11 @@ export default function LeadDashboard() {
     )
   }
 
+  const pendingTasksCount = evaluationTasks.filter(task => task.status === 'pending').length
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <LeadHeader userInfo={userInfo} />
+      <LeadHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
 
       <div className="container mx-auto p-4 max-w-4xl">
         <div className="mb-6 flex items-center justify-between">
