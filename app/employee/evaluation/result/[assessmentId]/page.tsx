@@ -289,18 +289,30 @@ export default function EmployeeEvaluationResultPage() {
               {/* 分差 */}
               <div className="text-center">
                 <div className="mb-3">
-                  <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${getDifferenceColor(comparisonData.comparison.overall_difference)}`}>
-                    {getDifferenceIcon(comparisonData.comparison.overall_difference)}
-                    {Math.abs(Number(comparisonData.comparison.overall_difference)).toFixed(1)}
+                  <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${
+                    comparisonData.comparison?.overall_difference !== undefined 
+                      ? getDifferenceColor(comparisonData.comparison.overall_difference)
+                      : 'text-gray-600'
+                  }`}>
+                    {comparisonData.comparison?.overall_difference !== undefined 
+                      ? getDifferenceIcon(comparisonData.comparison.overall_difference)
+                      : <Minus className="w-4 h-4 text-gray-600" />
+                    }
+                    {comparisonData.comparison?.overall_difference !== undefined 
+                      ? Math.abs(Number(comparisonData.comparison.overall_difference)).toFixed(1)
+                      : '--'
+                    }
                   </div>
                   <div className="text-sm text-gray-600">分差</div>
                 </div>
                 <div className="text-sm text-gray-500">
-                  {comparisonData.comparison.overall_difference > 0 
-                    ? '领导评分更高' 
-                    : comparisonData.comparison.overall_difference < 0 
-                      ? '自评更高' 
-                      : '评分一致'
+                  {comparisonData.comparison?.overall_difference !== undefined
+                    ? comparisonData.comparison.overall_difference > 0 
+                      ? '领导评分更高' 
+                      : comparisonData.comparison.overall_difference < 0 
+                        ? '自评更高' 
+                        : '评分一致'
+                    : '暂无对比数据'
                   }
                 </div>
               </div>
@@ -322,6 +334,7 @@ export default function EmployeeEvaluationResultPage() {
                 <CardDescription>各个评分项目的详细对比分析</CardDescription>
               </CardHeader>
               <CardContent>
+                {comparisonData.comparison?.category_differences ? (
                 <div className="space-y-6">
                   {comparisonData.comparison.category_differences.map((category) => (
                     <div key={category.categoryId} className="border rounded-lg p-4">
@@ -380,6 +393,12 @@ export default function EmployeeEvaluationResultPage() {
                     </div>
                   ))}
                 </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>暂无对比数据</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -412,7 +431,7 @@ export default function EmployeeEvaluationResultPage() {
                         <div key={category.categoryId} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold">
-                              {comparisonData.comparison.category_differences.find(
+                              {comparisonData.comparison?.category_differences?.find(
                                 c => c.categoryId === category.categoryId
                               )?.category_name || category.categoryId}
                             </h3>
@@ -426,9 +445,9 @@ export default function EmployeeEvaluationResultPage() {
                               <div key={item.itemId} className="bg-blue-50 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="font-medium">
-                                    {comparisonData.comparison.category_differences
-                                      .find(c => c.categoryId === category.categoryId)
-                                      ?.item_differences.find(i => i.itemId === item.itemId)
+                                    {comparisonData.comparison?.category_differences
+                                      ?.find(c => c.categoryId === category.categoryId)
+                                      ?.item_differences?.find(i => i.itemId === item.itemId)
                                       ?.item_name || item.itemId}
                                   </span>
                                   <span className="text-blue-600 font-medium">
@@ -483,7 +502,7 @@ export default function EmployeeEvaluationResultPage() {
                         <div key={category.categoryId} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold">
-                              {comparisonData.comparison.category_differences.find(
+                              {comparisonData.comparison?.category_differences?.find(
                                 c => c.categoryId === category.categoryId
                               )?.category_name || category.categoryId}
                             </h3>
@@ -497,9 +516,9 @@ export default function EmployeeEvaluationResultPage() {
                               <div key={item.itemId} className="bg-purple-50 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="font-medium">
-                                    {comparisonData.comparison.category_differences
-                                      .find(c => c.categoryId === category.categoryId)
-                                      ?.item_differences.find(i => i.itemId === item.itemId)
+                                    {comparisonData.comparison?.category_differences
+                                      ?.find(c => c.categoryId === category.categoryId)
+                                      ?.item_differences?.find(i => i.itemId === item.itemId)
                                       ?.item_name || item.itemId}
                                   </span>
                                   <span className="text-purple-600 font-medium">
