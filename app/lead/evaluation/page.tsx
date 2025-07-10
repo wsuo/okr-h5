@@ -61,14 +61,14 @@ export default function LeadEvaluationCenter() {
         const tasks = tasksResponse.data.map(evaluation => ({
           id: `leader_${evaluation.assessment_id}_${evaluation.evaluatee_id}`,
           assessment_id: evaluation.assessment_id,
-          assessment_title: `评估 #${evaluation.assessment_id}`,
-          assessment_period: evaluationUtils.formatDate(evaluation.created_at),
+          assessment_title: evaluation.assessment?.title || `评估 #${evaluation.assessment_id}`,
+          assessment_period: evaluation.assessment?.period || evaluationUtils.formatDate(evaluation.created_at),
           type: 'leader' as const,
           evaluatee_id: evaluation.evaluatee_id,
-          evaluatee_name: `用户 #${evaluation.evaluatee_id}`,
-          evaluatee_department: '技术部',
+          evaluatee_name: evaluation.evaluatee?.name || `用户 #${evaluation.evaluatee_id}`,
+          evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
           status: evaluation.status === 'submitted' ? 'completed' as const : 'pending' as const,
-          deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           is_overdue: false,
           evaluation_id: evaluation.id,
           last_updated: evaluation.updated_at
@@ -562,7 +562,7 @@ export default function LeadEvaluationCenter() {
                           <div>
                             <h3 className="font-semibold text-lg">评估 #{evaluation.assessment_id}</h3>
                             <p className="text-sm text-gray-600">
-                              被评估人：用户 #{evaluation.evaluatee_id}
+                              被评估人：{evaluation.evaluatee?.name || `用户 #${evaluation.evaluatee_id}`}
                             </p>
                           </div>
                           {getEvaluationStatusBadge(evaluation)}

@@ -28,6 +28,21 @@ export interface Evaluation {
   improvements?: string
   created_at: string
   updated_at: string
+  // 关联对象
+  evaluatee?: {
+    id: number
+    name: string
+    department?: {
+      id: number
+      name: string
+    }
+  }
+  assessment?: {
+    id: number
+    title: string
+    period: string
+    deadline: string
+  }
 }
 
 // 评估详细信息接口
