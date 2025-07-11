@@ -13,6 +13,17 @@ import { ArrowLeft, ArrowRight, Save, Send, User, AlertTriangle } from "lucide-r
 import { useRouter, useParams } from "next/navigation"
 import LeadHeader from "@/components/lead-header"
 import { safeParseUserInfo } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface AssessmentItem {
   id: string
@@ -36,6 +47,7 @@ export default function LeadAssessmentPage() {
   const [assessmentData, setAssessmentData] = useState<AssessmentItem[]>([])
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [finalComment, setFinalComment] = useState("")
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false)
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -174,6 +186,12 @@ export default function LeadAssessmentPage() {
       return
     }
 
+    setShowPublishConfirm(true)
+  }
+
+  const handleConfirmPublish = () => {
+    setShowPublishConfirm(false)
+    
     // 模拟计算最终得分
     const leaderScore = Number.parseFloat(calculateTotalScore())
     const selfScore = params.employeeId === "zhangsan" ? 85.2 : 88.1 // 模拟员工自评分数
@@ -277,10 +295,33 @@ export default function LeadAssessmentPage() {
             <Button variant="outline" onClick={() => setIsPreviewMode(false)}>
               返回编辑
             </Button>
-            <Button onClick={handlePublish} className="bg-green-600 hover:bg-green-700">
-              <Send className="w-4 h-4 mr-2" />
-              发布结果
-            </Button>
+            <AlertDialog open={showPublishConfirm} onOpenChange={setShowPublishConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button onClick={handlePublish} className="bg-green-600 hover:bg-green-700">
+                  <Send className="w-4 h-4 mr-2" />
+                  发布结果
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    确认发布评分结果
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    您确定要发布对 <span className="font-semibold">{employeeInfo?.name}</span> 的评分结果吗？
+                    <br />
+                    <span className="text-red-600 font-medium">发布后将无法修改，员工将能看到最终评分和评价。</span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmPublish} className="bg-green-600 hover:bg-green-700">
+                    确定发布
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

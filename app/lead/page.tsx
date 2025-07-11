@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Clock, CheckCircle, TrendingUp, AlertTriangle, Loader2, BookOpen, FileText } from "lucide-react"
+import { Users, Clock, CheckCircle, TrendingUp, AlertTriangle, Loader2, BookOpen, FileText, Calendar } from "lucide-react"
 import LeadHeader from "@/components/lead-header"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -16,24 +16,15 @@ import {
   evaluationUtils
 } from "@/lib/evaluation"
 import { assessmentService, AssessmentListItem } from "@/lib/assessment"
+import { teamService, TeamMember, teamUtils } from "@/lib/team"
 import { safeParseUserInfo } from "@/lib/utils"
 
-interface TeamMemberStats {
-  user_id: number
-  user_name: string
-  position?: string
-  department?: string
-  pending_tasks: number
-  completed_tasks: number
-  latest_score?: number
-  average_score?: number
-}
+// 使用 team.ts 中的 TeamMember 类型
 
 export default function LeadDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [evaluationTasks, setEvaluationTasks] = useState<EvaluationTask[]>([])
-  const [activeAssessments, setActiveAssessments] = useState<AssessmentListItem[]>([])
-  const [teamStats, setTeamStats] = useState<TeamMemberStats[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [overallStats, setOverallStats] = useState({
     totalMembers: 0,
@@ -60,8 +51,13 @@ export default function LeadDashboard() {
     try {
       setLoading(true)
 
-      // 获取需要我评分的评估任务
-      const tasksResponse = await evaluationService.getEvaluationsToGive()
+      // 并行加载数据
+      const [tasksResponse, teamResponse] = await Promise.all([
+        evaluationService.getEvaluationsToGive(),
+        teamService.getTeamMembers()
+      ])
+
+      // 处理评估任务数据
       if (tasksResponse.code === 200 && tasksResponse.data) {
         setEvaluationTasks(tasksResponse.data.map(evaluation => {
           const assessmentId = evaluation.assessment?.id
@@ -85,73 +81,31 @@ export default function LeadDashboard() {
         }))
       }
 
-      // 获取当前活跃的考核
-      const assessmentsResponse = await assessmentService.getAssessments({
-        status: 'active',
-        limit: 10
-      })
-      
-      if (assessmentsResponse.code === 200 && assessmentsResponse.data) {
-        setActiveAssessments(assessmentsResponse.data.items)
-
-        // 为每个活跃考核获取详细进度
-        const progressPromises = assessmentsResponse.data.items.map(async (assessment) => {
-          try {
-            const progressResponse = await evaluationService.getEvaluationProgress(assessment.id)
-            return progressResponse.code === 200 ? progressResponse.data : null
-          } catch (error) {
-            console.warn(`获取考核${assessment.id}进度失败:`, error)
-            return null
-          }
-        })
-
-        const progressResults = await Promise.all(progressPromises)
-        const validProgress = progressResults.filter(p => p !== null) as EvaluationProgress[]
-
-        // 汇总团队统计数据
-        let totalMembers = 0
-        let pendingEvaluations = 0
-        let totalScore = 0
-        let scoreCount = 0
-        let totalCompleted = 0
-        let totalTasks = 0
-
-        const memberStatsMap = new Map<number, TeamMemberStats>()
-
-        validProgress.forEach(progress => {
-          totalMembers += progress.total_participants
-          pendingEvaluations += (progress.total_participants - progress.leader_completed_count)
-          totalCompleted += progress.leader_completed_count
-          totalTasks += progress.total_participants
-
-          progress.participants.forEach(participant => {
-            if (!memberStatsMap.has(participant.user_id)) {
-              memberStatsMap.set(participant.user_id, {
-                user_id: participant.user_id,
-                user_name: participant.user_name,
-                department: participant.department,
-                pending_tasks: 0,
-                completed_tasks: 0
-              })
-            }
-
-            const stats = memberStatsMap.get(participant.user_id)!
-            if (participant.leader_status === 'completed') {
-              stats.completed_tasks += 1
-            } else {
-              stats.pending_tasks += 1
-            }
-          })
-        })
-
-        setTeamStats(Array.from(memberStatsMap.values()))
+      // 处理团队成员数据
+      if (teamResponse.code === 200 && teamResponse.data) {
+        setTeamMembers(teamResponse.data.members)
         
-        const completionRate = totalTasks > 0 ? (totalCompleted / totalTasks) * 100 : 0
+        // 计算统计数据
+        const { members, total_members, active_assessments_count, self_completed_count, leader_completed_count } = teamResponse.data
+        
+        // 计算平均分
+        const scoresData = members
+          .filter(member => member.evaluation_status.final_score !== null)
+          .map(member => member.evaluation_status.final_score!)
+        
+        const teamAverageScore = scoresData.length > 0 
+          ? scoresData.reduce((sum, score) => sum + score, 0) / scoresData.length 
+          : 0
+        
+        // 计算完成率
+        const completionRate = total_members > 0 
+          ? (leader_completed_count / total_members) * 100 
+          : 0
         
         setOverallStats({
-          totalMembers: Math.max(...validProgress.map(p => p.total_participants), 0),
-          pendingEvaluations,
-          teamAverageScore: scoreCount > 0 ? totalScore / scoreCount : 0,
+          totalMembers: total_members,
+          pendingEvaluations: total_members - leader_completed_count,
+          teamAverageScore,
           completionRate
         })
       }
@@ -337,42 +291,93 @@ export default function LeadDashboard() {
             <CardDescription>您的团队成员绩效概览</CardDescription>
           </CardHeader>
           <CardContent>
-            {teamStats.length > 0 ? (
+            {teamMembers.length > 0 ? (
               <div className="space-y-4">
-                {teamStats.map((member) => (
+                {teamMembers.map((member) => (
                   <div key={member.user_id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <h3 className="font-semibold">{member.user_name}</h3>
-                        <p className="text-sm text-gray-600">{member.department}</p>
+                        <p className="text-sm text-gray-600">{member.department} · {member.position}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-gray-600">最近得分</p>
-                        <p className={`text-lg font-bold ${getScoreColor(member.latest_score || 0)}`}>
-                          {member.latest_score?.toFixed(1) || '--'}
+                        <p className="text-sm text-gray-600">当前得分</p>
+                        <p className={`text-lg font-bold ${teamUtils.getScoreColor(member.evaluation_status.final_score)}`}>
+                          {member.evaluation_status.final_score?.toFixed(1) || '--'}
                         </p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                      <div>
-                        <span className="text-gray-600">平均得分：</span>
-                        <span className={`font-semibold ${getScoreColor(member.average_score || 0)}`}>
-                          {member.average_score?.toFixed(1) || '--'}
+                    
+                    {/* 考核信息 */}
+                    <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          {member.current_assessment.assessment_title}
                         </span>
+                        <Badge className={teamUtils.getStatusColor(member)}>
+                          {teamUtils.formatEvaluationStatus(member)}
+                        </Badge>
                       </div>
-                      <div>
-                        <span className="text-gray-600">待办事项：</span>
-                        <span className="font-semibold">{member.pending_tasks}</span>
+                      <div className="flex items-center text-xs text-gray-500 gap-4">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {member.current_assessment.period}
+                        </span>
+                        {member.is_historical && (
+                          <span className="text-orange-600">历史考核</span>
+                        )}
+                        {member.has_active_assessment && teamUtils.isAssessmentOverdue(member.current_assessment) && (
+                          <span className="text-red-600">已过期</span>
+                        )}
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full bg-transparent"
-                      onClick={() => router.push(`/lead/member/${member.user_id}`)}
-                    >
-                      查看详情
-                    </Button>
+
+                    {/* 评分状态 */}
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                      <div>
+                        <span className="text-gray-600">自评状态：</span>
+                        <span className={`font-semibold ${member.evaluation_status.self_completed ? 'text-green-600' : 'text-gray-400'}`}>
+                          {member.evaluation_status.self_completed ? '已完成' : '未完成'}
+                        </span>
+                        {member.evaluation_status.self_score && (
+                          <span className="ml-1 text-gray-500">
+                            ({member.evaluation_status.self_score}分)
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">我的评分：</span>
+                        <span className={`font-semibold ${member.evaluation_status.leader_completed ? 'text-green-600' : 'text-orange-600'}`}>
+                          {member.evaluation_status.leader_completed ? '已完成' : '待评分'}
+                        </span>
+                        {member.evaluation_status.leader_score && (
+                          <span className="ml-1 text-gray-500">
+                            ({member.evaluation_status.leader_score}分)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 操作按钮 */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => router.push(`/lead/member/${member.user_id}`)}
+                      >
+                        查看详情
+                      </Button>
+                      {member.has_active_assessment && !member.evaluation_status.leader_completed && (
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/lead/evaluation/${member.current_assessment.assessment_id}/${member.user_id}`)}
+                        >
+                          开始评分
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

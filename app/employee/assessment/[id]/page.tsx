@@ -8,10 +8,21 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ArrowRight, Save, Send } from "lucide-react"
+import { ArrowLeft, ArrowRight, Save, Send, AlertTriangle } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import EmployeeHeader from "@/components/employee-header"
 import { safeParseUserInfo } from "@/lib/utils"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface AssessmentItem {
   id: string
@@ -32,6 +43,7 @@ export default function EmployeeAssessmentPage() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [assessmentData, setAssessmentData] = useState<AssessmentItem[]>([])
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -143,6 +155,11 @@ export default function EmployeeAssessmentPage() {
       return
     }
 
+    setShowSubmitConfirm(true)
+  }
+
+  const handleConfirmSubmit = () => {
+    setShowSubmitConfirm(false)
     alert("自评提交成功！")
     router.push("/employee")
   }
@@ -266,10 +283,33 @@ export default function EmployeeAssessmentPage() {
               <Save className="w-4 h-4 mr-2" />
               保存草稿
             </Button>
-            <Button onClick={handleSubmit}>
-              <Send className="w-4 h-4 mr-2" />
-              提交自评
-            </Button>
+            <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button onClick={handleSubmit}>
+                  <Send className="w-4 h-4 mr-2" />
+                  提交自评
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    确认提交自评
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    您确定要提交自评吗？
+                    <br />
+                    <span className="text-red-600 font-medium">提交后将无法修改，请确认所有评分内容准确无误。</span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmSubmit} className="bg-blue-600 hover:bg-blue-700">
+                    确定提交
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

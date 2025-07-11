@@ -5,17 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, User, TrendingUp, Calendar, Award, BarChart3 } from "lucide-react"
+import { ArrowLeft, User, TrendingUp, Calendar, Award, BarChart3, Loader2, Eye } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import LeadHeader from "@/components/lead-header"
 import { safeParseUserInfo } from "@/lib/utils"
+import { teamService, teamUtils, EmployeeAssessmentHistory, EmployeeEvaluationStats } from "@/lib/team"
+import { evaluationService } from "@/lib/evaluation"
+import { toast } from "sonner"
 
 export default function MemberDetailPage() {
   const router = useRouter()
   const params = useParams()
   const [userInfo, setUserInfo] = useState<any>(null)
   const [memberInfo, setMemberInfo] = useState<any>(null)
+  const [employeeStats, setEmployeeStats] = useState<EmployeeEvaluationStats | null>(null)
+  const [assessmentHistory, setAssessmentHistory] = useState<EmployeeAssessmentHistory[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const userId = parseInt(params.id as string)
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -26,54 +35,95 @@ export default function MemberDetailPage() {
       return
     }
 
-    // 模拟加载成员详细信息
-    const mockMemberInfo = {
-      id: params.id,
-      name: params.id === "zhangsan" ? "张三" : "王五",
-      position: params.id === "zhangsan" ? "前端工程师" : "后端工程师",
-      department: "技术部",
-      joinDate: params.id === "zhangsan" ? "2023-03-15" : "2023-05-20",
-      currentScore: params.id === "zhangsan" ? 85.2 : 88.7,
-      avgScore: params.id === "zhangsan" ? 83.5 : 86.3,
-      trend: "up",
-      historyRecords: [
-        {
-          id: "2023-12",
-          title: "2023年12月绩效考核",
-          finalScore: params.id === "zhangsan" ? 87.5 : 90.2,
-          selfScore: params.id === "zhangsan" ? 85.2 : 88.1,
-          leaderScore: params.id === "zhangsan" ? 88.9 : 91.5,
-          date: "2023-12-31",
-          status: "completed",
-        },
-        {
-          id: "2023-11",
-          title: "2023年11月绩效考核",
-          finalScore: params.id === "zhangsan" ? 82.3 : 85.8,
-          selfScore: params.id === "zhangsan" ? 80.1 : 84.2,
-          leaderScore: params.id === "zhangsan" ? 83.8 : 86.9,
-          date: "2023-11-30",
-          status: "completed",
-        },
-        {
-          id: "2023-10",
-          title: "2023年10月绩效考核",
-          finalScore: params.id === "zhangsan" ? 80.8 : 83.5,
-          selfScore: params.id === "zhangsan" ? 79.5 : 82.1,
-          leaderScore: params.id === "zhangsan" ? 81.7 : 84.3,
-          date: "2023-10-31",
-          status: "completed",
-        },
-      ],
-      trendData: [
-        { month: "10月", score: params.id === "zhangsan" ? 80.8 : 83.5 },
-        { month: "11月", score: params.id === "zhangsan" ? 82.3 : 85.8 },
-        { month: "12月", score: params.id === "zhangsan" ? 87.5 : 90.2 },
-      ],
-    }
-
-    setMemberInfo(mockMemberInfo)
+    loadEmployeeData()
   }, [params.id])
+
+  const loadEmployeeData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      if (isNaN(userId)) {
+        throw new Error('无效的用户ID')
+      }
+
+      // 并行加载数据
+      const [statsResponse, historyResponse] = await Promise.allSettled([
+        teamService.getEmployeeStats(userId),
+        teamService.getEmployeeAssessmentHistory(userId)
+      ])
+
+      // 处理统计数据
+      if (statsResponse.status === 'fulfilled' && statsResponse.value.code === 200) {
+        setEmployeeStats(statsResponse.value.data)
+      } else {
+        console.warn('获取员工统计数据失败:', statsResponse.status === 'rejected' ? statsResponse.reason : statsResponse.value)
+      }
+
+      // 处理历史数据
+      if (historyResponse.status === 'fulfilled' && historyResponse.value.code === 200) {
+        setAssessmentHistory(historyResponse.value.data)
+      } else {
+        console.warn('获取员工历史数据失败:', historyResponse.status === 'rejected' ? historyResponse.reason : historyResponse.value)
+      }
+
+      // 生成基本成员信息（如果没有从API获取到）
+      if (!employeeStats) {
+        const basicInfo = {
+          id: userId,
+          name: `员工 #${userId}`,
+          position: '职位未知',
+          department: '部门未知',
+          joinDate: '入职日期未知',
+          currentScore: 0,
+          avgScore: 0,
+          trend: 'stable' as const,
+        }
+        setMemberInfo(basicInfo)
+      }
+
+    } catch (error: any) {
+      console.error('加载员工数据失败:', error)
+      setError(error.message || '加载数据失败')
+      toast.error('加载数据失败', {
+        description: error.message || '服务器错误，请稍后重试'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 当有统计数据时，生成成员信息
+  useEffect(() => {
+    if (employeeStats) {
+      const trendData = employeeStats.score_history.slice(-6).map((item, index) => ({
+        month: `${index + 1}月`,
+        score: item.final_score,
+        assessment_title: item.assessment_title
+      }))
+
+      setMemberInfo({
+        id: employeeStats.user_id,
+        name: employeeStats.user_name,
+        position: '职位信息', // 这里可能需要从其他接口获取
+        department: '部门信息', // 这里可能需要从其他接口获取
+        joinDate: '入职日期', // 这里可能需要从其他接口获取
+        currentScore: employeeStats.latest_score,
+        avgScore: employeeStats.average_score,
+        trend: employeeStats.score_trend,
+        historyRecords: employeeStats.score_history.map(item => ({
+          id: item.assessment_id.toString(),
+          title: item.assessment_title,
+          finalScore: item.final_score,
+          selfScore: null, // 需要额外获取
+          leaderScore: null, // 需要额外获取
+          date: item.completed_at,
+          status: 'completed' as const,
+        })),
+        trendData,
+      })
+    }
+  }, [employeeStats])
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600"
@@ -103,8 +153,69 @@ export default function MemberDetailPage() {
     return <Badge className={colorClass}>{level}</Badge>
   }
 
-  if (!userInfo || !memberInfo) {
-    return <div>Loading...</div>
+  if (!userInfo) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          <span className="ml-2 text-gray-600">加载用户信息...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <LeadHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-6xl">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            <span className="ml-2 text-gray-600">加载员工信息...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <LeadHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-6xl">
+          <Button variant="ghost" onClick={() => router.push("/lead")} className="mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            返回团队管理
+          </Button>
+          <div className="text-center py-12">
+            <div className="text-red-500 mb-4">
+              <User className="w-12 h-12 mx-auto mb-2" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">加载失败</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={loadEmployeeData}>重试</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!memberInfo) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <LeadHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-6xl">
+          <Button variant="ghost" onClick={() => router.push("/lead")} className="mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            返回团队管理
+          </Button>
+          <div className="text-center py-12">
+            <User className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <p className="text-gray-600">未找到员工信息</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -229,47 +340,117 @@ export default function MemberDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle>历史考核记录</CardTitle>
-                <CardDescription>查看详细的历史考核记录</CardDescription>
+                <CardDescription>查看详细的历史考核记录和评估对比</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {memberInfo.historyRecords.map((record: any) => (
-                    <div key={record.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold">{record.title}</h3>
-                          <p className="text-sm text-gray-600">完成时间：{record.date}</p>
+                {assessmentHistory.length > 0 ? (
+                  <div className="space-y-4">
+                    {assessmentHistory.map((assessment) => (
+                      <div key={assessment.assessment_id} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h3 className="font-semibold">{assessment.assessment_title}</h3>
+                            <p className="text-sm text-gray-600">
+                              考核期间：{teamUtils.formatDate(assessment.start_date)} - {teamUtils.formatDate(assessment.end_date)}
+                            </p>
+                            <p className="text-xs text-gray-500">{assessment.period}</p>
+                          </div>
+                          <Badge className={
+                            assessment.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                            assessment.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                            'bg-gray-100 text-gray-800 border-gray-200'
+                          }>
+                            {assessment.status === 'completed' ? '已完成' : 
+                             assessment.status === 'in_progress' ? '进行中' : '待开始'}
+                          </Badge>
                         </div>
-                        <Badge className="bg-green-100 text-green-800 border-green-200">已完成</Badge>
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-                        <div>
-                          <span className="text-gray-600">最终得分：</span>
-                          <span className={`font-semibold ${getScoreColor(record.finalScore)}`}>
-                            {record.finalScore}
-                          </span>
+                        {/* 评估状态 */}
+                        <div className="grid grid-cols-2 gap-4 text-sm mb-3 p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <span className="text-gray-600">自评状态：</span>
+                            <span className={`font-semibold ml-1 ${assessment.self_evaluation.completed ? 'text-green-600' : 'text-gray-400'}`}>
+                              {assessment.self_evaluation.completed ? '已完成' : '未完成'}
+                            </span>
+                            {assessment.self_evaluation.score && (
+                              <span className="ml-1 text-gray-500">
+                                ({assessment.self_evaluation.score}分)
+                              </span>
+                            )}
+                            {assessment.self_evaluation.completed_at && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                完成时间：{teamUtils.formatDateTime(assessment.self_evaluation.completed_at)}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-gray-600">领导评分：</span>
+                            <span className={`font-semibold ml-1 ${assessment.leader_evaluation.completed ? 'text-green-600' : 'text-orange-600'}`}>
+                              {assessment.leader_evaluation.completed ? '已完成' : '待评分'}
+                            </span>
+                            {assessment.leader_evaluation.score && (
+                              <span className="ml-1 text-gray-500">
+                                ({assessment.leader_evaluation.score}分)
+                              </span>
+                            )}
+                            {assessment.leader_evaluation.completed_at && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                完成时间：{teamUtils.formatDateTime(assessment.leader_evaluation.completed_at)}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-gray-600">自评得分：</span>
-                          <span className="font-semibold">{record.selfScore}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">我的评分：</span>
-                          <span className="font-semibold">{record.leaderScore}</span>
+
+                        {/* 最终得分 */}
+                        {assessment.final_score && (
+                          <div className="mb-3 p-3 bg-blue-50 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-blue-900">最终得分</span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-lg font-bold ${teamUtils.getScoreColor(assessment.final_score)}`}>
+                                  {assessment.final_score.toFixed(1)}分
+                                </span>
+                                {assessment.final_level && (
+                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                    {assessment.final_level}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 操作按钮 */}
+                        <div className="flex gap-2">
+                          {assessment.status === 'completed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/lead/evaluation/result/${assessment.assessment_id}?userId=${userId}`)}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              查看对比
+                            </Button>
+                          )}
+                          {assessment.status === 'in_progress' && !assessment.leader_evaluation.completed && (
+                            <Button
+                              size="sm"
+                              onClick={() => router.push(`/lead/evaluation/${assessment.assessment_id}/${userId}`)}
+                            >
+                              继续评分
+                            </Button>
+                          )}
                         </div>
                       </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/lead/history/${memberInfo.id}/${record.id}`)}
-                      >
-                        查看详情
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Calendar className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>暂无历史考核记录</p>
+                    <p className="text-xs mt-1">该员工尚未参与任何考核</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
