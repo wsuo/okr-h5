@@ -12,6 +12,7 @@ import LeadHeader from "@/components/lead-header"
 import { safeParseUserInfo } from "@/lib/utils"
 import { teamService, teamUtils, EmployeeAssessmentHistory, EmployeeEvaluationStats } from "@/lib/team"
 import { evaluationService } from "@/lib/evaluation"
+import { userService } from "@/lib/user"
 import { toast } from "sonner"
 
 export default function MemberDetailPage() {
@@ -21,6 +22,7 @@ export default function MemberDetailPage() {
   const [memberInfo, setMemberInfo] = useState<any>(null)
   const [employeeStats, setEmployeeStats] = useState<EmployeeEvaluationStats | null>(null)
   const [assessmentHistory, setAssessmentHistory] = useState<EmployeeAssessmentHistory[]>([])
+  const [employeeDetails, setEmployeeDetails] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -48,9 +50,10 @@ export default function MemberDetailPage() {
       }
 
       // 并行加载数据
-      const [statsResponse, historyResponse] = await Promise.allSettled([
+      const [statsResponse, historyResponse, userDetailsResponse] = await Promise.allSettled([
         teamService.getEmployeeStats(userId),
-        teamService.getEmployeeAssessmentHistory(userId)
+        teamService.getEmployeeAssessmentHistory(userId),
+        userService.getUser(userId)
       ])
 
       // 处理统计数据
@@ -62,9 +65,18 @@ export default function MemberDetailPage() {
 
       // 处理历史数据
       if (historyResponse.status === 'fulfilled' && historyResponse.value.code === 200) {
-        setAssessmentHistory(historyResponse.value.data)
+        // API返回的是包含items数组的对象
+        const historyData = historyResponse.value.data.items || []
+        setAssessmentHistory(historyData)
       } else {
         console.warn('获取员工历史数据失败:', historyResponse.status === 'rejected' ? historyResponse.reason : historyResponse.value)
+      }
+
+      // 处理用户详细信息
+      if (userDetailsResponse.status === 'fulfilled' && userDetailsResponse.value.code === 200) {
+        setEmployeeDetails(userDetailsResponse.value.data)
+      } else {
+        console.warn('获取员工详细信息失败:', userDetailsResponse.status === 'rejected' ? userDetailsResponse.reason : userDetailsResponse.value)
       }
 
       // 生成基本成员信息（如果没有从API获取到）
@@ -93,13 +105,13 @@ export default function MemberDetailPage() {
     }
   }
 
-  // 当有统计数据时，生成成员信息
+  // 当有统计数据和员工详细信息时，生成成员信息
   useEffect(() => {
-    if (employeeStats) {
-      // 安全地生成趋势数据
+    if (employeeStats && employeeDetails) {
+      // 安全地生成趋势数据 - 使用period字段而不是序号
       const trendData = employeeStats.score_history && employeeStats.score_history.length > 0 
-        ? employeeStats.score_history.slice(-6).map((item, index) => ({
-            month: `${index + 1}月`,
+        ? employeeStats.score_history.slice(-6).map((item) => ({
+            month: item.period || '未知',
             score: item.final_score,
             assessment_title: item.assessment_title
           }))
@@ -108,9 +120,9 @@ export default function MemberDetailPage() {
       setMemberInfo({
         id: employeeStats.user_id,
         name: employeeStats.user_name,
-        position: '职位信息', // 这里可能需要从其他接口获取
-        department: '部门信息', // 这里可能需要从其他接口获取
-        joinDate: '入职日期', // 这里可能需要从其他接口获取
+        position: employeeDetails.position || employeeStats.position || '职位未知',
+        department: employeeDetails.department?.name || employeeStats.department || '部门未知',
+        joinDate: employeeDetails.join_date ? teamUtils.formatDate(employeeDetails.join_date) : '入职日期未知',
         currentScore: employeeStats.latest_score,
         avgScore: employeeStats.average_score,
         trend: employeeStats.score_trend,
@@ -119,8 +131,40 @@ export default function MemberDetailPage() {
               id: item.assessment_id.toString(),
               title: item.assessment_title,
               finalScore: item.final_score,
-              selfScore: null, // 需要额外获取
-              leaderScore: null, // 需要额外获取
+              selfScore: item.self_score || null,
+              leaderScore: item.leader_score || null,
+              date: item.completed_at,
+              status: 'completed' as const,
+            }))
+          : [],
+        trendData,
+      })
+    } else if (employeeStats) {
+      // 如果只有统计数据，使用统计数据中的信息
+      const trendData = employeeStats.score_history && employeeStats.score_history.length > 0 
+        ? employeeStats.score_history.slice(-6).map((item) => ({
+            month: item.period || '未知',
+            score: item.final_score,
+            assessment_title: item.assessment_title
+          }))
+        : []
+
+      setMemberInfo({
+        id: employeeStats.user_id,
+        name: employeeStats.user_name,
+        position: employeeStats.position || '职位未知',
+        department: employeeStats.department || '部门未知',
+        joinDate: '入职日期未知',
+        currentScore: employeeStats.latest_score,
+        avgScore: employeeStats.average_score,
+        trend: employeeStats.score_trend,
+        historyRecords: employeeStats.score_history && employeeStats.score_history.length > 0
+          ? employeeStats.score_history.map(item => ({
+              id: item.assessment_id.toString(),
+              title: item.assessment_title,
+              finalScore: item.final_score,
+              selfScore: item.self_score || null,
+              leaderScore: item.leader_score || null,
               date: item.completed_at,
               status: 'completed' as const,
             }))
@@ -128,7 +172,7 @@ export default function MemberDetailPage() {
         trendData,
       })
     }
-  }, [employeeStats])
+  }, [employeeStats, employeeDetails])
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600"
@@ -308,22 +352,40 @@ export default function MemberDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle>绩效趋势分析</CardTitle>
-                <CardDescription>近三个月的绩效变化趋势</CardDescription>
+                <CardDescription>历史绩效变化趋势</CardDescription>
               </CardHeader>
               <CardContent>
                 {memberInfo.trendData && memberInfo.trendData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={memberInfo.trendData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis domain={[70, 100]} />
-                      <Tooltip />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip 
+                        formatter={(value, name) => [
+                          `${value}分`, 
+                          name === 'score' ? '评估得分' : name
+                        ]}
+                        labelFormatter={(label) => `评估期间: ${label}`}
+                        contentStyle={{
+                          backgroundColor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px'
+                        }}
+                      />
                       <Line
                         type="monotone"
                         dataKey="score"
                         stroke="#3b82f6"
                         strokeWidth={3}
                         dot={{ fill: "#3b82f6", strokeWidth: 2, r: 6 }}
+                        name="score"
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -420,27 +482,57 @@ export default function MemberDetailPage() {
                         </div>
 
                         {/* 最终得分 */}
-                        {assessment.final_score && (
+                        {assessment.self_evaluation.completed && assessment.leader_evaluation.completed && (
                           <div className="mb-3 p-3 bg-blue-50 rounded-lg">
                             <div className="flex items-center justify-between">
                               <span className="text-sm font-medium text-blue-900">最终得分</span>
                               <div className="flex items-center gap-2">
-                                <span className={`text-lg font-bold ${teamUtils.getScoreColor(assessment.final_score)}`}>
-                                  {assessment.final_score.toFixed(1)}分
-                                </span>
-                                {assessment.final_level && (
-                                  <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                    {assessment.final_level}
-                                  </Badge>
+                                {assessment.final_score ? (
+                                  <>
+                                    <span className={`text-lg font-bold ${teamUtils.getScoreColor(assessment.final_score)}`}>
+                                      {assessment.final_score.toFixed(1)}分
+                                    </span>
+                                    {assessment.final_level && (
+                                      <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                        {assessment.final_level}
+                                      </Badge>
+                                    )}
+                                  </>
+                                ) : (
+                                  // 计算最终得分：根据权重配置
+                                  (() => {
+                                    const selfScore = assessment.self_evaluation.score || 0
+                                    const leaderScore = assessment.leader_evaluation.score || 0
+                                    const selfWeight = assessment.weight_config?.self_weight || 30
+                                    const leaderWeight = assessment.weight_config?.leader_weight || 70
+                                    const calculatedScore = (selfScore * selfWeight + leaderScore * leaderWeight) / 100
+                                    
+                                    return (
+                                      <>
+                                        <span className={`text-lg font-bold ${teamUtils.getScoreColor(calculatedScore)}`}>
+                                          {calculatedScore.toFixed(1)}分
+                                        </span>
+                                        <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                          {teamUtils.getScoreLevel(calculatedScore)}
+                                        </Badge>
+                                      </>
+                                    )
+                                  })()
                                 )}
                               </div>
+                            </div>
+                            {/* 权重说明 */}
+                            <div className="text-xs text-blue-700 mt-2">
+                              自评权重: {assessment.weight_config?.self_weight || 30}% | 
+                              领导评分权重: {assessment.weight_config?.leader_weight || 70}%
                             </div>
                           </div>
                         )}
 
                         {/* 操作按钮 */}
                         <div className="flex gap-2">
-                          {assessment.status === 'completed' && (
+                          {(assessment.status === 'completed' || 
+                            (assessment.self_evaluation.completed && assessment.leader_evaluation.completed)) && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -456,6 +548,15 @@ export default function MemberDetailPage() {
                               onClick={() => router.push(`/lead/evaluation/${assessment.assessment_id}/${userId}`)}
                             >
                               继续评分
+                            </Button>
+                          )}
+                          {assessment.status === 'in_progress' && assessment.leader_evaluation.completed && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled
+                            >
+                              评分已完成
                             </Button>
                           )}
                         </div>

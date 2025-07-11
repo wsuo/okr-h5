@@ -47,6 +47,25 @@ export default function LeadEvaluationResultPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [error, setError] = useState("")
 
+  // 安全的数字格式化函数
+  const safeToFixed = (value: any, digits: number = 1): string => {
+    if (value === null || value === undefined) return '--'
+    const num = typeof value === 'string' ? parseFloat(value) : value
+    return isNaN(num) ? '--' : num.toFixed(digits)
+  }
+
+  // 安全的数字转换函数
+  const safeToNumber = (value: any): number => {
+    if (value === null || value === undefined) return 0
+    const num = typeof value === 'string' ? parseFloat(value) : value
+    return isNaN(num) ? 0 : num
+  }
+
+  // 安全获取对比差值
+  const getOverallDifference = (comparison: any): number => {
+    return comparison?.comparison?.overall_difference ?? 0
+  }
+
   useEffect(() => {
     const user = safeParseUserInfo()
     if (user) {
@@ -282,7 +301,7 @@ export default function LeadEvaluationResultPage() {
                   <div>
                     <p className="text-sm text-gray-600">自评完成</p>
                     <p className="text-2xl font-bold text-green-600">{progressData.self_completed_count}</p>
-                    <p className="text-xs text-gray-500">{progressData.self_completion_rate.toFixed(0)}%</p>
+                    <p className="text-xs text-gray-500">{safeToFixed(progressData.self_completion_rate, 0)}%</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
@@ -294,7 +313,7 @@ export default function LeadEvaluationResultPage() {
                   <div>
                     <p className="text-sm text-gray-600">领导评分</p>
                     <p className="text-2xl font-bold text-purple-600">{progressData.leader_completed_count}</p>
-                    <p className="text-xs text-gray-500">{progressData.leader_completion_rate.toFixed(0)}%</p>
+                    <p className="text-xs text-gray-500">{safeToFixed(progressData.leader_completion_rate, 0)}%</p>
                   </div>
                   <BarChart3 className="w-8 h-8 text-purple-600" />
                 </div>
@@ -306,7 +325,7 @@ export default function LeadEvaluationResultPage() {
                   <div>
                     <p className="text-sm text-gray-600">整体完成</p>
                     <p className="text-2xl font-bold text-orange-600">{progressData.fully_completed_count}</p>
-                    <p className="text-xs text-gray-500">{progressData.overall_completion_rate.toFixed(0)}%</p>
+                    <p className="text-xs text-gray-500">{safeToFixed(progressData.overall_completion_rate, 0)}%</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-orange-600" />
                 </div>
@@ -349,20 +368,20 @@ export default function LeadEvaluationResultPage() {
                       <div className="grid grid-cols-3 gap-4 text-sm mb-3">
                         <div>
                           <span className="text-gray-600">自评得分：</span>
-                          <span className={`font-semibold ${getScoreColor(result.self_score || 0)}`}>
-                            {result.self_score?.toFixed(1) || '--'}
+                          <span className={`font-semibold ${getScoreColor(safeToNumber(result.self_score))}`}>
+                            {safeToFixed(result.self_score)}
                           </span>
                         </div>
                         <div>
                           <span className="text-gray-600">领导评分：</span>
-                          <span className={`font-semibold ${getScoreColor(result.leader_score || 0)}`}>
-                            {result.leader_score?.toFixed(1) || '--'}
+                          <span className={`font-semibold ${getScoreColor(safeToNumber(result.leader_score))}`}>
+                            {safeToFixed(result.leader_score)}
                           </span>
                         </div>
                         <div>
                           <span className="text-gray-600">最终得分：</span>
-                          <span className={`font-semibold ${getScoreColor(result.final_score || 0)}`}>
-                            {result.final_score?.toFixed(1) || '--'}
+                          <span className={`font-semibold ${getScoreColor(safeToNumber(result.final_score))}`}>
+                            {safeToFixed(result.final_score)}
                           </span>
                         </div>
                       </div>
@@ -423,10 +442,10 @@ export default function LeadEvaluationResultPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-green-600">
-                              {result.final_score?.toFixed(1) || '--'}
+                              {safeToFixed(result.final_score)}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {result.final_score ? getScoreLevel(result.final_score) : ''}
+                              {result.final_score ? getScoreLevel(safeToNumber(result.final_score)) : ''}
                             </div>
                           </div>
                         </div>
@@ -434,11 +453,11 @@ export default function LeadEvaluationResultPage() {
                         <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                           <div>
                             <span className="text-gray-600">自评得分：</span>
-                            <span className="font-semibold">{result.self_score?.toFixed(1) || '--'}</span>
+                            <span className="font-semibold">{safeToFixed(result.self_score)}</span>
                           </div>
                           <div>
                             <span className="text-gray-600">领导评分：</span>
-                            <span className="font-semibold">{result.leader_score?.toFixed(1) || '--'}</span>
+                            <span className="font-semibold">{safeToFixed(result.leader_score)}</span>
                           </div>
                         </div>
                         
@@ -562,11 +581,14 @@ export default function LeadEvaluationResultPage() {
                             <p className="text-sm text-gray-600">{result.department}</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            {result.comparison && (
+                            {result.self_score && result.leader_score && (
                               <>
-                                {getDifferenceIcon(result.comparison.comparison.overall_difference)}
+                                {(() => {
+                                  const difference = safeToNumber(result.leader_score) - safeToNumber(result.self_score)
+                                  return getDifferenceIcon(difference)
+                                })()}
                                 <span className="font-medium">
-                                  {Math.abs(result.comparison.comparison.overall_difference).toFixed(1)}
+                                  {safeToFixed(Math.abs(safeToNumber(result.leader_score) - safeToNumber(result.self_score)))}
                                 </span>
                               </>
                             )}
@@ -576,19 +598,22 @@ export default function LeadEvaluationResultPage() {
                         <div className="grid grid-cols-3 gap-4 text-center mb-4">
                           <div className="p-3 bg-blue-50 rounded-lg">
                             <div className="text-2xl font-bold text-blue-600">
-                              {result.self_score?.toFixed(1) || '--'}
+                              {safeToFixed(result.self_score)}
                             </div>
                             <div className="text-sm text-gray-600">自评得分</div>
                           </div>
                           <div className="p-3 bg-purple-50 rounded-lg">
                             <div className="text-2xl font-bold text-purple-600">
-                              {result.leader_score?.toFixed(1) || '--'}
+                              {safeToFixed(result.leader_score)}
                             </div>
                             <div className="text-sm text-gray-600">领导评分</div>
                           </div>
                           <div className="p-3 bg-gray-50 rounded-lg">
                             <div className="text-2xl font-bold text-gray-600">
-                              {result.comparison ? Math.abs(result.comparison.comparison.overall_difference).toFixed(1) : '--'}
+                              {result.self_score && result.leader_score 
+                                ? safeToFixed(Math.abs(safeToNumber(result.leader_score) - safeToNumber(result.self_score)))
+                                : '--'
+                              }
                             </div>
                             <div className="text-sm text-gray-600">分差</div>
                           </div>
@@ -596,14 +621,14 @@ export default function LeadEvaluationResultPage() {
                         
                         <div className="flex items-center justify-between">
                           <div className="text-sm text-gray-500">
-                            {result.comparison && (
+                            {result.self_score && result.leader_score && (
                               <span>
-                                {result.comparison.comparison.overall_difference > 0 
-                                  ? '领导评分更高' 
-                                  : result.comparison.comparison.overall_difference < 0 
-                                    ? '自评更高' 
-                                    : '评分一致'
-                                }
+                                {(() => {
+                                  const difference = safeToNumber(result.leader_score) - safeToNumber(result.self_score)
+                                  if (difference > 0) return '领导评分更高'
+                                  if (difference < 0) return '自评更高'
+                                  return '评分一致'
+                                })()}
                               </span>
                             )}
                           </div>
