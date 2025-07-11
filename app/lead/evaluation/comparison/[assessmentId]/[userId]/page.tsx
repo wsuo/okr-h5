@@ -205,7 +205,7 @@ export default function EvaluationComparisonPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {comparisonData.user_name} - 评分对比分析
+                {comparisonData.self_evaluation?.evaluator?.name || comparisonData.leader_evaluation?.evaluator?.name || '未知用户'} - 评分对比分析
               </h1>
               <p className="text-gray-600 mt-1">
                 自评与领导评分的详细对比
@@ -256,13 +256,35 @@ export default function EvaluationComparisonPage() {
                 <div>
                   <p className="text-sm text-gray-700">分差 (绝对值)</p>
                   <div className="flex items-center gap-2">
-                    {getDifferenceIcon(comparisonData.comparison?.overall_difference || 0)}
+                    {(() => {
+                      // 从新的数据结构中计算分差
+                      const selfScore = safeToNumber(comparisonData.self_evaluation?.score)
+                      const leaderScore = safeToNumber(comparisonData.leader_evaluation?.score)
+                      const difference = leaderScore - selfScore
+                      return getDifferenceIcon(difference)
+                    })()}
                     <p className="text-2xl font-bold text-gray-600">
-                      {safeToFixed(Math.abs(comparisonData.comparison?.overall_difference || 0))}
+                      {(() => {
+                        // 前端计算分差并保留两位小数
+                        const selfScore = safeToNumber(comparisonData.self_evaluation?.score)
+                        const leaderScore = safeToNumber(comparisonData.leader_evaluation?.score)
+                        const difference = Math.abs(leaderScore - selfScore)
+                        return difference.toFixed(2)
+                      })()}
                     </p>
                   </div>
-                  <p className={`text-xs ${getDifferenceColor(comparisonData.comparison?.overall_difference || 0)}`}>
-                    {getDifferenceDescription(comparisonData.comparison?.overall_difference || 0)}
+                  <p className={`text-xs ${(() => {
+                    const selfScore = safeToNumber(comparisonData.self_evaluation?.score)
+                    const leaderScore = safeToNumber(comparisonData.leader_evaluation?.score)
+                    const difference = leaderScore - selfScore
+                    return getDifferenceColor(difference)
+                  })()}`}>
+                    {(() => {
+                      const selfScore = safeToNumber(comparisonData.self_evaluation?.score)
+                      const leaderScore = safeToNumber(comparisonData.leader_evaluation?.score)
+                      const difference = leaderScore - selfScore
+                      return getDifferenceDescription(difference)
+                    })()}
                   </p>
                 </div>
                 <div className="text-right">
@@ -334,13 +356,20 @@ export default function EvaluationComparisonPage() {
                 <CardDescription>各评分分类的自评与领导评分对比</CardDescription>
               </CardHeader>
               <CardContent>
-                {comparisonData.comparison?.category_differences && comparisonData.comparison.category_differences.length > 0 ? (
+                {comparisonData.comparison_analysis?.category_differences && comparisonData.comparison_analysis.category_differences.length > 0 ? (
                   <div className="space-y-6">
-                    {comparisonData.comparison.category_differences.map((category) => (
+                    {comparisonData.comparison_analysis.category_differences.map((category) => (
                       <div key={category.categoryId} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <h3 className="font-semibold text-lg">{category.category_name}</h3>
+                            <h3 className="font-semibold text-lg">
+                              {(() => {
+                                // 从详细评分数据中找到分类名称
+                                const selfCategory = comparisonData.self_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === category.categoryId)
+                                const leaderCategory = comparisonData.leader_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === category.categoryId)
+                                return selfCategory?.categoryName || leaderCategory?.categoryName || category.categoryId
+                              })()}
+                            </h3>
                           </div>
                           <div className="flex items-center gap-2">
                             {getDifferenceIcon(category.difference)}
@@ -373,15 +402,15 @@ export default function EvaluationComparisonPage() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-blue-600">自评</span>
-                            <span className="text-sm text-blue-600">{safeToFixed(category.self_score)}%</span>
+                            <span className="text-sm text-blue-600">{safeToFixed(category.self_score)}</span>
                           </div>
-                          <Progress value={category.self_score} className="h-2 bg-blue-100" />
+                          <Progress value={Math.min(category.self_score, 100)} className="h-2 bg-blue-100" />
                           
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-purple-600">领导评分</span>
-                            <span className="text-sm text-purple-600">{safeToFixed(category.leader_score)}%</span>
+                            <span className="text-sm text-purple-600">{safeToFixed(category.leader_score)}</span>
                           </div>
-                          <Progress value={category.leader_score} className="h-2 bg-purple-100" />
+                          <Progress value={Math.min(category.leader_score, 100)} className="h-2 bg-purple-100" />
                         </div>
                         
                         <div className="mt-4 p-3 bg-gray-50 rounded-lg">
@@ -417,58 +446,88 @@ export default function EvaluationComparisonPage() {
                 <CardDescription>各评分项目的详细对比分析</CardDescription>
               </CardHeader>
               <CardContent>
-                {comparisonData.comparison?.category_differences && comparisonData.comparison.category_differences.length > 0 ? (
+                {comparisonData.comparison_analysis?.category_differences && comparisonData.comparison_analysis.category_differences.length > 0 ? (
                   <div className="space-y-6">
-                    {comparisonData.comparison.category_differences.map((category) => (
+                    {comparisonData.comparison_analysis.category_differences.map((category) => (
                       <div key={category.categoryId} className="border rounded-lg p-4">
-                        <h3 className="font-semibold text-lg mb-4 text-gray-900">{category.category_name}</h3>
+                        <h3 className="font-semibold text-lg mb-4 text-gray-900">
+                          {(() => {
+                            // 从详细评分数据中找到分类名称
+                            const selfCategory = comparisonData.self_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === category.categoryId)
+                            const leaderCategory = comparisonData.leader_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === category.categoryId)
+                            return selfCategory?.categoryName || leaderCategory?.categoryName || category.categoryId
+                          })()}
+                        </h3>
                         
-                        {category.item_differences && category.item_differences.length > 0 ? (
-                          <div className="space-y-4">
-                            {category.item_differences.map((item) => (
-                              <div key={item.itemId} className="border-l-4 border-gray-200 pl-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-medium text-gray-800">{item.item_name}</h4>
-                                  <div className="flex items-center gap-2">
-                                    {getDifferenceIcon(item.difference)}
-                                    <span className={`text-sm font-medium ${getDifferenceColor(item.difference)}`}>
-                                      {item.difference > 0 ? '+' : ''}{safeToFixed(item.difference)}
-                                    </span>
+                        {(() => {
+                          // 从详细评分数据中生成具体项目对比
+                          const selfCategory = comparisonData.self_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === category.categoryId)
+                          const leaderCategory = comparisonData.leader_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === category.categoryId)
+                          
+                          if (!selfCategory || !leaderCategory) {
+                            return <p className="text-gray-500 text-sm">该分类暂无具体项目对比数据</p>
+                          }
+                          
+                          // 合并两个评分的项目数据
+                          const itemComparisons: any[] = []
+                          selfCategory.items.forEach(selfItem => {
+                            const leaderItem = leaderCategory.items.find(l => l.itemId === selfItem.itemId)
+                            if (leaderItem) {
+                              itemComparisons.push({
+                                itemId: selfItem.itemId,
+                                itemName: selfItem.itemName,
+                                self_score: selfItem.score,
+                                leader_score: leaderItem.score,
+                                difference: leaderItem.score - selfItem.score
+                              })
+                            }
+                          })
+                          
+                          return (
+                            <div className="space-y-4">
+                              {itemComparisons.map((item) => (
+                                <div key={item.itemId} className="border-l-4 border-gray-200 pl-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-medium text-gray-800">{item.itemName}</h4>
+                                    <div className="flex items-center gap-2">
+                                      {getDifferenceIcon(item.difference)}
+                                      <span className={`text-sm font-medium ${getDifferenceColor(item.difference)}`}>
+                                        {item.difference > 0 ? '+' : ''}{safeToFixed(item.difference)}
+                                      </span>
+                                    </div>
                                   </div>
+                                  
+                                  <div className="grid grid-cols-3 gap-4 text-sm">
+                                    <div className="text-center p-2 bg-blue-50 rounded">
+                                      <div className="font-semibold text-blue-600">
+                                        {safeToFixed(item.self_score)}
+                                      </div>
+                                      <div className="text-blue-600">自评</div>
+                                    </div>
+                                    <div className="text-center p-2 bg-purple-50 rounded">
+                                      <div className="font-semibold text-purple-600">
+                                        {safeToFixed(item.leader_score)}
+                                      </div>
+                                      <div className="text-purple-600">领导评分</div>
+                                    </div>
+                                    <div className="text-center p-2 bg-gray-50 rounded">
+                                      <div className="font-semibold text-gray-600">
+                                        {safeToFixed(Math.abs(item.difference))}
+                                      </div>
+                                      <div className="text-gray-600">分差</div>
+                                    </div>
+                                  </div>
+                                  
+                                  {Math.abs(item.difference) > 10 && (
+                                    <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
+                                      ⚠️ 此项目分差较大，建议深入沟通了解原因
+                                    </div>
+                                  )}
                                 </div>
-                                
-                                <div className="grid grid-cols-3 gap-4 text-sm">
-                                  <div className="text-center p-2 bg-blue-50 rounded">
-                                    <div className="font-semibold text-blue-600">
-                                      {safeToFixed(item.self_score)}
-                                    </div>
-                                    <div className="text-blue-600">自评</div>
-                                  </div>
-                                  <div className="text-center p-2 bg-purple-50 rounded">
-                                    <div className="font-semibold text-purple-600">
-                                      {safeToFixed(item.leader_score)}
-                                    </div>
-                                    <div className="text-purple-600">领导评分</div>
-                                  </div>
-                                  <div className="text-center p-2 bg-gray-50 rounded">
-                                    <div className="font-semibold text-gray-600">
-                                      {safeToFixed(Math.abs(item.difference))}
-                                    </div>
-                                    <div className="text-gray-600">分差</div>
-                                  </div>
-                                </div>
-                                
-                                {Math.abs(item.difference) > 10 && (
-                                  <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-700">
-                                    ⚠️ 此项目分差较大，建议深入沟通了解原因
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 text-sm">该分类暂无具体项目对比数据</p>
-                        )}
+                              ))}
+                            </div>
+                          )
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -495,28 +554,41 @@ export default function EvaluationComparisonPage() {
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h4 className="font-semibold text-blue-900 mb-2">整体分析</h4>
                   <p className="text-blue-800 text-sm">
-                    {Math.abs(comparisonData.comparison.overall_difference) < 5 
-                      ? `${comparisonData.user_name}的自评与领导评分比较一致，说明对自己的表现有准确的认知。`
-                      : comparisonData.comparison.overall_difference > 0
-                        ? `领导对${comparisonData.user_name}的评价高于自评${safeToFixed(comparisonData.comparison.overall_difference)}分，说明可能存在自我认知偏保守的情况。`
-                        : `${comparisonData.user_name}的自评高于领导评分${safeToFixed(Math.abs(comparisonData.comparison.overall_difference))}分，需要重新审视自己的表现。`
-                    }
+                    {(() => {
+                      const selfScore = safeToNumber(comparisonData.self_evaluation?.score)
+                      const leaderScore = safeToNumber(comparisonData.leader_evaluation?.score)
+                      const overallDifference = leaderScore - selfScore
+                      
+                      const userName = comparisonData.self_evaluation?.evaluator?.name || comparisonData.leader_evaluation?.evaluator?.name || '未知用户'
+                      
+                      if (Math.abs(overallDifference) < 5) {
+                        return `${userName}的自评与领导评分比较一致，说明对自己的表现有准确的认知。`
+                      } else if (overallDifference > 0) {
+                        return `领导对${userName}的评价高于自评${safeToFixed(overallDifference)}分，说明可能存在自我认知偏保守的情况。`
+                      } else {
+                        return `${userName}的自评高于领导评分${safeToFixed(Math.abs(overallDifference))}分，需要重新审视自己的表现。`
+                      }
+                    })()}
                   </p>
                 </div>
 
-                {comparisonData.comparison.category_differences && comparisonData.comparison.category_differences.length > 0 && (
+                {comparisonData.comparison_analysis.category_differences && comparisonData.comparison_analysis.category_differences.length > 0 && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <h4 className="font-semibold text-green-900 mb-2">建议关注</h4>
                     <ul className="text-green-800 text-sm space-y-1">
-                      {comparisonData.comparison.category_differences
+                      {comparisonData.comparison_analysis.category_differences
                         .filter(cat => Math.abs(cat.difference) > 5)
                         .map(cat => (
                           <li key={cat.categoryId}>
-                            • {cat.category_name}: {getDifferenceDescription(cat.difference)} {safeToFixed(Math.abs(cat.difference))} 分，建议沟通确认
+                            • {(() => {
+                              const selfCategory = comparisonData.self_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === cat.categoryId)
+                              const leaderCategory = comparisonData.leader_evaluation?.detailed_scores_with_template?.find(c => c.categoryId === cat.categoryId)
+                              return selfCategory?.categoryName || leaderCategory?.categoryName || cat.categoryId
+                            })()}: {getDifferenceDescription(cat.difference)} {safeToFixed(Math.abs(cat.difference))} 分，建议沟通确认
                           </li>
                         ))
                       }
-                      {comparisonData.comparison.category_differences.every(cat => Math.abs(cat.difference) <= 5) && (
+                      {comparisonData.comparison_analysis.category_differences.every(cat => Math.abs(cat.difference) <= 5) && (
                         <li>各分类评分都比较接近，整体评价一致性良好</li>
                       )}
                     </ul>
