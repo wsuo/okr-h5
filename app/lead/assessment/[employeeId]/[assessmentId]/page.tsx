@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, ArrowRight, Save, Send, User, AlertTriangle } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import LeadHeader from "@/components/lead-header"
+import { safeParseUserInfo } from "@/lib/utils"
 
 interface AssessmentItem {
   id: string
@@ -37,9 +38,12 @@ export default function LeadAssessmentPage() {
   const [finalComment, setFinalComment] = useState("")
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
 
     // 模拟加载员工信息

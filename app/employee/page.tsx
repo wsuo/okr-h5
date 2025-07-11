@@ -15,6 +15,7 @@ import {
   EvaluationComparison,
   evaluationUtils
 } from "@/lib/evaluation"
+import { safeParseUserInfo } from "@/lib/utils"
 
 interface EvaluationHistory {
   assessment_id: number
@@ -49,9 +50,12 @@ export default function EmployeeDashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
     
     loadData()

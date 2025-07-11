@@ -18,6 +18,7 @@ import {
   evaluationUtils
 } from "@/lib/evaluation"
 import { assessmentService, Assessment } from "@/lib/assessment"
+import { safeParseUserInfo } from "@/lib/utils"
 
 interface TeamMemberResult {
   user_id: number
@@ -47,9 +48,12 @@ export default function LeadEvaluationResultPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
     
     loadData()

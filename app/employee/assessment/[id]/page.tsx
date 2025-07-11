@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, ArrowRight, Save, Send } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import EmployeeHeader from "@/components/employee-header"
+import { safeParseUserInfo } from "@/lib/utils"
 
 interface AssessmentItem {
   id: string
@@ -33,9 +34,12 @@ export default function EmployeeAssessmentPage() {
   const [assessmentData, setAssessmentData] = useState<AssessmentItem[]>([])
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
 
     // 模拟加载考核模板快照

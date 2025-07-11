@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Calendar, User, TrendingUp, MessageSquare, Award } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import EmployeeHeader from "@/components/employee-header"
+import { safeParseUserInfo } from "@/lib/utils"
 
 interface HistoryDetail {
   id: string
@@ -45,9 +46,12 @@ export default function EmployeeHistoryDetailPage() {
   const [historyDetail, setHistoryDetail] = useState<HistoryDetail | null>(null)
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
 
     // 模拟加载历史考核详情数据

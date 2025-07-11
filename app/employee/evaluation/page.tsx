@@ -17,6 +17,7 @@ import {
   EvaluationComparison,
   evaluationUtils
 } from "@/lib/evaluation"
+import { safeParseUserInfo } from "@/lib/utils"
 
 // 评估状态分类接口
 interface EvaluationStatus {
@@ -37,9 +38,12 @@ export default function EmployeeEvaluationCenter() {
   const router = useRouter()
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
     
     loadData()

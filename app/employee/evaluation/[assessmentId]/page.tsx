@@ -14,6 +14,7 @@ import {
   DetailedEvaluation,
   evaluationUtils
 } from "@/lib/evaluation"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function EmployeeSelfEvaluationPage() {
   const router = useRouter()
@@ -27,9 +28,12 @@ export default function EmployeeSelfEvaluationPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
     
     loadData()

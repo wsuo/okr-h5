@@ -9,6 +9,7 @@ import { ArrowLeft, User, TrendingUp, Calendar, Award, BarChart3 } from "lucide-
 import { useRouter, useParams } from "next/navigation"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import LeadHeader from "@/components/lead-header"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function MemberDetailPage() {
   const router = useRouter()
@@ -17,9 +18,12 @@ export default function MemberDetailPage() {
   const [memberInfo, setMemberInfo] = useState<any>(null)
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
 
     // 模拟加载成员详细信息

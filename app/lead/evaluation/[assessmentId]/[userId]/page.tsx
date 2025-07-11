@@ -17,6 +17,7 @@ import {
   evaluationUtils
 } from "@/lib/evaluation"
 import { userService, User as UserType } from "@/lib/user"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function LeaderEvaluationPage() {
   const router = useRouter()
@@ -47,9 +48,12 @@ export default function LeaderEvaluationPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
     
     // 参数验证

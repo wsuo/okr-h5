@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { assessmentService, Assessment, assessmentUtils, ScorePreviewResult, PublishValidationResult } from "@/lib/assessment"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function AssessmentDetailPage() {
   const router = useRouter()
@@ -37,9 +38,12 @@ export default function AssessmentDetailPage() {
   const [showPublishDialog, setShowPublishDialog] = useState(false)
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
 
     loadAssessmentDetail()

@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TrendingUp, Users, Award, Building2, Search } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
@@ -18,9 +19,12 @@ export default function BossDashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
   }, [])
 

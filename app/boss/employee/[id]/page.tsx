@@ -9,6 +9,7 @@ import { ArrowLeft, User, TrendingUp, Calendar, Award, BarChart3, Building2 } fr
 import { useRouter, useParams } from "next/navigation"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import BossHeader from "@/components/boss-header"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function EmployeeDetailPage() {
   const router = useRouter()
@@ -17,9 +18,12 @@ export default function EmployeeDetailPage() {
   const [employeeInfo, setEmployeeInfo] = useState<any>(null)
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
 
     // 模拟加载员工详细信息

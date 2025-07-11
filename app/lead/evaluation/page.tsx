@@ -19,6 +19,7 @@ import {
   evaluationUtils
 } from "@/lib/evaluation"
 import { assessmentService, AssessmentListItem } from "@/lib/assessment"
+import { safeParseUserInfo } from "@/lib/utils"
 
 export default function LeadEvaluationCenter() {
   const [userInfo, setUserInfo] = useState<any>(null)
@@ -33,9 +34,12 @@ export default function LeadEvaluationCenter() {
   const router = useRouter()
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
     }
     
     loadData()

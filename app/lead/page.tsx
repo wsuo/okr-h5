@@ -16,6 +16,7 @@ import {
   evaluationUtils
 } from "@/lib/evaluation"
 import { assessmentService, AssessmentListItem } from "@/lib/assessment"
+import { safeParseUserInfo } from "@/lib/utils"
 
 interface TeamMemberStats {
   user_id: number
@@ -43,9 +44,13 @@ export default function LeadDashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    const user = localStorage.getItem("userInfo")
+    const user = safeParseUserInfo()
     if (user) {
-      setUserInfo(JSON.parse(user))
+      setUserInfo(user)
+    } else {
+      // 如果没有用户信息，重定向到登录页面
+      router.push("/")
+      return
     }
     
     loadData()
