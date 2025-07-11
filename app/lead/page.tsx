@@ -303,7 +303,7 @@ export default function LeadDashboard() {
                       <div className="text-right">
                         <p className="text-sm text-gray-600">当前得分</p>
                         <p className={`text-lg font-bold ${teamUtils.getScoreColor(member.evaluation_status.final_score)}`}>
-                          {member.evaluation_status.final_score?.toFixed(1) || '--'}
+                          {member.evaluation_status.final_score ? Number(member.evaluation_status.final_score).toFixed(1) : '--'}
                         </p>
                       </div>
                     </div>
