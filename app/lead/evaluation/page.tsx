@@ -177,10 +177,10 @@ export default function LeadEvaluationCenter() {
   })
 
   const filteredHistory = evaluationHistory.filter(evaluation => {
-    const matchesSearch = evaluation.assessment_id.toString().includes(searchQuery) ||
+    const matchesSearch = (evaluation.assessment_id?.toString() || '').includes(searchQuery) ||
                          (evaluation.leader_review && evaluation.leader_review.toLowerCase().includes(searchQuery.toLowerCase()))
     
-    const matchesAssessment = selectedAssessment === "all" || evaluation.assessment_id.toString() === selectedAssessment
+    const matchesAssessment = selectedAssessment === "all" || (evaluation.assessment_id?.toString() || '') === selectedAssessment
     
     return matchesSearch && matchesAssessment
   })
