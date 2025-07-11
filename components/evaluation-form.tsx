@@ -10,6 +10,17 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ChevronLeft, ChevronRight, Save, Send, AlertTriangle, CheckCircle, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import EvaluationItemComponent from "./evaluation-item"
 import {
   EvaluationTemplate,
@@ -54,11 +65,23 @@ export default function EvaluationForm({
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [initialDataHash, setInitialDataHash] = useState<string>('')
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
 
   // 创建数据哈希用于比较
   const createDataHash = useCallback((scores: DetailedScore[], review: string, strengths: string, improvements: string) => {
+    // 对分数数据进行标准化处理，确保比较的准确性
+    const normalizedScores = scores.map(score => ({
+      categoryId: score.categoryId,
+      categoryScore: score.categoryScore,
+      items: score.items.map(item => ({
+        itemId: item.itemId,
+        score: item.score,
+        comment: (item.comment || '').trim()
+      })).sort((a, b) => a.itemId.localeCompare(b.itemId)) // 确保顺序一致
+    })).sort((a, b) => a.categoryId.localeCompare(b.categoryId)) // 确保顺序一致
+    
     const data = {
-      scores,
+      scores: normalizedScores,
       review: review.trim(),
       strengths: strengths.trim(),
       improvements: improvements.trim()
@@ -203,6 +226,13 @@ export default function EvaluationForm({
   const autoSaveDraft = useCallback(async () => {
     if (saving || submitting) return
 
+    // 再次确认数据是否真的发生了变化
+    if (!checkIfDataChanged()) {
+      console.log('数据没有变化，跳过保存')
+      setIsDirty(false)
+      return
+    }
+
     try {
       setSaving(true)
       
@@ -229,6 +259,7 @@ export default function EvaluationForm({
       
       if (!hasContent && !draftId) {
         console.log('没有内容需要保存，跳过创建草稿')
+        setIsDirty(false)
         return
       }
 
@@ -305,21 +336,28 @@ export default function EvaluationForm({
     }
   }, [
     assessmentId, type, evaluateeId, overallReview, strengths, improvements, 
-    detailedScores, draftId, saving, submitting, onSaveDraft, createDataHash
+    detailedScores, draftId, saving, submitting, onSaveDraft, createDataHash, checkIfDataChanged
   ])
 
-  // 智能防抖自动保存 - 只在脏状态时保存
+  // 智能防抖自动保存 - 只在脏状态且数据真正改变时保存
   useEffect(() => {
     if (!isDirty || saving || submitting) return
 
+    // 检查数据是否真的发生了变化
+    const hasRealChanges = checkIfDataChanged()
+    if (!hasRealChanges) {
+      setIsDirty(false) // 如果没有真正的变化，重置脏状态
+      return
+    }
+
     const timer = setTimeout(() => {
-      if (isDirty && detailedScores.length > 0) {
+      if (isDirty && detailedScores.length > 0 && checkIfDataChanged()) {
         autoSaveDraft()
       }
     }, 3000) // 3秒后自动保存，增加防抖时间
 
     return () => clearTimeout(timer)
-  }, [isDirty, saving, submitting, detailedScores, autoSaveDraft])
+  }, [isDirty, saving, submitting, detailedScores, autoSaveDraft, checkIfDataChanged])
 
   // 页面离开前的保存提醒
   useEffect(() => {
@@ -355,8 +393,8 @@ export default function EvaluationForm({
     }
   }
 
-  // 提交评估
-  const handleSubmit = async () => {
+  // 触发提交确认
+  const handleSubmit = () => {
     // 验证数据
     const errors = evaluationUtils.validateDetailedScores(detailedScores, template)
     if (errors.length > 0) {
@@ -370,6 +408,14 @@ export default function EvaluationForm({
       toast.error('请填写总体评价')
       return
     }
+
+    // 显示确认弹窗
+    setShowSubmitConfirm(true)
+  }
+
+  // 确认提交评估
+  const handleConfirmSubmit = async () => {
+    setShowSubmitConfirm(false)
 
     try {
       setSubmitting(true)
@@ -651,18 +697,44 @@ export default function EvaluationForm({
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitting || !overallReview.trim()}
-                  className="bg-green-600 hover:bg-green-700 touch-manipulation"
-                >
-                  {submitting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4 mr-2" />
-                  )}
-                  提交评估
-                </Button>
+                <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={submitting || !overallReview.trim()}
+                      className="bg-green-600 hover:bg-green-700 touch-manipulation"
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      提交评估
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-orange-500" />
+                        确认提交{type === 'self' ? '自评' : '评分'}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        您确定要提交{type === 'self' ? '自评' : '对该员工的评分'}吗？
+                        <br />
+                        <span className="text-red-600 font-medium">提交后将无法修改，请确认所有评分内容准确无误。</span>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleConfirmSubmit} 
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        确定提交
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
 
