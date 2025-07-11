@@ -96,11 +96,14 @@ export default function MemberDetailPage() {
   // 当有统计数据时，生成成员信息
   useEffect(() => {
     if (employeeStats) {
-      const trendData = employeeStats.score_history.slice(-6).map((item, index) => ({
-        month: `${index + 1}月`,
-        score: item.final_score,
-        assessment_title: item.assessment_title
-      }))
+      // 安全地生成趋势数据
+      const trendData = employeeStats.score_history && employeeStats.score_history.length > 0 
+        ? employeeStats.score_history.slice(-6).map((item, index) => ({
+            month: `${index + 1}月`,
+            score: item.final_score,
+            assessment_title: item.assessment_title
+          }))
+        : []
 
       setMemberInfo({
         id: employeeStats.user_id,
@@ -111,15 +114,17 @@ export default function MemberDetailPage() {
         currentScore: employeeStats.latest_score,
         avgScore: employeeStats.average_score,
         trend: employeeStats.score_trend,
-        historyRecords: employeeStats.score_history.map(item => ({
-          id: item.assessment_id.toString(),
-          title: item.assessment_title,
-          finalScore: item.final_score,
-          selfScore: null, // 需要额外获取
-          leaderScore: null, // 需要额外获取
-          date: item.completed_at,
-          status: 'completed' as const,
-        })),
+        historyRecords: employeeStats.score_history && employeeStats.score_history.length > 0
+          ? employeeStats.score_history.map(item => ({
+              id: item.assessment_id.toString(),
+              title: item.assessment_title,
+              finalScore: item.final_score,
+              selfScore: null, // 需要额外获取
+              leaderScore: null, // 需要额外获取
+              date: item.completed_at,
+              status: 'completed' as const,
+            }))
+          : [],
         trendData,
       })
     }
@@ -306,32 +311,45 @@ export default function MemberDetailPage() {
                 <CardDescription>近三个月的绩效变化趋势</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={memberInfo.trendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis domain={[70, 100]} />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="score"
-                      stroke="#3b82f6"
-                      strokeWidth={3}
-                      dot={{ fill: "#3b82f6", strokeWidth: 2, r: 6 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {memberInfo.trendData && memberInfo.trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={memberInfo.trendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis domain={[70, 100]} />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        stroke="#3b82f6"
+                        strokeWidth={3}
+                        dot={{ fill: "#3b82f6", strokeWidth: 2, r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>暂无绩效趋势数据</p>
+                    <p className="text-xs mt-1">该员工尚未有足够的评估记录生成趋势图</p>
+                  </div>
+                )}
 
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold text-blue-900 mb-2">趋势分析</h4>
-                  <p className="text-blue-800 text-sm">
-                    {memberInfo.name}在近三个月的绩效表现呈现
-                    <span className="font-semibold text-green-600">上升趋势</span>， 从10月的
-                    {memberInfo.trendData[0].score}分提升到12月的{memberInfo.trendData[2].score}分， 提升了
-                    {(memberInfo.trendData[2].score - memberInfo.trendData[0].score).toFixed(1)}分，
-                    表现出良好的成长性。
-                  </p>
-                </div>
+                {memberInfo.trendData && memberInfo.trendData.length >= 3 && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-semibold text-blue-900 mb-2">趋势分析</h4>
+                    <p className="text-blue-800 text-sm">
+                      {memberInfo.name}在近期的绩效表现呈现
+                      <span className="font-semibold text-green-600">
+                        {memberInfo.trendData[memberInfo.trendData.length - 1].score >= memberInfo.trendData[0].score ? '上升趋势' : '下降趋势'}
+                      </span>， 从{memberInfo.trendData[0].month}的
+                      {memberInfo.trendData[0].score}分到{memberInfo.trendData[memberInfo.trendData.length - 1].month}的{memberInfo.trendData[memberInfo.trendData.length - 1].score}分， 
+                      {memberInfo.trendData[memberInfo.trendData.length - 1].score >= memberInfo.trendData[0].score ? '提升了' : '下降了'}
+                      {Math.abs(memberInfo.trendData[memberInfo.trendData.length - 1].score - memberInfo.trendData[0].score).toFixed(1)}分，
+                      表现出{memberInfo.trendData[memberInfo.trendData.length - 1].score >= memberInfo.trendData[0].score ? '良好的成长性' : '需要关注的下降趋势'}。
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
