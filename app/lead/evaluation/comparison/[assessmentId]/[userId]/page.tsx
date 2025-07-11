@@ -9,7 +9,6 @@ import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, Minus, User, Award, Calendar, Loader2, FileText } from "lucide-react"
 import LeadHeader from "@/components/lead-header"
 import { useRouter, useParams } from "next/navigation"
-import { toast } from "sonner"
 import {
   evaluationService,
   EvaluationComparison,
