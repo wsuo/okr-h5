@@ -227,7 +227,7 @@ export default function LeadEvaluationCenter() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <LeadHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
+      <LeadHeader userInfo={userInfo} />
       
       <div className="container mx-auto p-4 max-w-6xl">
         <div className="mb-6">

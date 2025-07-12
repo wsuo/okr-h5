@@ -156,7 +156,7 @@ export default function LeadDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <LeadHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
+      <LeadHeader userInfo={userInfo} />
 
       <div className="container mx-auto p-4 max-w-4xl">
         <div className="mb-6 flex items-center justify-between">

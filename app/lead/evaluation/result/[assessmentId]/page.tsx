@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +46,7 @@ export default function LeadEvaluationResultPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("overview")
   const [error, setError] = useState("")
+  const [isDataLoaded, setIsDataLoaded] = useState(false)
 
   // 安全的数字格式化函数
   const safeToFixed = (value: any, digits: number = 1): string => {
@@ -66,19 +67,7 @@ export default function LeadEvaluationResultPage() {
     return comparison?.comparison?.overall_difference ?? 0
   }
 
-  useEffect(() => {
-    const user = safeParseUserInfo()
-    if (user) {
-      setUserInfo(user)
-    } else {
-      router.push('/')
-      return
-    }
-    
-    loadData()
-  }, [assessmentId])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       setError("")
@@ -108,6 +97,11 @@ export default function LeadEvaluationResultPage() {
             
             const comparison = comparisonResponse.code === 200 ? comparisonResponse.data : undefined
             
+            // 从考核详情中获取正确的final_score
+            const assessmentParticipant = assessmentResponse.data?.participants?.find(
+              p => p.user.id === participant.user_id
+            )
+            
             return {
               user_id: participant.user_id,
               user_name: participant.user_name,
@@ -116,18 +110,25 @@ export default function LeadEvaluationResultPage() {
               leader_status: participant.leader_status,
               self_score: comparison?.self_evaluation?.score,
               leader_score: comparison?.leader_evaluation?.score,
-              final_score: comparison?.leader_evaluation?.score || comparison?.self_evaluation?.score,
+              final_score: assessmentParticipant?.final_score || comparison?.leader_evaluation?.score || comparison?.self_evaluation?.score,
               comparison,
               last_updated: participant.leader_completed_at || participant.self_completed_at
             } as TeamMemberResult
           } catch (error) {
             console.warn(`获取用户${participant.user_id}对比数据失败:`, error)
+            
+            // 即使对比数据获取失败，也要从考核详情中获取final_score
+            const assessmentParticipant = assessmentResponse.data?.participants?.find(
+              p => p.user.id === participant.user_id
+            )
+            
             return {
               user_id: participant.user_id,
               user_name: participant.user_name,
               department: participant.department,
               self_status: participant.self_status,
               leader_status: participant.leader_status,
+              final_score: assessmentParticipant?.final_score,
               last_updated: participant.leader_completed_at || participant.self_completed_at
             } as TeamMemberResult
           }
@@ -143,7 +144,19 @@ export default function LeadEvaluationResultPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [assessmentId])
+
+  useEffect(() => {
+    const user = safeParseUserInfo()
+    if (user) {
+      setUserInfo(user)
+    } else {
+      router.push('/')
+      return
+    }
+    
+    loadData()
+  }, [assessmentId, loadData])
 
   const handleBack = () => {
     router.push('/lead/evaluation')
@@ -250,7 +263,7 @@ export default function LeadEvaluationResultPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <LeadHeader userInfo={userInfo} />
+      <LeadHeader userInfo={userInfo} pendingTasksCount={0} />
       
       <div className="container mx-auto p-4 max-w-6xl">
         <div className="mb-6">
