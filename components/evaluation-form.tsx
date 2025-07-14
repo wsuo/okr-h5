@@ -112,7 +112,7 @@ export default function EvaluationForm({
     if (existingDraft) {
       // 加载现有草稿
       const scores = existingDraft.detailed_scores || []
-      const review = existingDraft.self_review || existingDraft.leader_review || ''
+      const review = existingDraft.self_review || existingDraft.leader_review || existingDraft.feedback || ''
       const strengthsValue = existingDraft.strengths || ''
       const improvementsValue = existingDraft.improvements || ''
       

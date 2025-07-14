@@ -24,6 +24,7 @@ export interface Evaluation {
   score?: number
   self_review?: string
   leader_review?: string
+  feedback?: string  // Backend alias for leader_review
   strengths?: string
   improvements?: string
   created_at: string
