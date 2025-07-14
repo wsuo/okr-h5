@@ -30,36 +30,39 @@ export function useAssessmentStatusMonitor({
       if (response.code === 200 && response.data) {
         const newStatus = response.data
         
-        // 检查状态是否发生变化
-        if (currentStatus && currentStatus.status !== newStatus.status) {
-          console.log('Assessment status changed:', {
-            from: currentStatus.status,
-            to: newStatus.status
-          })
-          
-          // 如果考核结束了，触发回调
-          if (newStatus.isEnded && !currentStatus.isEnded) {
-            toast.info('考核状态更新', {
-              description: '考核已结束，所有参与者已完成评分'
+        // 使用函数式更新来避免依赖currentStatus
+        setCurrentStatus(prevStatus => {
+          // 检查状态是否发生变化
+          if (prevStatus && prevStatus.status !== newStatus.status) {
+            console.log('Assessment status changed:', {
+              from: prevStatus.status,
+              to: newStatus.status
             })
             
-            if (onAssessmentEnded) {
-              onAssessmentEnded()
+            // 如果考核结束了，触发回调
+            if (newStatus.isEnded && !prevStatus.isEnded) {
+              toast.info('考核状态更新', {
+                description: '考核已结束，所有参与者已完成评分'
+              })
+              
+              if (onAssessmentEnded) {
+                onAssessmentEnded()
+              }
+            }
+            
+            if (onStatusChanged) {
+              onStatusChanged(newStatus)
             }
           }
           
-          if (onStatusChanged) {
-            onStatusChanged(newStatus)
-          }
-        }
-        
-        setCurrentStatus(newStatus)
+          return newStatus
+        })
       }
     } catch (error) {
       console.warn('检查考核状态失败:', error)
       // 不显示错误提示，避免干扰用户
     }
-  }, [assessmentId, currentStatus, enabled, onStatusChanged, onAssessmentEnded])
+  }, [assessmentId, enabled, onStatusChanged, onAssessmentEnded])
 
   // 启动监听
   const startMonitoring = useCallback(() => {
