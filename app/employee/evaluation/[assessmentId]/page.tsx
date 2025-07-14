@@ -5,6 +5,15 @@ import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Loader2, AlertTriangle, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import EmployeeHeader from "@/components/employee-header"
 import EvaluationForm from "@/components/evaluation-form"
 import { toast } from "sonner"
@@ -14,6 +23,7 @@ import {
   DetailedEvaluation,
   evaluationUtils
 } from "@/lib/evaluation"
+import { useEvaluationPageMonitor } from "@/hooks/use-assessment-status"
 import { safeParseUserInfo } from "@/lib/utils"
 
 export default function EmployeeSelfEvaluationPage() {
@@ -26,6 +36,17 @@ export default function EmployeeSelfEvaluationPage() {
   const [existingDraft, setExistingDraft] = useState<DetailedEvaluation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+
+  // 使用状态监听Hook
+  const {
+    currentStatus,
+    viewMode,
+    showEndedDialog,
+    setViewMode,
+    handleEndedDialogConfirm,
+    handleEvaluationError,
+    manualCheck
+  } = useEvaluationPageMonitor(assessmentId, !loading && !!template)
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -43,6 +64,15 @@ export default function EmployeeSelfEvaluationPage() {
     try {
       setLoading(true)
       setError("")
+
+      // 首先检查考核状态
+      const statusResponse = await evaluationService.checkAssessmentStatus(assessmentId)
+      if (statusResponse.code === 200 && statusResponse.data) {
+        // 如果考核已结束，设置为查看模式
+        if (!statusResponse.data.canEvaluate) {
+          setViewMode(true)
+        }
+      }
 
       // 获取评分模板
       const templateResponse = await evaluationService.getEvaluationTemplate(assessmentId)
@@ -92,6 +122,14 @@ export default function EmployeeSelfEvaluationPage() {
       description: '感谢您的配合，正在跳转到结果页面'
     })
     router.push(`/employee/evaluation/result/${assessmentId}`)
+  }
+
+  const handleSubmitError = (error: any) => {
+    const errorInfo = handleEvaluationError(error)
+
+    if (!errorInfo.shouldShowDialog) {
+      toast.error(errorInfo.message)
+    }
   }
 
   const handleDraftSaved = () => {
@@ -235,7 +273,17 @@ export default function EmployeeSelfEvaluationPage() {
           </div>
         </div>
 
-        {existingDraft && (
+        {/* 考核状态提示 */}
+        {viewMode && currentStatus && (
+          <Alert className="mb-6" variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {currentStatus.message || '考核已结束，只能查看评估结果'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {existingDraft && !viewMode && (
           <Alert className="mb-6">
             <FileText className="h-4 w-4" />
             <AlertDescription>
@@ -251,9 +299,28 @@ export default function EmployeeSelfEvaluationPage() {
           type="self"
           existingDraft={existingDraft}
           onSubmit={handleSubmitSuccess}
+          onSubmitError={handleSubmitError}
           onSaveDraft={handleDraftSaved}
+          viewMode={viewMode}
         />
       </div>
+
+      {/* 考核结束对话框 */}
+      <AlertDialog open={showEndedDialog} onOpenChange={setShowEndedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>考核已结束</AlertDialogTitle>
+            <AlertDialogDescription>
+              此考核已结束，无法进行评分操作。页面将切换为查看模式。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleEndedDialogConfirm}>
+              确定
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

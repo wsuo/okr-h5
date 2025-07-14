@@ -5,6 +5,15 @@ import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Loader2, AlertTriangle, FileText, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import LeadHeader from "@/components/lead-header"
@@ -17,6 +26,7 @@ import {
   evaluationUtils
 } from "@/lib/evaluation"
 import { userService, User as UserType } from "@/lib/user"
+import { useEvaluationPageMonitor } from "@/hooks/use-assessment-status"
 import { safeParseUserInfo } from "@/lib/utils"
 
 export default function LeaderEvaluationPage() {
@@ -46,6 +56,17 @@ export default function LeaderEvaluationPage() {
   }>({ completed: false, status: 'none' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+
+  // 使用状态监听Hook
+  const {
+    currentStatus,
+    viewMode,
+    showEndedDialog,
+    setViewMode,
+    handleEndedDialogConfirm,
+    handleEvaluationError,
+    manualCheck
+  } = useEvaluationPageMonitor(assessmentId || 0, !loading && !!template && !!assessmentId)
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -81,6 +102,15 @@ export default function LeaderEvaluationPage() {
       // 确保参数有效
       if (!assessmentId || !userId) {
         throw new Error('无效的评估参数')
+      }
+
+      // 首先检查考核状态
+      const statusResponse = await evaluationService.checkAssessmentStatus(assessmentId)
+      if (statusResponse.code === 200 && statusResponse.data) {
+        // 如果考核已结束，设置为查看模式
+        if (!statusResponse.data.canEvaluate) {
+          setViewMode(true)
+        }
       }
 
       // 并行加载多个数据
@@ -195,6 +225,14 @@ export default function LeaderEvaluationPage() {
       description: '感谢您的评价，正在跳转到团队评估页面'
     })
     router.push('/lead')
+  }
+
+  const handleSubmitError = (error: any) => {
+    const errorInfo = handleEvaluationError(error)
+
+    if (!errorInfo.shouldShowDialog) {
+      toast.error(errorInfo.message)
+    }
   }
 
   const handleDraftSaved = () => {
@@ -409,8 +447,18 @@ export default function LeaderEvaluationPage() {
           </CardContent>
         </Card>
 
+        {/* 考核状态提示 */}
+        {viewMode && currentStatus && (
+          <Alert className="mb-6" variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {currentStatus.message || '考核已结束，只能查看评估结果'}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* 自评状态提醒 */}
-        {(() => {
+        {!viewMode && (() => {
           switch (selfEvaluationStatus.status) {
             case 'none':
               return (
@@ -446,7 +494,7 @@ export default function LeaderEvaluationPage() {
         })()}
 
         {/* 草稿恢复提醒 */}
-        {existingDraft && (
+        {existingDraft && !viewMode && (
           <Alert className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50">
             <FileText className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
@@ -457,13 +505,15 @@ export default function LeaderEvaluationPage() {
         )}
 
         {/* 评分说明 */}
-        <Alert className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200/50">
-          <AlertTriangle className="h-4 w-4 text-purple-600" />
-          <AlertDescription className="text-purple-800">
-            <strong className="font-semibold">评分说明：</strong> 为确保评分的公正性，您无法查看该员工的自评分数和评论。
-            请根据您对其工作表现的了解进行客观评价。
-          </AlertDescription>
-        </Alert>
+        {!viewMode && (
+          <Alert className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200/50">
+            <AlertTriangle className="h-4 w-4 text-purple-600" />
+            <AlertDescription className="text-purple-800">
+              <strong className="font-semibold">评分说明：</strong> 为确保评分的公正性，您无法查看该员工的自评分数和评论。
+              请根据您对其工作表现的了解进行客观评价。
+            </AlertDescription>
+          </Alert>
+        )}
 
         <EvaluationForm
           template={template}
@@ -472,9 +522,28 @@ export default function LeaderEvaluationPage() {
           type="leader"
           existingDraft={existingDraft}
           onSubmit={handleSubmitSuccess}
+          onSubmitError={handleSubmitError}
           onSaveDraft={handleDraftSaved}
+          viewMode={viewMode}
         />
       </div>
+
+      {/* 考核结束对话框 */}
+      <AlertDialog open={showEndedDialog} onOpenChange={setShowEndedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>考核已结束</AlertDialogTitle>
+            <AlertDialogDescription>
+              此考核已结束，无法进行评分操作。页面将切换为查看模式。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleEndedDialogConfirm}>
+              确定
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -288,9 +288,24 @@ export interface UpdateEvaluationRequest {
   detailed_scores?: DetailedScore[]
 }
 
+// 考核状态检查结果接口
+export interface AssessmentStatusCheckResult {
+  canEvaluate: boolean
+  status: string
+  isEnded: boolean
+  message?: string
+}
+
 // 评估管理服务类
 export class EvaluationService {
   
+  /**
+   * 0. 检查考核状态
+   */
+  async checkAssessmentStatus(assessmentId: number): Promise<ApiResponse<AssessmentStatusCheckResult>> {
+    return apiClient.get<AssessmentStatusCheckResult>(`/assessments/${assessmentId}/status`)
+  }
+
   /**
    * 1. 获取评估列表
    */
@@ -626,6 +641,42 @@ export const evaluationUtils = {
     })
 
     return errors
+  },
+
+  /**
+   * 检查考核状态
+   */
+  checkAssessmentStatus: (assessment: any) => {
+    if (assessment.status === 'completed' || assessment.status === 'ended') {
+      return {
+        canEvaluate: false,
+        message: '考核已结束，只能查看评估结果',
+        showViewOnly: true
+      }
+    }
+    return { canEvaluate: true }
+  },
+
+  /**
+   * 处理评分提交错误
+   */
+  handleEvaluationError: (error: any, onAssessmentEnded?: () => void) => {
+    if (error.message && error.message.includes('考核已结束')) {
+      if (onAssessmentEnded) {
+        onAssessmentEnded()
+      }
+      return {
+        shouldShowDialog: true,
+        title: '考核已结束',
+        message: '此考核已结束，无法进行评分操作。页面将切换为查看模式。',
+        type: 'warning' as const
+      }
+    }
+    return {
+      shouldShowDialog: false,
+      message: error.message || '操作失败',
+      type: 'error' as const
+    }
   },
 
   /**
