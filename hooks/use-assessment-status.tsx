@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { evaluationService } from '@/lib/evaluation'
 import { toast } from 'sonner'
 
@@ -21,6 +21,13 @@ export function useAssessmentStatusMonitor({
 }: AssessmentStatusMonitorOptions) {
   const [currentStatus, setCurrentStatus] = useState<any>(null)
   const [isMonitoring, setIsMonitoring] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const callbacksRef = useRef({ onStatusChanged, onAssessmentEnded })
+
+  // 更新回调引用
+  useEffect(() => {
+    callbacksRef.current = { onStatusChanged, onAssessmentEnded }
+  }, [onStatusChanged, onAssessmentEnded])
 
   const checkStatus = useCallback(async () => {
     if (!enabled || !assessmentId) return
@@ -45,13 +52,13 @@ export function useAssessmentStatusMonitor({
                 description: '考核已结束，所有参与者已完成评分'
               })
               
-              if (onAssessmentEnded) {
-                onAssessmentEnded()
+              if (callbacksRef.current.onAssessmentEnded) {
+                callbacksRef.current.onAssessmentEnded()
               }
             }
             
-            if (onStatusChanged) {
-              onStatusChanged(newStatus)
+            if (callbacksRef.current.onStatusChanged) {
+              callbacksRef.current.onStatusChanged(newStatus)
             }
           }
           
@@ -62,11 +69,11 @@ export function useAssessmentStatusMonitor({
       console.warn('检查考核状态失败:', error)
       // 不显示错误提示，避免干扰用户
     }
-  }, [assessmentId, enabled, onStatusChanged, onAssessmentEnded])
+  }, [assessmentId, enabled])
 
   // 启动监听
   const startMonitoring = useCallback(() => {
-    if (!enabled || isMonitoring) return
+    if (!enabled || isMonitoring || !assessmentId) return
 
     setIsMonitoring(true)
     
@@ -74,16 +81,23 @@ export function useAssessmentStatusMonitor({
     checkStatus()
     
     // 设置定时检查
-    const interval = setInterval(checkStatus, intervalMs)
+    intervalRef.current = setInterval(checkStatus, intervalMs)
     
     return () => {
-      clearInterval(interval)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
       setIsMonitoring(false)
     }
-  }, [enabled, isMonitoring, checkStatus, intervalMs])
+  }, [enabled, isMonitoring, assessmentId, checkStatus, intervalMs])
 
   // 停止监听
   const stopMonitoring = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
     setIsMonitoring(false)
   }, [])
 
@@ -99,6 +113,15 @@ export function useAssessmentStatusMonitor({
     }
   }, [enabled, assessmentId, startMonitoring])
 
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [])
+
   return {
     currentStatus,
     isMonitoring,
@@ -113,9 +136,10 @@ export function useEvaluationPageMonitor(assessmentId: number, enabled: boolean 
   const [viewMode, setViewMode] = useState(false)
   const [showEndedDialog, setShowEndedDialog] = useState(false)
 
+  // 暂时禁用自动监听，避免无限循环
   const { currentStatus, manualCheck } = useAssessmentStatusMonitor({
     assessmentId,
-    enabled,
+    enabled: false, // 暂时禁用
     onAssessmentEnded: () => {
       setShowEndedDialog(true)
     },
