@@ -43,6 +43,7 @@ export default function EmployeeSelfEvaluationPage() {
     viewMode,
     showEndedDialog,
     setViewMode,
+    setShowEndedDialog,
     handleEndedDialogConfirm,
     handleEvaluationError,
     manualCheck
