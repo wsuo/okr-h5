@@ -63,6 +63,7 @@ export default function LeaderEvaluationPage() {
     viewMode,
     showEndedDialog,
     setViewMode,
+    setShowEndedDialog,
     handleEndedDialogConfirm,
     handleEvaluationError,
     manualCheck
