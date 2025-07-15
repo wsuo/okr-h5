@@ -27,6 +27,7 @@ export interface Evaluation {
   feedback?: string  // Backend alias for leader_review
   strengths?: string
   improvements?: string
+  submitted_at?: string
   created_at: string
   updated_at: string
   // 关联对象

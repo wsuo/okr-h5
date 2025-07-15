@@ -499,7 +499,7 @@ curl -X GET "http://localhost:3000/evaluations/subordinates/1" \
     "subordinate_id": 3,
     "subordinate_name": "张三",
     "subordinate_department": "技术部",
-    "status": "in_progress",
+    "status": "draft",
     "self_evaluation_completed": true,
     "self_evaluation_completed_at": "2024-01-15T10:30:00Z",
     "leader_evaluation_id": 5,
@@ -635,6 +635,463 @@ curl -X GET "http://localhost:3000/evaluations/comparison/1/3" \
   }
 }
 ```
+
+## 员工评估管理接口
+
+### 20. 获取员工评估统计
+
+```http
+GET /users/{userId}/evaluation-stats
+```
+
+**描述：** 获取指定员工的评估统计数据，包含历史得分、趋势分析和排名信息。
+
+**权限要求：** 需要 `leader`、`boss` 或 `admin` 角色权限
+
+**路径参数：**
+- `userId` (required, integer): 员工用户ID
+
+**查询参数：**
+- `period` (optional, string): 统计周期
+  - `all` (默认): 全部历史
+  - `recent_6`: 最近6次评估
+  - `year_2024`: 2024年度
+- `include_trend` (optional, boolean): 是否包含趋势数据，默认 true
+
+**测试用例：**
+
+```bash
+# 获取员工评估统计（全部历史）
+curl -X GET "http://localhost:3000/api/v1/users/7/evaluation-stats" \
+  -H "Authorization: Bearer <leader-token>"
+
+# 获取最近6次评估统计
+curl -X GET "http://localhost:3000/api/v1/users/7/evaluation-stats?period=recent_6" \
+  -H "Authorization: Bearer <leader-token>"
+
+# 获取2024年度统计（不包含趋势）
+curl -X GET "http://localhost:3000/api/v1/users/7/evaluation-stats?period=year_2024&include_trend=false" \
+  -H "Authorization: Bearer <leader-token>"
+```
+
+**预期响应：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "user_id": 7,
+    "user_name": "wyx",
+    "department": "技术部",
+    "position": "全栈工程师",
+    "total_assessments": 5,
+    "completed_assessments": 4,
+    "completion_rate": 80.0,
+    "average_score": 87.5,
+    "latest_score": 89.2,
+    "highest_score": 95.5,
+    "lowest_score": 78.3,
+    "score_trend": "up",
+    "score_improvement": 8.7,
+    "rank_in_department": 3,
+    "rank_total": 15,
+    "score_history": [
+      {
+        "assessment_id": 10,
+        "assessment_title": "2025年08月绩效考核",
+        "final_score": 39.64,
+        "self_score": 35.0,
+        "leader_score": 42.0,
+        "completed_at": "2025-07-10T03:41:55.000Z",
+        "period": "2025-07"
+      }
+    ],
+    "trend_analysis": {
+      "recent_6_months": {
+        "trend": "up",
+        "improvement": 6.3,
+        "consistency": "stable"
+      },
+      "score_distribution": {
+        "excellent": 1,
+        "good": 2,
+        "average": 1,
+        "poor": 0
+      }
+    },
+    "statistics": {
+      "avg_self_score": 84.2,
+      "avg_leader_score": 88.8,
+      "self_leader_difference": -4.6,
+      "last_updated": "2025-07-10T03:41:57.000Z"
+    }
+  }
+}
+```
+
+### 21. 获取员工考核历史
+
+```http
+GET /users/{userId}/assessments-history
+```
+
+**描述：** 获取指定员工的考核历史记录，支持分页和多种过滤条件。
+
+**权限要求：** 需要 `leader`、`boss` 或 `admin` 角色权限
+
+**路径参数：**
+- `userId` (required, integer): 员工用户ID
+
+**查询参数：**
+- `page` (optional, integer): 页码，默认1
+- `limit` (optional, integer): 每页数量，默认20
+- `status` (optional, string): 过滤状态
+  - `all` (默认): 全部状态
+  - `completed`: 已完成
+  - `in_progress`: 进行中
+  - `pending`: 待开始
+- `year` (optional, string): 过滤年份，如 2024
+- `sort` (optional, string): 排序方式
+  - `start_date_desc` (默认): 按开始日期倒序
+  - `start_date_asc`: 按开始日期正序
+  - `score_desc`: 按得分倒序
+
+**测试用例：**
+
+```bash
+# 获取员工考核历史（默认参数）
+curl -X GET "http://localhost:3000/api/v1/users/7/assessments-history" \
+  -H "Authorization: Bearer <leader-token>"
+
+# 获取已完成的考核，按得分倒序
+curl -X GET "http://localhost:3000/api/v1/users/7/assessments-history?status=completed&sort=score_desc" \
+  -H "Authorization: Bearer <leader-token>"
+
+# 获取2024年的考核记录
+curl -X GET "http://localhost:3000/api/v1/users/7/assessments-history?year=2024&page=1&limit=10" \
+  -H "Authorization: Bearer <leader-token>"
+```
+
+**预期响应：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "assessment_id": 10,
+        "assessment_title": "2025年08月绩效考核",
+        "period": "2025-07",
+        "status": "in_progress",
+        "start_date": "2025-07-01T00:00:00.000Z",
+        "end_date": "2025-07-31T23:59:59.000Z",
+        "deadline": "2025-07-31T23:59:59.000Z",
+        "created_at": "2025-07-07T07:21:33.000Z",
+        "self_evaluation": {
+          "completed": true,
+          "score": 35.0,
+          "submitted_at": "2025-07-10T03:41:55.000Z",
+          "last_updated": "2025-07-10T03:41:55.000Z"
+        },
+        "leader_evaluation": {
+          "completed": false,
+          "score": null,
+          "leader_id": 3,
+          "leader_name": "李四",
+          "submitted_at": null,
+          "last_updated": null
+        },
+        "final_score": null,
+        "final_level": null,
+        "weight_config": {
+          "self_weight": 30,
+          "leader_weight": 70
+        },
+        "is_overdue": true,
+        "days_to_deadline": -11,
+        "template_id": 1,
+        "template_name": "标准绩效考核模板"
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "limit": 20,
+      "total_pages": 1,
+      "has_next": false,
+      "has_prev": false
+    },
+    "summary": {
+      "total_assessments": 1,
+      "completed_count": 0,
+      "in_progress_count": 1,
+      "pending_count": 0,
+      "average_final_score": 0,
+      "completion_rate": 0
+    }
+  }
+}
+```
+
+### 22. 获取完整评估详情
+
+```http
+GET /evaluations/assessment/{assessmentId}/user/{userId}/complete
+```
+
+**描述：** 获取指定考核和员工的完整评估详情，包含自评、领导评分、对比分析和时间线。
+
+**权限要求：** 需要 `leader`、`boss` 或 `admin` 角色权限
+
+**路径参数：**
+- `assessmentId` (required, integer): 考核ID
+- `userId` (required, integer): 被评估员工ID
+
+**查询参数：**
+- `include_details` (optional, boolean): 是否包含详细评分项，默认 true
+- `include_comments` (optional, boolean): 是否包含评论内容，默认 true
+- `include_comparison` (optional, boolean): 是否包含对比分析，默认 true
+
+**测试用例：**
+
+```bash
+# 获取完整评估详情
+curl -X GET "http://localhost:3000/api/v1/evaluations/assessment/10/user/7/complete" \
+  -H "Authorization: Bearer <leader-token>"
+
+# 获取简化的评估详情（不包含详细评分和对比）
+curl -X GET "http://localhost:3000/api/v1/evaluations/assessment/10/user/7/complete?include_details=false&include_comparison=false" \
+  -H "Authorization: Bearer <leader-token>"
+```
+
+**预期响应：**
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "assessment_info": {
+      "assessment_id": 10,
+      "assessment_title": "2025年08月绩效考核",
+      "period": "2025-07",
+      "template_name": "标准绩效考核模板",
+      "start_date": "2025-07-01T00:00:00.000Z",
+      "end_date": "2025-07-31T23:59:59.000Z",
+      "deadline": "2025-07-31T23:59:59.000Z",
+      "status": "active"
+    },
+    "evaluatee_info": {
+      "user_id": 7,
+      "user_name": "wyx",
+      "department": "技术部",
+      "position": "全栈工程师",
+      "email": "wangsuoo@example.com"
+    },
+    "self_evaluation": {
+      "evaluation_id": 15,
+      "completed": true,
+      "submitted_at": "2025-07-10T03:41:55.000Z",
+      "overall_score": 35.0,
+      "review": "本期工作表现良好，完成了所有既定目标",
+      "strengths": "技术能力强，学习能力快",
+      "improvements": "需要提高沟通协调能力",
+      "detailed_scores": []
+    },
+    "leader_evaluation": {
+      "evaluation_id": 0,
+      "leader_id": 0,
+      "leader_name": "",
+      "completed": false,
+      "submitted_at": "2025-07-11T04:02:23.461Z",
+      "overall_score": 0,
+      "review": "",
+      "strengths": "",
+      "improvements": "",
+      "detailed_scores": []
+    },
+    "final_result": {
+      "final_score": 0,
+      "final_level": "待改进",
+      "calculation_method": "weighted_average",
+      "weight_config": {
+        "self_weight": 30,
+        "leader_weight": 70
+      },
+      "calculation_details": {
+        "self_weighted_score": 10.5,
+        "leader_weighted_score": 0,
+        "total_score": 10.5,
+        "rounded_score": 0
+      },
+      "completed_at": "2025-07-10T03:41:57.000Z"
+    },
+    "timeline": [
+      {
+        "event": "assessment_created",
+        "description": "考核创建",
+        "timestamp": "2025-07-07T07:21:33.000Z",
+        "actor": "系统"
+      },
+      {
+        "event": "self_evaluation_submitted",
+        "description": "员工提交自评",
+        "timestamp": "2025-07-10T03:41:55.000Z",
+        "actor": "wyx"
+      }
+    ]
+  }
+}
+```
+
+**错误处理：**
+
+```bash
+# 用户不存在
+curl -X GET "http://localhost:3000/api/v1/users/999/evaluation-stats" \
+  -H "Authorization: Bearer <leader-token>"
+# 预期响应：404 Not Found - "用户不存在"
+
+# 权限不足
+curl -X GET "http://localhost:3000/api/v1/users/7/evaluation-stats" \
+  -H "Authorization: Bearer <employee-token>"
+# 预期响应：403 Forbidden - "无权限"
+
+# 考核不存在
+curl -X GET "http://localhost:3000/api/v1/evaluations/assessment/999/user/7/complete" \
+  -H "Authorization: Bearer <leader-token>"
+# 预期响应：404 Not Found - "考核不存在"
+```
+
+## 团队管理接口
+
+### 获取团队成员列表
+
+```http
+GET /users/team-members
+```
+
+**描述：** 获取当前领导的团队成员列表，包含每个成员的考核状态和评估进度。
+
+**权限要求：** 需要 `leader` 或 `boss` 角色权限
+
+**特性：**
+- 自动显示进行中的考核（优先级最高）
+- 如果没有进行中的考核，显示最近的历史考核
+- 提供完整的评估状态和进度信息
+- 包含团队整体统计数据
+
+**测试用例：**
+
+```bash
+# 获取团队成员列表
+curl -X GET "http://localhost:3000/users/team-members" \
+  -H "Authorization: Bearer <leader-token>"
+```
+
+**预期响应：**
+```json
+{
+  "members": [
+    {
+      "user_id": 3,
+      "user_name": "张三",
+      "email": "zhangsan@company.com",
+      "department": "技术部",
+      "position": "高级工程师",
+      "has_active_assessment": true,
+      "is_historical": false,
+      "current_assessment": {
+        "assessment_id": 1,
+        "assessment_title": "2024年度绩效考核",
+        "status": "active",
+        "start_date": "2024-01-01T00:00:00Z",
+        "end_date": "2024-12-31T23:59:59Z",
+        "period": "2024年度"
+      },
+      "evaluation_status": {
+        "self_completed": true,
+        "leader_completed": false,
+        "self_completed_at": "2024-01-15T10:30:00Z",
+        "leader_completed_at": null,
+        "final_score": null,
+        "self_score": 85,
+        "leader_score": null
+      },
+      "last_updated": "2024-01-15T10:30:00Z"
+    },
+    {
+      "user_id": 4,
+      "user_name": "李四",
+      "email": "lisi@company.com",
+      "department": "技术部",
+      "position": "工程师",
+      "has_active_assessment": false,
+      "is_historical": true,
+      "current_assessment": {
+        "assessment_id": 2,
+        "assessment_title": "2023年度绩效考核",
+        "status": "completed",
+        "start_date": "2023-01-01T00:00:00Z",
+        "end_date": "2023-12-31T23:59:59Z",
+        "period": "2023年度"
+      },
+      "evaluation_status": {
+        "self_completed": true,
+        "leader_completed": true,
+        "self_completed_at": "2023-12-15T10:30:00Z",
+        "leader_completed_at": "2023-12-20T14:20:00Z",
+        "final_score": 88.5,
+        "self_score": 85,
+        "leader_score": 90
+      },
+      "last_updated": "2023-12-20T14:20:00Z"
+    }
+  ],
+  "total_members": 2,
+  "active_assessments_count": 1,
+  "self_completed_count": 1,
+  "leader_completed_count": 0
+}
+```
+
+**字段说明：**
+
+- `members`: 团队成员列表
+  - `user_id`: 用户ID
+  - `user_name`: 用户姓名
+  - `email`: 用户邮箱
+  - `department`: 部门名称
+  - `position`: 职位
+  - `has_active_assessment`: 是否有进行中的考核
+  - `is_historical`: 是否显示的是历史考核
+  - `current_assessment`: 当前考核信息（进行中优先，否则显示最近的）
+  - `evaluation_status`: 评估状态和进度
+  - `last_updated`: 最后更新时间
+
+- `total_members`: 团队成员总数
+- `active_assessments_count`: 有进行中考核的成员数量
+- `self_completed_count`: 完成自评的成员数量
+- `leader_completed_count`: 完成领导评分的成员数量
+
+**错误处理：**
+
+```bash
+# 非领导角色访问
+curl -X GET "http://localhost:3000/users/team-members" \
+  -H "Authorization: Bearer <employee-token>"
+# 预期响应：403 Forbidden - "无权限"
+
+# 未授权访问
+curl -X GET "http://localhost:3000/users/team-members"
+# 预期响应：401 Unauthorized
+```
+
+**使用场景：**
+1. **领导页面初始化**: 加载团队成员列表和评估状态
+2. **考核进度监控**: 查看团队成员的考核完成情况
+3. **历史考核回顾**: 当没有进行中的考核时，查看最近的考核结果
+4. **管理决策支持**: 基于统计数据做出管理决策
 
 ## 传统评分接口（兼容性）
 
@@ -872,6 +1329,26 @@ curl -X GET "$BASE_URL/evaluations/my-tasks" \
 # 6. 获取评分进度
 echo "6. 获取评分进度"
 curl -X GET "$BASE_URL/evaluations/progress/1" \
+  -H "$AUTH_HEADER"
+
+# 7. 获取团队成员列表
+echo "7. 获取团队成员列表"
+curl -X GET "$BASE_URL/users/team-members" \
+  -H "$AUTH_HEADER"
+
+# 8. 获取员工评估统计
+echo "8. 获取员工评估统计"
+curl -X GET "$BASE_URL/users/7/evaluation-stats" \
+  -H "$AUTH_HEADER"
+
+# 9. 获取员工考核历史
+echo "9. 获取员工考核历史"
+curl -X GET "$BASE_URL/users/7/assessments-history" \
+  -H "$AUTH_HEADER"
+
+# 10. 获取完整评估详情
+echo "10. 获取完整评估详情"
+curl -X GET "$BASE_URL/evaluations/assessment/10/user/7/complete" \
   -H "$AUTH_HEADER"
 
 echo "评估模块API测试完成!"

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Search, Calendar, User, Loader2, FileText, Users, BarChart3 } from "lucide-react"
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Search, Calendar, User, Loader2, FileText, Users, BarChart3, X } from "lucide-react"
 import LeadHeader from "@/components/lead-header"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -16,7 +16,8 @@ import {
   EvaluationTask,
   Evaluation,
   EvaluationProgress,
-  evaluationUtils
+  evaluationUtils,
+  TaskStatus
 } from "@/lib/evaluation"
 import { assessmentService, AssessmentListItem } from "@/lib/assessment"
 import { safeParseUserInfo } from "@/lib/utils"
@@ -60,12 +61,23 @@ export default function LeadEvaluationCenter() {
         assessmentService.getAssessments({ status: 'active' })
       ])
 
-      // 处理评估任务
+      // Combine both pending tasks and completed evaluations
+      let allTasks: EvaluationTask[] = []
+
+      // Process pending evaluation tasks
       if (tasksResponse.code === 200 && tasksResponse.data) {
-        const tasks = tasksResponse.data.map(evaluation => {
+        const pendingTasks = tasksResponse.data.map(evaluation => {
           const assessmentId = evaluation.assessment?.id
           const evaluateeId = evaluation.evaluatee?.id
-          
+
+          // Determine task status based on evaluation status
+          let taskStatus: TaskStatus = 'pending'
+          if (evaluation.status === 'submitted' || evaluation.status === 'completed') {
+            taskStatus = 'completed'
+          } else if (evaluation.status === 'draft') {
+            taskStatus = 'in_progress'
+          }
+
           return {
             id: `leader_${assessmentId}_${evaluateeId}`,
             assessment_id: assessmentId,
@@ -75,19 +87,73 @@ export default function LeadEvaluationCenter() {
             evaluatee_id: evaluateeId,
             evaluatee_name: evaluation.evaluatee?.name || `用户 #${evaluateeId}`,
             evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
-            status: evaluation.status === 'submitted' ? 'completed' as const : 'pending' as const,
+            status: taskStatus,
             deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             is_overdue: false,
             evaluation_id: evaluation.id,
             last_updated: evaluation.updated_at
           }
         })
-        setEvaluationTasks(tasks)
+        allTasks = [...pendingTasks]
       }
 
-      // 处理评估历史
+      // Process completed evaluations from history
       if (historyResponse.code === 200 && historyResponse.data) {
-        setEvaluationHistory(historyResponse.data.items)
+        // Handle the API response structure: {code, message, data: {items: [...]}}
+        let historyData = []
+        if (historyResponse.data) {
+          if (Array.isArray(historyResponse.data)) {
+            // Direct array
+            historyData = historyResponse.data
+          } else if (historyResponse.data.items && Array.isArray(historyResponse.data.items)) {
+            // Paginated response with items array
+            historyData = historyResponse.data.items
+          }
+        }
+
+        // Create tasks for submitted evaluations
+        const submittedTasks = historyData
+          .filter(evaluation => evaluation.status === 'submitted')
+          .map(evaluation => {
+
+            // Extract IDs, handling both nested and direct properties
+            const assessmentId = evaluation.assessment?.id || evaluation.assessment_id
+            const evaluateeId = evaluation.evaluatee?.id || evaluation.evaluatee_id
+
+            return {
+              id: `leader_${assessmentId}_${evaluateeId}`,
+              assessment_id: assessmentId,
+              assessment_title: evaluation.assessment?.title || `评估 #${assessmentId}`,
+              assessment_period: evaluation.assessment?.period || evaluationUtils.formatDate(evaluation.created_at),
+              type: 'leader' as const,
+              evaluatee_id: evaluateeId,
+              evaluatee_name: evaluation.evaluatee?.name || `用户 #${evaluateeId}`,
+              evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
+              status: 'completed' as TaskStatus, // Mark as completed for the completed tab
+              deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              is_overdue: false,
+              evaluation_id: evaluation.id,
+              last_updated: evaluation.updated_at || evaluation.submitted_at
+            }
+          })
+
+        // Add submitted tasks to the main task list
+        // Use a Set to avoid duplicates based on task ID
+        const existingTaskIds = new Set(allTasks.map(task => task.id))
+        const newSubmittedTasks = submittedTasks.filter(task => !existingTaskIds.has(task.id))
+
+        allTasks = [...allTasks, ...newSubmittedTasks]
+      }
+
+      setEvaluationTasks(allTasks)
+
+      // 处理评估历史 (for history tab display)
+      if (historyResponse.code === 200 && historyResponse.data) {
+        // Handle both direct array and paginated response
+        const historyData = Array.isArray(historyResponse.data)
+          ? historyResponse.data
+          : historyResponse.data.items || []
+        setEvaluationHistory(historyData)
       }
 
       // 处理活跃考核
@@ -155,11 +221,17 @@ export default function LeadEvaluationCenter() {
   }
 
   const filteredTasks = evaluationTasks.filter(task => {
-    const matchesSearch = task.assessment_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         task.evaluatee_name.toLowerCase().includes(searchQuery.toLowerCase())
-    
+    // Enhanced search functionality
+    const searchLower = searchQuery.toLowerCase()
+    const matchesSearch = searchQuery === "" ||
+                         task.assessment_title.toLowerCase().includes(searchLower) ||
+                         task.evaluatee_name.toLowerCase().includes(searchLower) ||
+                         task.evaluatee_department.toLowerCase().includes(searchLower) ||
+                         task.assessment_period.toLowerCase().includes(searchLower) ||
+                         evaluationUtils.getTaskStatusText(task.status).toLowerCase().includes(searchLower)
+
     const matchesAssessment = selectedAssessment === "all" || task.assessment_id.toString() === selectedAssessment
-    
+
     let matchesTab = true
     switch (activeTab) {
       case 'pending':
@@ -172,16 +244,26 @@ export default function LeadEvaluationCenter() {
         matchesTab = task.is_overdue
         break
     }
-    
+
     return matchesSearch && matchesAssessment && matchesTab
   })
 
   const filteredHistory = evaluationHistory.filter(evaluation => {
-    const matchesSearch = (evaluation.assessment_id?.toString() || '').includes(searchQuery) ||
-                         (evaluation.leader_review && evaluation.leader_review.toLowerCase().includes(searchQuery.toLowerCase()))
-    
-    const matchesAssessment = selectedAssessment === "all" || (evaluation.assessment_id?.toString() || '') === selectedAssessment
-    
+    // Enhanced search functionality for history
+    const searchLower = searchQuery.toLowerCase()
+    const matchesSearch = searchQuery === "" ||
+                         (evaluation.assessment?.title && evaluation.assessment.title.toLowerCase().includes(searchLower)) ||
+                         (evaluation.assessment?.id?.toString() || evaluation.assessment_id?.toString() || '').includes(searchQuery) ||
+                         (evaluation.leader_review && evaluation.leader_review.toLowerCase().includes(searchLower)) ||
+                         (evaluation.evaluatee?.name && evaluation.evaluatee.name.toLowerCase().includes(searchLower)) ||
+                         (evaluation.strengths && evaluation.strengths.toLowerCase().includes(searchLower)) ||
+                         (evaluation.improvements && evaluation.improvements.toLowerCase().includes(searchLower)) ||
+                         (evaluation.assessment?.period && evaluation.assessment.period.toLowerCase().includes(searchLower)) ||
+                         evaluationUtils.getStatusText(evaluation.status).toLowerCase().includes(searchLower)
+
+    const assessmentId = evaluation.assessment?.id || evaluation.assessment_id
+    const matchesAssessment = selectedAssessment === "all" || (assessmentId?.toString() || '') === selectedAssessment
+
     return matchesSearch && matchesAssessment
   })
 
@@ -260,11 +342,19 @@ export default function LeadEvaluationCenter() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="搜索评估..."
+                  placeholder="搜索姓名、部门、考核标题..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
+                  className="pl-10 pr-10 w-64"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -412,13 +502,22 @@ export default function LeadEvaluationCenter() {
                           <div className="text-sm text-gray-500">
                             完成时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/lead/evaluation/result/${task.assessment_id}`)}
-                          >
-                            查看结果
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/lead/evaluation/comparison/${task.assessment_id}/${task.evaluatee_id}`)}
+                            >
+                              查看详情
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/lead/evaluation/result/${task.assessment_id}`)}
+                            >
+                              查看结果
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -568,36 +667,101 @@ export default function LeadEvaluationCenter() {
                 {filteredHistory.length > 0 ? (
                   <div className="space-y-4">
                     {filteredHistory.map((evaluation) => (
-                      <div key={evaluation.id} className="border rounded-lg p-4">
+                      <div key={evaluation.id} className={`border rounded-lg p-4 ${!(evaluation.assessment?.id || evaluation.assessment_id) ? 'bg-gray-50 border-gray-300' : ''}`}>
                         <div className="flex items-center justify-between mb-3">
                           <div>
-                            <h3 className="font-semibold text-lg">评估 #{evaluation.assessment_id}</h3>
+                            <h3 className="font-semibold text-lg">
+                              {evaluation.assessment?.title || `评估 #${evaluation.assessment?.id || evaluation.assessment_id || '未知'}`}
+                              {!(evaluation.assessment?.id || evaluation.assessment_id) && (
+                                <span className="ml-2 text-xs text-red-500 bg-red-100 px-2 py-1 rounded">
+                                  数据不完整
+                                </span>
+                              )}
+                            </h3>
                             <p className="text-sm text-gray-600">
-                              被评估人：{evaluation.evaluatee?.name || `用户 #${evaluation.evaluatee_id}`}
+                              被评估人：{evaluation.evaluatee?.name || `用户 #${evaluation.evaluatee?.id || evaluation.evaluatee_id}`}
+                              {evaluation.assessment?.period && (
+                                <span className="ml-2 text-blue-600">
+                                  ({evaluation.assessment.period})
+                                </span>
+                              )}
                             </p>
                           </div>
                           {getEvaluationStatusBadge(evaluation)}
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                        <div className="grid grid-cols-3 gap-4 text-sm mb-3">
                           <div>
                             <span className="text-gray-600">评估类型：</span>
                             <span className="font-medium">{evaluationUtils.getTypeText(evaluation.type)}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">得分：</span>
-                            <span className="font-medium">{evaluation.score || '--'}</span>
+                            <span className="text-gray-600">领导评分：</span>
+                            <span className="font-medium text-blue-600">{evaluation.score || '--'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">评估时间：</span>
+                            <span className="font-medium">
+                              {evaluation.assessment?.period || evaluationUtils.formatDate(evaluation.updated_at)}
+                            </span>
                           </div>
                         </div>
                         
+                        {/* 评价内容摘要 */}
+                        {(evaluation.feedback || evaluation.leader_review || evaluation.strengths || evaluation.improvements) && (
+                          <div className="bg-gray-50 rounded-lg p-3 mb-3 text-sm">
+                            <div className="font-medium text-gray-700 mb-2">评价摘要：</div>
+                            <div className="space-y-1 text-gray-600">
+                              {(evaluation.feedback || evaluation.leader_review) && (
+                                <div>
+                                  <span className="font-medium">总体评价：</span>
+                                  <span className="ml-1">
+                                    {(evaluation.feedback || evaluation.leader_review || '').slice(0, 50)}
+                                    {(evaluation.feedback || evaluation.leader_review || '').length > 50 && '...'}
+                                  </span>
+                                </div>
+                              )}
+                              {evaluation.strengths && (
+                                <div>
+                                  <span className="font-medium">优势：</span>
+                                  <span className="ml-1">
+                                    {evaluation.strengths.slice(0, 40)}
+                                    {evaluation.strengths.length > 40 && '...'}
+                                  </span>
+                                </div>
+                              )}
+                              {evaluation.improvements && (
+                                <div>
+                                  <span className="font-medium">改进：</span>
+                                  <span className="ml-1">
+                                    {evaluation.improvements.slice(0, 40)}
+                                    {evaluation.improvements.length > 40 && '...'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="flex items-center justify-between">
                           <div className="text-sm text-gray-500">
-                            评分时间：{evaluationUtils.formatDateTime(evaluation.updated_at)}
+                            提交时间：{evaluationUtils.formatDateTime(evaluation.submitted_at || evaluation.updated_at)}
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => router.push(`/lead/evaluation/result/${evaluation.assessment_id}`)}
+                            disabled={!(evaluation.assessment?.id || evaluation.assessment_id) || !(evaluation.evaluatee?.id || evaluation.evaluatee_id)}
+                            onClick={() => {
+                              const assessmentId = evaluation.assessment?.id || evaluation.assessment_id
+                              const evaluateeId = evaluation.evaluatee?.id || evaluation.evaluatee_id
+                              if (assessmentId && evaluateeId) {
+                                router.push(`/lead/evaluation/comparison/${assessmentId}/${evaluateeId}`)
+                              } else {
+                                toast.error('无法查看详情', {
+                                  description: '评估记录缺少必要信息'
+                                })
+                              }
+                            }}
                           >
                             查看详情
                           </Button>
