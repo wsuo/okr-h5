@@ -17,6 +17,7 @@ import {
 
   evaluationUtils
 } from "@/lib/evaluation"
+import { assessmentService, AssessmentListItem } from "@/lib/assessment"
 import { safeParseUserInfo } from "@/lib/utils"
 
 // 评估状态分类接口
@@ -29,6 +30,7 @@ export default function EmployeeEvaluationCenter() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [evaluationTasks, setEvaluationTasks] = useState<EvaluationTask[]>([])
   const [evaluationHistory, setEvaluationHistory] = useState<Evaluation[]>([])
+  const [completedAssessments, setCompletedAssessments] = useState<AssessmentListItem[]>([])
   const [evaluationStatus, setEvaluationStatus] = useState<EvaluationStatus>({
     selfOnly: [],
     fullCompleted: []
@@ -53,10 +55,11 @@ export default function EmployeeEvaluationCenter() {
     try {
       setLoading(true)
 
-      // 并行加载评估任务和历史记录
-      const [tasksResponse, historyResponse] = await Promise.all([
+      // 并行加载评估任务、历史记录和已完成考核
+      const [tasksResponse, historyResponse, completedAssessmentsResponse] = await Promise.all([
         evaluationService.getMyEvaluationTasks(),
-        evaluationService.getEvaluations({ type: 'self' })
+        evaluationService.getEvaluations({ type: 'self' }),
+        assessmentService.getAssessments({ status: 'completed' })
       ])
 
       // 处理评估任务
@@ -119,6 +122,22 @@ export default function EmployeeEvaluationCenter() {
         setEvaluationHistory(historyData)
       }
 
+      // 处理已完成考核
+      if (completedAssessmentsResponse.code === 200 && completedAssessmentsResponse.data) {
+        // Handle the API response structure: {code, message, data: {items: [...]}}
+        let assessmentsData: AssessmentListItem[] = []
+        if (completedAssessmentsResponse.data) {
+          if (Array.isArray(completedAssessmentsResponse.data)) {
+            // Direct array
+            assessmentsData = completedAssessmentsResponse.data
+          } else if (completedAssessmentsResponse.data.items && Array.isArray(completedAssessmentsResponse.data.items)) {
+            // Paginated response with items array
+            assessmentsData = completedAssessmentsResponse.data.items
+          }
+        }
+        setCompletedAssessments(assessmentsData)
+      }
+
     } catch (error: any) {
       console.error('加载数据失败:', error)
       toast.error('加载数据失败', {
@@ -178,7 +197,7 @@ export default function EmployeeEvaluationCenter() {
         count = evaluationTasks.filter(task => task.status === 'pending' || task.status === 'in_progress').length
         break
       case 'completed':
-        count = evaluationStatus.selfOnly.length + evaluationStatus.fullCompleted.length
+        count = evaluationStatus.selfOnly.length + completedAssessments.length
         break
       case 'overdue':
         count = evaluationTasks.filter(task => task.is_overdue).length
@@ -427,49 +446,58 @@ export default function EmployeeEvaluationCenter() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {evaluationStatus.fullCompleted.length > 0 ? (
+                  {completedAssessments.length > 0 ? (
                     <div className="space-y-4">
-                      {evaluationStatus.fullCompleted.map((task) => (
-                        <div key={task.id} className="border rounded-lg p-4 bg-green-50 border-green-200">
+                      {completedAssessments.map((assessment) => (
+                        <div key={assessment.id} className="border rounded-lg p-4 bg-green-50 border-green-200">
                           <div className="flex items-center justify-between mb-3">
                             <div>
-                              <h3 className="font-semibold text-lg">{task.assessment_title}</h3>
-                              <p className="text-sm text-gray-600">{task.assessment_period}</p>
+                              <h3 className="font-semibold text-lg">{assessment.title}</h3>
+                              <p className="text-sm text-gray-600">{assessment.period}</p>
                             </div>
                             <Badge variant="outline" className="text-green-600 border-green-600">
-                              全部完成
+                              已完成
                             </Badge>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
                             <div className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
-                              <span>截止：{evaluationUtils.formatDate(task.deadline)}</span>
+                              <span>截止日期：{assessment.deadline && evaluationUtils.formatDate(assessment.deadline)}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <User className="w-4 h-4" />
-                              <span>被评估人：{task.evaluatee_name}</span>
+                              <span>参与人数：{assessment.statistics.total_participants}人</span>
                             </div>
                           </div>
 
                           <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg">
                             <div className="flex items-center gap-2 text-green-700">
                               <CheckCircle className="w-4 h-4" />
-                              <span className="font-medium">全部评估已完成</span>
+                              <span className="font-medium">考核已完成</span>
                             </div>
-                            <p className="text-sm text-green-600 mt-1">
-                              可以查看完整评估结果和详细对比分析
-                            </p>
+                            <div className="grid grid-cols-2 gap-2 text-sm text-green-600 mt-2">
+                              <div>
+                                <span>平均分：</span>
+                                <span className="font-medium">{assessment.statistics.average_score?.toFixed(2) || '--'}</span>
+                              </div>
+                              <div>
+                                <span>完成率：</span>
+                                <span className="font-medium">
+                                  {Math.round((assessment.statistics.fully_completed_count / assessment.statistics.total_participants) * 100)}%
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          
+
                           <div className="flex items-center justify-between">
                             <div className="text-sm text-gray-500">
-                              完成时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
+                              完成时间：{assessment.updated_at && evaluationUtils.formatDateTime(assessment.updated_at)}
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => router.push(`/employee/evaluation/result/${task.assessment_id}`)}
+                              onClick={() => router.push(`/employee/evaluation/result/${assessment.id}`)}
                             >
                               查看结果
                             </Button>
@@ -480,7 +508,7 @@ export default function EmployeeEvaluationCenter() {
                   ) : (
                     <div className="text-center py-8 text-gray-500">
                       <CheckCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                      <p className="text-sm">暂无完成的评估</p>
+                      <p className="text-sm">暂无完成的考核</p>
                     </div>
                   )}
                 </CardContent>
