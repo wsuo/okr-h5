@@ -228,8 +228,17 @@ export default function EmployeeDashboard() {
             <h1 className="text-2xl font-bold text-gray-900">我的绩效中心</h1>
             <p className="text-gray-600">查看和管理您的绩效考核</p>
           </div>
-          <div className="text-sm text-gray-500">
-            总共 {evaluationStatus.selfOnly.length + evaluationStatus.fullCompleted.length} 个评估记录
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500">
+              总共 {evaluationStatus.selfOnly.length + evaluationStatus.fullCompleted.length} 个评估记录
+            </div>
+            <Button
+              onClick={() => router.push('/employee/evaluation')}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              评估中心
+            </Button>
           </div>
         </div>
 

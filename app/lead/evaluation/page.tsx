@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Search, Calendar, User, Loader2, FileText, Users, BarChart3, X } from "lucide-react"
+import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Search, Calendar, User, Loader2, FileText, Users, BarChart3, X, Star } from "lucide-react"
 import LeadHeader from "@/components/lead-header"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -91,7 +91,11 @@ export default function LeadEvaluationCenter() {
             deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             is_overdue: false,
             evaluation_id: evaluation.id,
-            last_updated: evaluation.updated_at
+            last_updated: evaluation.updated_at,
+            score: evaluation.score, // Include score information
+            feedback: evaluation.feedback || evaluation.leader_review, // Include feedback
+            strengths: evaluation.strengths, // Include strengths
+            improvements: evaluation.improvements // Include improvements
           }
         })
         allTasks = [...pendingTasks]
@@ -133,7 +137,11 @@ export default function LeadEvaluationCenter() {
               deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
               is_overdue: false,
               evaluation_id: evaluation.id,
-              last_updated: evaluation.updated_at || evaluation.submitted_at
+              last_updated: evaluation.updated_at || evaluation.submitted_at,
+              score: evaluation.score, // Include score information
+              feedback: evaluation.feedback || evaluation.leader_review, // Include feedback
+              strengths: evaluation.strengths, // Include strengths
+              improvements: evaluation.improvements // Include improvements
             }
           })
 
@@ -489,7 +497,7 @@ export default function LeadEvaluationCenter() {
                 {filteredTasks.length > 0 ? (
                   <div className="space-y-4">
                     {filteredTasks.map((task) => (
-                      <div key={task.id} className="border rounded-lg p-4">
+                      <div key={task.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex items-center justify-between mb-3">
                           <div>
                             <h3 className="font-semibold text-lg">{task.evaluatee_name}</h3>
@@ -497,10 +505,46 @@ export default function LeadEvaluationCenter() {
                           </div>
                           {getTaskStatusBadge(task)}
                         </div>
-                        
+
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                          <div className="flex items-center gap-1">
+                            <FileText className="w-4 h-4" />
+                            <span>考核：{task.assessment_title}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>周期：{task.assessment_period}</span>
+                          </div>
+                        </div>
+
+                        {/* 评分信息 */}
+                        <div className="bg-blue-50 rounded-lg p-3 mb-4 border border-blue-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-1 text-blue-700">
+                              <BarChart3 className="w-4 h-4" />
+                              <span className="font-medium">评分信息</span>
+                            </div>
+                            {task.score && (
+                              <div className="text-lg font-bold text-blue-700">
+                                {typeof task.score === 'number' ? task.score.toFixed(2) : task.score}
+                              </div>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm text-blue-600">
+                            <div>
+                              <span>完成时间：</span>
+                              <span className="font-medium">{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}</span>
+                            </div>
+                            <div>
+                              <span>评估ID：</span>
+                              <span className="font-medium">{task.evaluation_id || '未知'}</span>
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="flex items-center justify-between">
                           <div className="text-sm text-gray-500">
-                            完成时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
+                            {task.last_updated && `更新于 ${evaluationUtils.formatDate(task.last_updated)}`}
                           </div>
                           <div className="flex gap-2">
                             <Button

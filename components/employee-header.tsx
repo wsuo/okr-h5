@@ -73,23 +73,23 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
             <span className="hidden sm:inline">首页</span>
           </Button>
           
-          {pendingTasksCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => handleNavigation('/employee/evaluation')}
-              className="flex items-center gap-2 relative text-xs"
-            >
-              <Clock className="w-3 h-3" />
-              <span className="hidden sm:inline">评估中心</span>
-              <Badge 
-                variant="destructive" 
-                className="h-4 w-4 rounded-full p-0 text-xs flex items-center justify-center"
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleNavigation('/employee/evaluation')}
+            className="flex items-center gap-2 relative"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">评估中心</span>
+            {pendingTasksCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
               >
                 {pendingTasksCount > 9 ? '9+' : pendingTasksCount}
               </Badge>
-            </Button>
-          )}
+            )}
+          </Button>
 
           <div className="w-px h-6 bg-gray-200" />
           

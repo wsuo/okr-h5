@@ -337,7 +337,7 @@ export default function EmployeeEvaluationResultPage() {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900">评估结果</h1>
             <p className="text-gray-600 mt-1">
-              {comparisonData.user_name} · 考核 #{comparisonData.assessment_id}
+              {comparisonData.user_name} · {templateData?.assessment_title || `考核 #${comparisonData.assessment_id}`}
             </p>
           </div>
         </div>

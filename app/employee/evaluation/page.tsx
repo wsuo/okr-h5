@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Clock, CheckCircle, AlertTriangle, Calendar, User, Loader2, FileText } from "lucide-react"
 import EmployeeHeader from "@/components/employee-header"
@@ -14,7 +14,7 @@ import {
   evaluationService,
   EvaluationTask,
   Evaluation,
-  EvaluationComparison,
+
   evaluationUtils
 } from "@/lib/evaluation"
 import { safeParseUserInfo } from "@/lib/utils"
@@ -56,7 +56,7 @@ export default function EmployeeEvaluationCenter() {
       // 并行加载评估任务和历史记录
       const [tasksResponse, historyResponse] = await Promise.all([
         evaluationService.getMyEvaluationTasks(),
-        evaluationService.getMyEvaluations()
+        evaluationService.getEvaluations({ type: 'self' })
       ])
 
       // 处理评估任务
@@ -105,7 +105,18 @@ export default function EmployeeEvaluationCenter() {
 
       // 处理评估历史
       if (historyResponse.code === 200 && historyResponse.data) {
-        setEvaluationHistory(historyResponse.data)
+        // Handle the API response structure: {code, message, data: {items: [...]}}
+        let historyData: Evaluation[] = []
+        if (historyResponse.data) {
+          if (Array.isArray(historyResponse.data)) {
+            // Direct array
+            historyData = historyResponse.data
+          } else if (historyResponse.data.items && Array.isArray(historyResponse.data.items)) {
+            // Paginated response with items array
+            historyData = historyResponse.data.items
+          }
+        }
+        setEvaluationHistory(historyData)
       }
 
     } catch (error: any) {
@@ -542,28 +553,84 @@ export default function EmployeeEvaluationCenter() {
                 {filteredHistory.length > 0 ? (
                   <div className="space-y-4">
                     {filteredHistory.map((evaluation) => (
-                      <div key={evaluation.id} className="border rounded-lg p-4">
+                      <div key={evaluation.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                         <div className="flex items-center justify-between mb-3">
                           <div>
-                            <h3 className="font-semibold text-lg">评估 #{evaluation.assessment_id}</h3>
+                            <h3 className="font-semibold text-lg">
+                              {evaluation.assessment?.title || `评估 #${evaluation.assessment?.id || evaluation.assessment_id || '未知'}`}
+                            </h3>
                             <p className="text-sm text-gray-600">
-                              {evaluationUtils.formatDateTime(evaluation.created_at)}
+                              {evaluation.assessment?.period || evaluationUtils.formatDate(evaluation.created_at)}
                             </p>
                           </div>
                           {getEvaluationStatusBadge(evaluation)}
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                          <div>
-                            <span className="text-gray-600">评估类型：</span>
-                            <span className="font-medium">{evaluationUtils.getTypeText(evaluation.type)}</span>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>创建时间：{evaluationUtils.formatDate(evaluation.created_at)}</span>
                           </div>
-                          <div>
-                            <span className="text-gray-600">得分：</span>
-                            <span className="font-medium">{evaluation.score || '--'}</span>
+                          <div className="flex items-center gap-1">
+                            <User className="w-4 h-4" />
+                            <span>类型：{evaluationUtils.getTypeText(evaluation.type)}</span>
                           </div>
                         </div>
-                        
+
+                        {/* 评分信息 */}
+                        <div className="bg-green-50 rounded-lg p-3 mb-3 border border-green-100">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-1 text-green-700">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="font-medium">评分结果</span>
+                            </div>
+                            {evaluation.score && (
+                              <div className="text-lg font-bold text-green-700">
+                                {typeof evaluation.score === 'number' ? evaluation.score.toFixed(2) : evaluation.score}
+                              </div>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm text-green-600">
+                            <div>
+                              <span>提交时间：</span>
+                              <span className="font-medium">
+                                {evaluation.submitted_at ? evaluationUtils.formatDateTime(evaluation.submitted_at) : '--'}
+                              </span>
+                            </div>
+                            <div>
+                              <span>状态：</span>
+                              <span className="font-medium">{evaluationUtils.getStatusText(evaluation.status)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 评估反馈 */}
+                        {(evaluation.self_review || evaluation.strengths || evaluation.improvements) && (
+                          <div className="bg-blue-50 rounded-lg p-3 mb-3 border border-blue-100">
+                            <div className="text-blue-700 font-medium mb-2">评估反馈</div>
+                            <div className="space-y-2 text-sm text-blue-600">
+                              {evaluation.self_review && (
+                                <div>
+                                  <span className="font-medium">自评：</span>
+                                  <span>{evaluation.self_review}</span>
+                                </div>
+                              )}
+                              {evaluation.strengths && (
+                                <div>
+                                  <span className="font-medium">优势：</span>
+                                  <span>{evaluation.strengths}</span>
+                                </div>
+                              )}
+                              {evaluation.improvements && (
+                                <div>
+                                  <span className="font-medium">改进：</span>
+                                  <span>{evaluation.improvements}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex items-center justify-between">
                           <div className="text-sm text-gray-500">
                             更新时间：{evaluationUtils.formatDateTime(evaluation.updated_at)}
@@ -571,7 +638,16 @@ export default function EmployeeEvaluationCenter() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => router.push(`/employee/evaluation/result/${evaluation.assessment_id}`)}
+                            onClick={() => {
+                              const assessmentId = evaluation.assessment?.id || evaluation.assessment_id
+                              if (assessmentId) {
+                                router.push(`/employee/evaluation/result/${assessmentId}`)
+                              } else {
+                                toast.error('无法查看详情', {
+                                  description: '评估记录缺少必要信息'
+                                })
+                              }
+                            }}
                           >
                             查看详情
                           </Button>

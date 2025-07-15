@@ -129,6 +129,10 @@ export interface EvaluationTask {
   is_overdue: boolean
   evaluation_id?: number
   last_updated?: string
+  score?: number | string // 评估分数
+  feedback?: string // 评估反馈
+  strengths?: string // 优势
+  improvements?: string // 改进建议
 }
 
 // 评估进度接口
