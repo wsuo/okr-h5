@@ -6,19 +6,16 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts"
-import { TrendingUp, Users, Award, Building2, Search, Activity, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts"
+import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
 import { safeParseUserInfo } from "@/lib/utils"
 import {
   statisticsService,
   DashboardStatistics,
-  UserStatistics,
   DepartmentStat,
-  AssessmentStatistics,
   PerformanceTrends,
-  EvaluationStatistics,
   PerformanceListItem,
   UserStatisticsDetail
 } from "@/lib/statistics"
@@ -34,11 +31,8 @@ export default function BossDashboard() {
 
   // Statistics data states
   const [dashboardData, setDashboardData] = useState<DashboardStatistics | null>(null)
-  const [userStats, setUserStats] = useState<UserStatistics | null>(null)
   const [departmentStats, setDepartmentStats] = useState<DepartmentStat[]>([])
-  const [assessmentStats, setAssessmentStats] = useState<AssessmentStatistics | null>(null)
   const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null)
-  const [evaluationStats, setEvaluationStats] = useState<EvaluationStatistics | null>(null)
   const [performanceList, setPerformanceList] = useState<PerformanceListItem[]>([])
   const [userStatsDetail, setUserStatsDetail] = useState<UserStatisticsDetail[]>([])
 
@@ -67,20 +61,14 @@ export default function BossDashboard() {
       // Load all statistics data in parallel
       const [
         dashboardResponse,
-        userStatsResponse,
         departmentStatsResponse,
-        assessmentStatsResponse,
         trendsResponse,
-        evaluationStatsResponse,
         performanceListResponse,
         userStatsDetailResponse
       ] = await Promise.all([
         statisticsService.getDashboardStatistics(),
-        statisticsService.getUserStatistics(),
         statisticsService.getDepartmentStatistics(),
-        statisticsService.getAssessmentStatistics(),
         statisticsService.getPerformanceTrends(),
-        statisticsService.getEvaluationStatistics(),
         statisticsService.getPerformanceList(dateRange),
         statisticsService.getUserStatisticsDetail({
           ...dateRange,
@@ -93,20 +81,11 @@ export default function BossDashboard() {
       if (dashboardResponse.code === 200) {
         setDashboardData(dashboardResponse.data)
       }
-      if (userStatsResponse.code === 200) {
-        setUserStats(userStatsResponse.data)
-      }
       if (departmentStatsResponse.code === 200) {
         setDepartmentStats(departmentStatsResponse.data || [])
       }
-      if (assessmentStatsResponse.code === 200) {
-        setAssessmentStats(assessmentStatsResponse.data)
-      }
       if (trendsResponse.code === 200) {
         setPerformanceTrends(trendsResponse.data)
-      }
-      if (evaluationStatsResponse.code === 200) {
-        setEvaluationStats(evaluationStatsResponse.data)
       }
       if (performanceListResponse.code === 200) {
         setPerformanceList(performanceListResponse.data || [])
@@ -288,108 +267,133 @@ export default function BossDashboard() {
           <p className="text-gray-600">公司整体绩效数据分析</p>
         </div>
 
-        {/* 总体统计 */}
+        {/* 总体统计 - 重新设计以充分利用仪表板API数据 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* 总用户数 */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">总员工数</p>
-                  <p className="text-2xl font-bold">{dashboardData?.overview.total_users || 0}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    活跃考核: {dashboardData?.overview.active_assessments || 0}
-                  </p>
+                  <p className="text-sm text-gray-600">总用户数</p>
+                  <p className="text-2xl font-bold text-blue-600">{dashboardData?.overview.total_users || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">系统注册用户</p>
                 </div>
                 <Users className="w-8 h-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
+
+          {/* 总评估数 */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">平均得分</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {dashboardData?.overview.average_score?.toFixed(1) || '0.0'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    自评: {dashboardData?.overview.self_average?.toFixed(1) || '0.0'} |
-                    领导: {dashboardData?.overview.leader_average?.toFixed(1) || '0.0'}
-                  </p>
+                  <p className="text-sm text-gray-600">总评估数</p>
+                  <p className="text-2xl font-bold text-indigo-600">{dashboardData?.overview.total_evaluations || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">累计评估次数</p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-green-600" />
+                <Activity className="w-8 h-8 text-indigo-600" />
               </div>
             </CardContent>
           </Card>
+
+          {/* 完成率 */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">完成率</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-green-600">
                     {dashboardData?.overview.completion_rate?.toFixed(1) || '0.0'}%
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    总评估: {dashboardData?.overview.total_evaluations || 0}
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">评估完成比例</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-purple-600" />
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
+
+          {/* 平均得分 */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">部门数</p>
-                  <p className="text-2xl font-bold text-orange-600">{departmentStats.length}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    已完成考核: {dashboardData?.overview.completed_assessments || 0}
+                  <p className="text-sm text-gray-600">平均得分</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {dashboardData?.overview.average_score?.toFixed(1) || '0.0'}
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">综合平均分</p>
                 </div>
-                <Building2 className="w-8 h-8 text-orange-600" />
+                <TrendingUp className="w-8 h-8 text-emerald-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* 新增统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* 考核统计详情 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* 活跃考核 */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">评估统计</p>
-                  <p className="text-2xl font-bold text-cyan-600">
-                    {evaluationStats?.total_evaluations || 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    自评: {evaluationStats?.self_evaluations || 0} |
-                    领导: {evaluationStats?.leader_evaluations || 0}
-                  </p>
+                  <p className="text-sm text-gray-600">活跃考核</p>
+                  <p className="text-2xl font-bold text-orange-600">{dashboardData?.overview.active_assessments || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">正在进行中</p>
                 </div>
-                <Activity className="w-8 h-8 text-cyan-600" />
+                <Award className="w-8 h-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
+
+          {/* 已完成考核 */}
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">考核统计</p>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {assessmentStats?.total_assessments || 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    活跃: {assessmentStats?.active_assessments || 0} |
-                    完成: {assessmentStats?.completed_assessments || 0}
-                  </p>
+                  <p className="text-sm text-gray-600">已完成考核</p>
+                  <p className="text-2xl font-bold text-purple-600">{dashboardData?.overview.completed_assessments || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">已结束考核</p>
                 </div>
-                <Award className="w-8 h-8 text-emerald-600" />
+                <CheckCircle className="w-8 h-8 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 自评平均分 */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">自评平均分</p>
+                  <p className="text-2xl font-bold text-cyan-600">
+                    {dashboardData?.overview.self_average?.toFixed(1) || '0.0'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">员工自评得分</p>
+                </div>
+                <Users className="w-8 h-8 text-cyan-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 领导评分平均分 */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">领导评分平均分</p>
+                  <p className="text-2xl font-bold text-rose-600">
+                    {dashboardData?.overview.leader_average?.toFixed(1) || '0.0'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">领导评估得分</p>
+                </div>
+                <Building2 className="w-8 h-8 text-rose-600" />
               </div>
             </CardContent>
           </Card>
         </div>
+
+
 
         {/* 数据图表区域 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -497,85 +501,7 @@ export default function BossDashboard() {
           </Card>
         </div>
 
-        {/* 部门维度分析 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* 部门参与度分析 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>部门参与度分析</CardTitle>
-              <CardDescription>各部门考核参与情况统计</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={
-                  Object.entries(
-                    userStatsDetailProcessed.reduce((acc, user) => {
-                      if (!acc[user.department]) {
-                        acc[user.department] = {
-                          department: user.department,
-                          totalAssessments: 0,
-                          avgCompletionRate: 0,
-                          userCount: 0
-                        }
-                      }
-                      acc[user.department].totalAssessments += user.totalAssessments
-                      acc[user.department].avgCompletionRate += (user.selfCompletionRate + user.leaderCompletionRate) / 2
-                      acc[user.department].userCount += 1
-                      return acc
-                    }, {} as any)
-                  ).map(([dept, data]: [string, any]) => ({
-                    department: dept,
-                    totalAssessments: data.totalAssessments,
-                    avgCompletionRate: data.avgCompletionRate / data.userCount
-                  }))
-                }>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="department" />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      name === 'totalAssessments' ? `${value}次` : `${(value as number).toFixed(1)}%`,
-                      name === 'totalAssessments' ? '总考核次数' : '平均完成率'
-                    ]}
-                  />
-                  <Bar dataKey="totalAssessments" fill="#8b5cf6" name="总考核次数" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
 
-          {/* 评估完成率饼图 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>评估完成情况</CardTitle>
-              <CardDescription>自评与领导评分完成情况</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: '自评完成', value: evaluationStats?.self_evaluations || 0, fill: '#3b82f6' },
-                      { name: '领导评分完成', value: evaluationStats?.leader_evaluations || 0, fill: '#10b981' },
-                      {
-                        name: '待完成',
-                        value: Math.max(0, (dashboardData?.overview.total_evaluations || 0) - (evaluationStats?.total_evaluations || 0)),
-                        fill: '#f59e0b'
-                      }
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* 绩效趋势图 */}
         <Card className="mb-6">
