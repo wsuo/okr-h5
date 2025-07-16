@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
@@ -98,13 +98,21 @@ export default function BossDashboard() {
 
   // Helper functions for data processing
   const processScoreDistribution = () => {
+    // 分数区间到中文标签的映射
+    const getChineseLabel = (range: string) => {
+      if (range.includes('90') || range.includes('100')) return '优秀'
+      if (range.includes('80') || range.includes('89')) return '良好'
+      if (range.includes('70') || range.includes('79')) return '一般'
+      return '较差'
+    }
+
     if (!dashboardData?.score_distribution) {
       // Return default score ranges if no data available
       return [
-        { range: '90-100', count: 0, percentage: 0, color: '#10b981' },
-        { range: '80-89', count: 0, percentage: 0, color: '#3b82f6' },
-        { range: '70-79', count: 0, percentage: 0, color: '#f59e0b' },
-        { range: '60-69', count: 0, percentage: 0, color: '#ef4444' }
+        { range: '优秀', originalRange: '90-100', count: 0, percentage: 0, color: '#10b981' },
+        { range: '良好', originalRange: '80-89', count: 0, percentage: 0, color: '#3b82f6' },
+        { range: '一般', originalRange: '70-79', count: 0, percentage: 0, color: '#f59e0b' },
+        { range: '较差', originalRange: '60-69', count: 0, percentage: 0, color: '#ef4444' }
       ]
     }
 
@@ -119,7 +127,8 @@ export default function BossDashboard() {
 
     return distribution.map(item => ({
       ...item,
-      range: item.range, // Ensure range is properly formatted (e.g., "90-100", "80-89")
+      originalRange: item.range, // 保存原始区间用于颜色判断
+      range: getChineseLabel(item.range), // 使用中文标签
       color: item.range.includes('90') || item.range.includes('100') ? '#10b981' :
              item.range.includes('80') || item.range.includes('89') ? '#3b82f6' :
              item.range.includes('70') || item.range.includes('79') ? '#f59e0b' : '#ef4444'
@@ -164,12 +173,21 @@ export default function BossDashboard() {
   }
 
   const processUserStatsDetailData = () => {
-    return userStatsDetail.map(user => {
-      const totalAssessments = parseInt(user.total_assessments) || 1 // Avoid division by zero
+    if (!userStatsDetail || userStatsDetail.length === 0) {
+      console.log('用户统计详细数据为空')
+      return []
+    }
+
+    const processedData = userStatsDetail.map(user => {
+      const totalAssessments = parseInt(user.total_assessments) || 0
       const selfCompleted = parseInt(user.self_completed) || 0
       const leaderCompleted = parseInt(user.leader_completed) || 0
 
-      return {
+      // 计算完成率，避免除零错误
+      const selfCompletionRate = totalAssessments > 0 ? (selfCompleted / totalAssessments) * 100 : 0
+      const leaderCompletionRate = totalAssessments > 0 ? (leaderCompleted / totalAssessments) * 100 : 0
+
+      const processedUser = {
         userId: user.user_id,
         username: user.user_username,
         name: user.user_name,
@@ -179,11 +197,33 @@ export default function BossDashboard() {
         leaderCompleted,
         avgSelfScore: parseFloat(user.avg_self_score) || 0,
         avgLeaderScore: parseFloat(user.avg_leader_score) || 0,
-        // Calculate completion rates with proper handling of edge cases
-        selfCompletionRate: totalAssessments > 0 ? (selfCompleted / totalAssessments) * 100 : 0,
-        leaderCompletionRate: totalAssessments > 0 ? (leaderCompleted / totalAssessments) * 100 : 0
+        selfCompletionRate,
+        leaderCompletionRate
       }
+
+      // 调试信息：输出处理后的数据
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`处理用户数据 - ${user.user_name}:`, {
+          原始数据: {
+            total_assessments: user.total_assessments,
+            self_completed: user.self_completed,
+            leader_completed: user.leader_completed
+          },
+          处理后数据: {
+            totalAssessments,
+            selfCompleted,
+            leaderCompleted,
+            selfCompletionRate: selfCompletionRate.toFixed(1),
+            leaderCompletionRate: leaderCompletionRate.toFixed(1)
+          }
+        })
+      }
+
+      return processedUser
     })
+
+    console.log('处理后的用户统计数据总数:', processedData.length)
+    return processedData
   }
 
   // Get processed data
@@ -414,10 +454,14 @@ export default function BossDashboard() {
                   <XAxis dataKey="range" />
                   <YAxis />
                   <Tooltip
-                    formatter={(value, name) => [
-                      `${value}人 (${((value as number) / (dashboardData?.overview.total_users || 1) * 100).toFixed(1)}%)`,
-                      '人数'
-                    ]}
+                    formatter={(value, name, props) => {
+                      const data = props.payload?.[0]?.payload
+                      const originalRange = data?.originalRange || ''
+                      return [
+                        `${value}人 (${((value as number) / (dashboardData?.overview.total_users || 1) * 100).toFixed(1)}%)`,
+                        `${data?.range || ''}${originalRange ? ` (${originalRange}分)` : ''}`
+                      ]
+                    }}
                   />
                   <Bar dataKey="count" fill="#3b82f6" />
                 </BarChart>
@@ -457,25 +501,90 @@ export default function BossDashboard() {
           {/* 员工完成率对比 */}
           <Card>
             <CardHeader>
-              <CardTitle>员工完成率分析</CardTitle>
-              <CardDescription>各员工自评与领导评分完成率对比</CardDescription>
+              <CardTitle className="flex items-center justify-between">
+                <span>员工完成率分析</span>
+              </CardTitle>
+              <CardDescription>
+                各员工自评与领导评分完成率对比
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={userStatsDetailProcessed.slice(0, 10)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip
-                    formatter={(value, name) => [
-                      `${(value as number).toFixed(1)}%`,
-                      name === 'selfCompletionRate' ? '自评完成率' : '领导评分完成率'
-                    ]}
-                  />
-                  <Bar dataKey="selfCompletionRate" fill="#3b82f6" name="自评完成率" />
-                  <Bar dataKey="leaderCompletionRate" fill="#10b981" name="领导评分完成率" />
-                </BarChart>
-              </ResponsiveContainer>
+              {userStatsDetailProcessed.length === 0 ? (
+                <div className="flex items-center justify-center h-[350px] text-gray-500">
+                  <div className="text-center">
+                    <p>暂无数据</p>
+                    <p className="text-sm mt-1">请检查是否有用户统计数据</p>
+                  </div>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart
+                    data={userStatsDetailProcessed.slice(0, 10)}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="name"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      interval={0}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      label={{ value: '完成率 (%)', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || !payload.length) {
+                          return null
+                        }
+
+                        const data = payload[0]?.payload
+
+                        return (
+                          <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+                            <p className="font-medium mb-2">{`员工: ${label}`}</p>
+                            {payload.map((entry, index) => {
+                              const isself = entry.dataKey === 'selfCompletionRate'
+                              const completedCount = isself ? data?.selfCompleted : data?.leaderCompleted
+                              const totalCount = data?.totalAssessments || 0
+                              const labelText = isself ? '自评完成率' : '领导评分完成率'
+
+                              return (
+                                <div key={index} className="flex items-center mb-1">
+                                  <div
+                                    className="w-3 h-3 mr-2"
+                                    style={{ backgroundColor: entry.color }}
+                                  />
+                                  <span className="text-sm">
+                                    {labelText}: {(entry.value as number).toFixed(1)}% ({completedCount || 0}/{totalCount})
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      }}
+                    />
+                    <Legend
+                      wrapperStyle={{ paddingTop: '20px' }}
+                    />
+                    <Bar
+                      dataKey="selfCompletionRate"
+                      fill="#3b82f6"
+                      name="自评完成率"
+                      radius={[2, 2, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="leaderCompletionRate"
+                      fill="#10b981"
+                      name="领导评分完成率"
+                      radius={[2, 2, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
