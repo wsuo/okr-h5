@@ -183,6 +183,7 @@ export interface EvaluationComparison {
   self_evaluation?: ComparisonEvaluation
   leader_evaluation?: ComparisonEvaluation
   comparison: ComparisonResult
+  comparison_analysis?: ComparisonAnalysis  // Extended structure for detailed analysis
 }
 
 export interface ComparisonEvaluation {
@@ -212,6 +213,14 @@ export interface ItemDifference {
   self_score: number
   leader_score: number
   difference: number
+}
+
+// 扩展的对比分析结构
+export interface ComparisonAnalysis {
+  overall_score_difference: number  // 总体评分差异
+  category_differences: CategoryDifference[]  // 分类评分差异
+  analysis_summary?: string  // 分析总结
+  improvement_suggestions?: string[]  // 改进建议
 }
 
 // 评估查询参数

@@ -233,6 +233,32 @@ export default function EmployeeEvaluationResultPage() {
     return difference.toFixed(1)
   }
 
+  // Helper function to get score difference value from API response
+  // Handles both current structure (comparison.overall_difference) and expected structure (comparison_analysis.overall_score_difference)
+  const getScoreDifferenceValue = (data: EvaluationComparison | null): number | undefined => {
+    if (!data) return undefined
+
+    // First try the expected structure mentioned in the issue
+    const comparisonAnalysis = (data as any).comparison_analysis
+    if (comparisonAnalysis?.overall_score_difference !== undefined) {
+      return Number(comparisonAnalysis.overall_score_difference)
+    }
+
+    // Fall back to current structure
+    if (data.comparison?.overall_difference !== undefined) {
+      return Number(data.comparison.overall_difference)
+    }
+
+    // If neither structure has the value, calculate it from individual scores
+    if (data.self_evaluation?.score !== undefined && data.leader_evaluation?.score !== undefined) {
+      const selfScore = Number(data.self_evaluation.score)
+      const leaderScore = Number(data.leader_evaluation.score)
+      return leaderScore - selfScore
+    }
+
+    return undefined
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -424,27 +450,27 @@ export default function EmployeeEvaluationResultPage() {
               <div className="text-center">
                 <div className="mb-3">
                   <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${
-                    comparisonData.comparison?.overall_difference !== undefined 
-                      ? getDifferenceColor(comparisonData.comparison.overall_difference)
+                    getScoreDifferenceValue(comparisonData) !== undefined
+                      ? getDifferenceColor(getScoreDifferenceValue(comparisonData))
                       : 'text-gray-600'
                   }`}>
-                    {comparisonData.comparison?.overall_difference !== undefined 
-                      ? getDifferenceIcon(comparisonData.comparison.overall_difference)
+                    {getScoreDifferenceValue(comparisonData) !== undefined
+                      ? getDifferenceIcon(getScoreDifferenceValue(comparisonData))
                       : <Minus className="w-4 h-4 text-gray-600" />
                     }
-                    {comparisonData.comparison?.overall_difference !== undefined 
-                      ? Math.abs(Number(comparisonData.comparison.overall_difference)).toFixed(1)
+                    {getScoreDifferenceValue(comparisonData) !== undefined
+                      ? Math.abs(Number(getScoreDifferenceValue(comparisonData))).toFixed(1)
                       : '--'
                     }
                   </div>
                   <div className="text-sm text-gray-600">分差</div>
                 </div>
                 <div className="text-sm text-gray-500">
-                  {comparisonData.comparison?.overall_difference !== undefined
-                    ? comparisonData.comparison.overall_difference > 0 
-                      ? '领导评分更高' 
-                      : comparisonData.comparison.overall_difference < 0 
-                        ? '自评更高' 
+                  {getScoreDifferenceValue(comparisonData) !== undefined
+                    ? getScoreDifferenceValue(comparisonData) > 0
+                      ? '领导评分更高'
+                      : getScoreDifferenceValue(comparisonData) < 0
+                        ? '自评更高'
                         : '评分一致'
                     : '暂无对比数据'
                   }
