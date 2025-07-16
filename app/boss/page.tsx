@@ -6,88 +6,161 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts"
-import { TrendingUp, Users, Award, Building2, Search } from "lucide-react"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts"
+import { TrendingUp, Users, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
 import { safeParseUserInfo } from "@/lib/utils"
+import {
+  statisticsService,
+  DashboardStatistics,
+  UserStatistics,
+  DepartmentStat,
+  AssessmentStatistics,
+  PerformanceTrends,
+  EvaluationStatistics,
+  OkrStatistics
+} from "@/lib/statistics"
+import { toast } from "sonner"
 
 export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const router = useRouter()
+
+  // Statistics data states
+  const [dashboardData, setDashboardData] = useState<DashboardStatistics | null>(null)
+  const [userStats, setUserStats] = useState<UserStatistics | null>(null)
+  const [departmentStats, setDepartmentStats] = useState<DepartmentStat[]>([])
+  const [assessmentStats, setAssessmentStats] = useState<AssessmentStatistics | null>(null)
+  const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null)
+  const [evaluationStats, setEvaluationStats] = useState<EvaluationStatistics | null>(null)
+  const [okrStats, setOkrStats] = useState<OkrStatistics | null>(null)
 
   useEffect(() => {
     const user = safeParseUserInfo()
     if (user) {
       setUserInfo(user)
+      loadAllStatistics()
     } else {
       router.push('/')
       return
     }
   }, [])
 
-  // 模拟全员数据
-  const allEmployees = [
-    {
-      id: "zhangsan",
-      name: "张三",
-      department: "技术部",
-      position: "前端工程师",
-      lastScore: 85.2,
-      avgScore: 83.5,
-      trend: "up",
-    },
-    {
-      id: "wangwu",
-      name: "王五",
-      department: "技术部",
-      position: "后端工程师",
-      lastScore: 88.7,
-      avgScore: 86.3,
-      trend: "up",
-    },
-    {
-      id: "lisi",
-      name: "李四",
-      department: "技术部",
-      position: "技术经理",
-      lastScore: 92.1,
-      avgScore: 90.5,
-      trend: "stable",
-    },
-    {
-      id: "zhaoliu",
-      name: "赵六",
-      department: "市场部",
-      position: "市场经理",
-      lastScore: 87.3,
-      avgScore: 85.8,
-      trend: "up",
-    },
-  ]
+  const loadAllStatistics = async () => {
+    try {
+      setLoading(true)
+      setError("")
 
-  // 绩效分布数据
-  const scoreDistribution = [
-    { range: "90-100", count: 1, color: "#10b981" },
-    { range: "80-89", count: 3, color: "#3b82f6" },
-    { range: "70-79", count: 0, color: "#f59e0b" },
-    { range: "60-69", count: 0, color: "#ef4444" },
-  ]
+      // Load all statistics data in parallel
+      const [
+        dashboardResponse,
+        userStatsResponse,
+        departmentStatsResponse,
+        assessmentStatsResponse,
+        trendsResponse,
+        evaluationStatsResponse,
+        okrStatsResponse
+      ] = await Promise.all([
+        statisticsService.getDashboardStatistics(),
+        statisticsService.getUserStatistics(),
+        statisticsService.getDepartmentStatistics(),
+        statisticsService.getAssessmentStatistics(),
+        statisticsService.getPerformanceTrends(),
+        statisticsService.getEvaluationStatistics(),
+        statisticsService.getOkrStatistics()
+      ])
 
-  // 部门平均分数据
-  const departmentAverage = [
-    { department: "技术部", avgScore: 86.8, count: 3 },
-    { department: "市场部", avgScore: 85.8, count: 1 },
-  ]
+      // Set data if requests are successful
+      if (dashboardResponse.code === 200) {
+        setDashboardData(dashboardResponse.data)
+      }
+      if (userStatsResponse.code === 200) {
+        setUserStats(userStatsResponse.data)
+      }
+      if (departmentStatsResponse.code === 200) {
+        setDepartmentStats(departmentStatsResponse.data || [])
+      }
+      if (assessmentStatsResponse.code === 200) {
+        setAssessmentStats(assessmentStatsResponse.data)
+      }
+      if (trendsResponse.code === 200) {
+        setPerformanceTrends(trendsResponse.data)
+      }
+      if (evaluationStatsResponse.code === 200) {
+        setEvaluationStats(evaluationStatsResponse.data)
+      }
+      if (okrStatsResponse.code === 200) {
+        setOkrStats(okrStatsResponse.data)
+      }
 
-  // 趋势数据
-  const trendData = [
-    { month: "10月", avgScore: 82.5 },
-    { month: "11月", avgScore: 84.2 },
-    { month: "12月", avgScore: 86.8 },
-  ]
+    } catch (error: any) {
+      console.error('Failed to load statistics:', error)
+      setError(error.message || '加载统计数据失败')
+      toast.error('加载统计数据失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Helper functions for data processing
+  const processScoreDistribution = () => {
+    if (!dashboardData?.score_distribution) return []
+    return dashboardData.score_distribution.map(item => ({
+      ...item,
+      color: item.range.includes('90-100') ? '#10b981' :
+             item.range.includes('80-89') ? '#3b82f6' :
+             item.range.includes('70-79') ? '#f59e0b' : '#ef4444'
+    }))
+  }
+
+  const processDepartmentData = () => {
+    return departmentStats.map(dept => ({
+      department: dept.name,
+      avgScore: ((dept.avg_self_score + dept.avg_leader_score) / 2),
+      selfScore: dept.avg_self_score,
+      leaderScore: dept.avg_leader_score,
+      count: dept.user_count,
+      completionRate: ((dept.self_completion_rate + dept.leader_completion_rate) / 2)
+    }))
+  }
+
+  const processTrendData = () => {
+    if (!performanceTrends?.monthly_trends) return []
+    return performanceTrends.monthly_trends.map(trend => ({
+      month: trend.month,
+      avgScore: trend.average_score,
+      selfAverage: trend.self_average,
+      leaderAverage: trend.leader_average,
+      completionRate: trend.completion_rate
+    }))
+  }
+
+  const processEmployeeData = () => {
+    if (!userStats?.user_list) return []
+    return userStats.user_list.map(user => ({
+      id: user.id.toString(),
+      name: user.name,
+      department: user.department,
+      position: user.position,
+      lastScore: user.latest_score,
+      avgScore: user.average_score,
+      trend: user.score_trend,
+      totalAssessments: user.total_assessments,
+      completedAssessments: user.completed_assessments,
+      lastAssessmentDate: user.last_assessment_date
+    }))
+  }
+
+  // Get filtered employees
+  const allEmployees = processEmployeeData()
+  const scoreDistribution = processScoreDistribution()
+  const departmentAverage = processDepartmentData()
+  const trendData = processTrendData()
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600"
@@ -110,8 +183,52 @@ export default function BossDashboard() {
     return matchesSearch && matchesDepartment
   })
 
+  // Get unique departments for filter
+  const availableDepartments = Array.from(new Set(allEmployees.map(emp => emp.department)))
+
   if (!userInfo) {
-    return <div>Loading...</div>
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>加载中...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <BossHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-7xl">
+          <div className="flex items-center justify-center h-96">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <span className="text-lg">正在加载统计数据...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <BossHeader userInfo={userInfo} />
+        <div className="container mx-auto p-4 max-w-7xl">
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">加载失败</h2>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button onClick={loadAllStatistics}>重新加载</Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -125,13 +242,16 @@ export default function BossDashboard() {
         </div>
 
         {/* 总体统计 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">总员工数</p>
-                  <p className="text-2xl font-bold">{allEmployees.length}</p>
+                  <p className="text-2xl font-bold">{dashboardData?.overview.total_users || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    活跃考核: {dashboardData?.overview.active_assessments || 0}
+                  </p>
                 </div>
                 <Users className="w-8 h-8 text-blue-600" />
               </div>
@@ -142,7 +262,13 @@ export default function BossDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">平均得分</p>
-                  <p className="text-2xl font-bold text-green-600">86.8</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {dashboardData?.overview.average_score?.toFixed(1) || '0.0'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    自评: {dashboardData?.overview.self_average?.toFixed(1) || '0.0'} |
+                    领导: {dashboardData?.overview.leader_average?.toFixed(1) || '0.0'}
+                  </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-600" />
               </div>
@@ -152,10 +278,15 @@ export default function BossDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">优秀率</p>
-                  <p className="text-2xl font-bold text-purple-600">25%</p>
+                  <p className="text-sm text-gray-600">完成率</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {dashboardData?.overview.completion_rate?.toFixed(1) || '0.0'}%
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    总评估: {dashboardData?.overview.total_evaluations || 0}
+                  </p>
                 </div>
-                <Award className="w-8 h-8 text-purple-600" />
+                <CheckCircle className="w-8 h-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
@@ -164,9 +295,67 @@ export default function BossDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">部门数</p>
-                  <p className="text-2xl font-bold text-orange-600">2</p>
+                  <p className="text-2xl font-bold text-orange-600">{departmentStats.length}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    已完成考核: {dashboardData?.overview.completed_assessments || 0}
+                  </p>
                 </div>
                 <Building2 className="w-8 h-8 text-orange-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 新增统计卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">OKR统计</p>
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {okrStats?.total_okrs || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    完成: {okrStats?.completed_okrs || 0} |
+                    进度: {okrStats?.average_progress?.toFixed(1) || '0.0'}%
+                  </p>
+                </div>
+                <Target className="w-8 h-8 text-indigo-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">评估统计</p>
+                  <p className="text-2xl font-bold text-cyan-600">
+                    {evaluationStats?.total_evaluations || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    自评: {evaluationStats?.self_evaluations || 0} |
+                    领导: {evaluationStats?.leader_evaluations || 0}
+                  </p>
+                </div>
+                <Activity className="w-8 h-8 text-cyan-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">考核统计</p>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {assessmentStats?.total_assessments || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    活跃: {assessmentStats?.active_assessments || 0} |
+                    完成: {assessmentStats?.completed_assessments || 0}
+                  </p>
+                </div>
+                <Award className="w-8 h-8 text-emerald-600" />
               </div>
             </CardContent>
           </Card>
@@ -186,7 +375,12 @@ export default function BossDashboard() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="range" />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${value}人 (${((value as number) / (dashboardData?.overview.total_users || 1) * 100).toFixed(1)}%)`,
+                      '人数'
+                    ]}
+                  />
                   <Bar dataKey="count" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
@@ -196,17 +390,80 @@ export default function BossDashboard() {
           {/* 部门平均分对比 */}
           <Card>
             <CardHeader>
-              <CardTitle>部门平均分对比</CardTitle>
-              <CardDescription>各部门绩效平均分对比</CardDescription>
+              <CardTitle>部门绩效对比</CardTitle>
+              <CardDescription>各部门自评与领导评分对比</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={departmentAverage}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="department" />
-                  <YAxis domain={[70, 100]} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${(value as number).toFixed(1)}分`,
+                      name === 'selfScore' ? '自评平均分' :
+                      name === 'leaderScore' ? '领导评分' : '综合平均分'
+                    ]}
+                  />
+                  <Bar dataKey="selfScore" fill="#3b82f6" name="自评" />
+                  <Bar dataKey="leaderScore" fill="#10b981" name="领导评分" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 新增图表区域 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* 评估完成率饼图 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>评估完成情况</CardTitle>
+              <CardDescription>自评与领导评分完成情况</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: '自评完成', value: evaluationStats?.self_evaluations || 0, fill: '#3b82f6' },
+                      { name: '领导评分完成', value: evaluationStats?.leader_evaluations || 0, fill: '#10b981' },
+                      {
+                        name: '待完成',
+                        value: Math.max(0, (dashboardData?.overview.total_evaluations || 0) - (evaluationStats?.total_evaluations || 0)),
+                        fill: '#f59e0b'
+                      }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                  </Pie>
                   <Tooltip />
-                  <Bar dataKey="avgScore" fill="#10b981" />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* 部门完成率对比 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>部门完成率对比</CardTitle>
+              <CardDescription>各部门评估完成率情况</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={departmentAverage}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="department" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip
+                    formatter={(value) => [`${(value as number).toFixed(1)}%`, '完成率']}
+                  />
+                  <Bar dataKey="completionRate" fill="#8b5cf6" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -217,16 +474,45 @@ export default function BossDashboard() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>绩效趋势分析</CardTitle>
-            <CardDescription>近三个月公司整体绩效趋势</CardDescription>
+            <CardDescription>公司整体绩效趋势变化</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={350}>
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis domain={[75, 90]} />
-                <Tooltip />
-                <Line type="monotone" dataKey="avgScore" stroke="#3b82f6" strokeWidth={3} />
+                <YAxis domain={['dataMin - 5', 'dataMax + 5']} />
+                <Tooltip
+                  formatter={(value, name) => [
+                    `${(value as number).toFixed(1)}${name === 'completionRate' ? '%' : '分'}`,
+                    name === 'avgScore' ? '综合平均分' :
+                    name === 'selfAverage' ? '自评平均分' :
+                    name === 'leaderAverage' ? '领导评分' : '完成率'
+                  ]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="avgScore"
+                  stroke="#3b82f6"
+                  strokeWidth={3}
+                  name="综合平均分"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="selfAverage"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="自评平均分"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="leaderAverage"
+                  stroke="#f59e0b"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  name="领导评分"
+                />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -258,8 +544,9 @@ export default function BossDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">全部部门</SelectItem>
-                  <SelectItem value="技术部">技术部</SelectItem>
-                  <SelectItem value="市场部">市场部</SelectItem>
+                  {availableDepartments.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -288,7 +575,9 @@ export default function BossDashboard() {
                   <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                     <div>
                       <span className="text-gray-600">平均得分：</span>
-                      <span className={`font-semibold ${getScoreColor(employee.avgScore)}`}>{employee.avgScore}</span>
+                      <span className={`font-semibold ${getScoreColor(employee.avgScore)}`}>
+                        {employee.avgScore?.toFixed(1) || '--'}
+                      </span>
                     </div>
                     <div>
                       <span className="text-gray-600">绩效等级：</span>
@@ -299,11 +588,32 @@ export default function BossDashboard() {
                             ? "text-green-600 border-green-600"
                             : employee.lastScore >= 80
                               ? "text-blue-600 border-blue-600"
-                              : "text-yellow-600 border-yellow-600"
+                              : employee.lastScore >= 70
+                                ? "text-yellow-600 border-yellow-600"
+                                : "text-red-600 border-red-600"
                         }
                       >
-                        {employee.lastScore >= 90 ? "优秀" : employee.lastScore >= 80 ? "良好" : "合格"}
+                        {employee.lastScore >= 90 ? "优秀" :
+                         employee.lastScore >= 80 ? "良好" :
+                         employee.lastScore >= 70 ? "合格" : "待改进"}
                       </Badge>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                    <div>
+                      <span className="text-gray-600">考核参与：</span>
+                      <span className="font-semibold">
+                        {employee.completedAssessments || 0}/{employee.totalAssessments || 0}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">最近评估：</span>
+                      <span className="text-gray-500">
+                        {employee.lastAssessmentDate ?
+                          new Date(employee.lastAssessmentDate).toLocaleDateString() :
+                          '暂无'
+                        }
+                      </span>
                     </div>
                   </div>
                   <Button
