@@ -58,8 +58,9 @@ export default function LeadDashboard() {
       ])
 
       // 处理评估任务数据
+      let pendingTasksCount = 0
       if (tasksResponse.code === 200 && tasksResponse.data) {
-        setEvaluationTasks(tasksResponse.data.map(evaluation => {
+        const tasks = tasksResponse.data.map(evaluation => {
           const assessmentId = evaluation.assessment?.id
           const evaluateeId = evaluation.evaluatee?.id
           
@@ -78,7 +79,9 @@ export default function LeadDashboard() {
             evaluation_id: evaluation.id,
             last_updated: evaluation.updated_at
           }
-        }))
+        })
+        setEvaluationTasks(tasks)
+        pendingTasksCount = tasks.filter(task => task.status === 'pending').length
       }
 
       // 处理团队成员数据
@@ -90,7 +93,7 @@ export default function LeadDashboard() {
         
         // 计算平均分
         const scoresData = members
-          .filter(member => member.evaluation_status.final_score !== null)
+          .filter(member => member.evaluation_status && member.evaluation_status.final_score !== null)
           .map(member => member.evaluation_status.final_score!)
         
         const teamAverageScore = scoresData.length > 0 
@@ -104,7 +107,7 @@ export default function LeadDashboard() {
         
         setOverallStats({
           totalMembers: total_members,
-          pendingEvaluations: total_members - leader_completed_count,
+          pendingEvaluations: pendingTasksCount,
           teamAverageScore,
           completionRate
         })
@@ -302,8 +305,8 @@ export default function LeadDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600">当前得分</p>
-                        <p className={`text-lg font-bold ${teamUtils.getScoreColor(member.evaluation_status.final_score)}`}>
-                          {member.evaluation_status.final_score ? Number(member.evaluation_status.final_score).toFixed(1) : '--'}
+                        <p className={`text-lg font-bold ${teamUtils.getScoreColor(member.evaluation_status?.final_score ?? 0)}`}>
+                          {member.evaluation_status?.final_score ? Number(member.evaluation_status.final_score).toFixed(1) : '--'}
                         </p>
                       </div>
                     </div>
@@ -312,7 +315,7 @@ export default function LeadDashboard() {
                     <div className="mb-3 p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">
-                          {member.current_assessment.assessment_title}
+                          {member.current_assessment?.assessment_title || '暂无考核'}
                         </span>
                         <Badge className={teamUtils.getStatusColor(member)}>
                           {teamUtils.formatEvaluationStatus(member)}
@@ -321,12 +324,12 @@ export default function LeadDashboard() {
                       <div className="flex items-center text-xs text-gray-500 gap-4">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {member.current_assessment.period}
+                          {member.current_assessment?.period || 'N/A'}
                         </span>
                         {member.is_historical && (
                           <span className="text-orange-600">历史考核</span>
                         )}
-                        {member.has_active_assessment && teamUtils.isAssessmentOverdue(member.current_assessment) && (
+                        {member.has_active_assessment && member.current_assessment && teamUtils.isAssessmentOverdue(member.current_assessment) && (
                           <span className="text-red-600">已过期</span>
                         )}
                       </div>
@@ -336,10 +339,10 @@ export default function LeadDashboard() {
                     <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                       <div>
                         <span className="text-gray-600">自评状态：</span>
-                        <span className={`font-semibold ${member.evaluation_status.self_completed ? 'text-green-600' : 'text-gray-400'}`}>
-                          {member.evaluation_status.self_completed ? '已完成' : '未完成'}
+                        <span className={`font-semibold ${member.evaluation_status?.self_completed ? 'text-green-600' : 'text-gray-400'}`}>
+                          {member.evaluation_status?.self_completed ? '已完成' : '未完成'}
                         </span>
-                        {member.evaluation_status.self_score && (
+                        {member.evaluation_status?.self_score && (
                           <span className="ml-1 text-gray-500">
                             ({member.evaluation_status.self_score}分)
                           </span>
@@ -347,10 +350,10 @@ export default function LeadDashboard() {
                       </div>
                       <div>
                         <span className="text-gray-600">我的评分：</span>
-                        <span className={`font-semibold ${member.evaluation_status.leader_completed ? 'text-green-600' : 'text-orange-600'}`}>
-                          {member.evaluation_status.leader_completed ? '已完成' : '待评分'}
+                        <span className={`font-semibold ${member.evaluation_status?.leader_completed ? 'text-green-600' : 'text-orange-600'}`}>
+                          {member.evaluation_status?.leader_completed ? '已完成' : '待评分'}
                         </span>
-                        {member.evaluation_status.leader_score && (
+                        {member.evaluation_status?.leader_score && (
                           <span className="ml-1 text-gray-500">
                             ({member.evaluation_status.leader_score}分)
                           </span>
@@ -368,7 +371,7 @@ export default function LeadDashboard() {
                       >
                         查看详情
                       </Button>
-                      {member.has_active_assessment && !member.evaluation_status.leader_completed && (
+                      {member.has_active_assessment && !member.evaluation_status?.leader_completed && (
                         <Button
                           size="sm"
                           className="flex-1"

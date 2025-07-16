@@ -327,8 +327,8 @@ export default function EmployeeDetailPage() {
                           {employeeStats.score_trend === 'up' ? '上升趋势' :
                            employeeStats.score_trend === 'down' ? '下降趋势' : '稳定趋势'}
                         </span>
-                        ，平均得分为{employeeStats.average_score.toFixed(1)}分，
-                        最近得分为{employeeStats.latest_score.toFixed(1)}分，
+                        ，平均得分为{employeeStats.average_score?.toFixed(1) || '--'}分，
+                        最近得分为{employeeStats.latest_score?.toFixed(1) || '--'}分，
                         共参与{employeeStats.total_assessments}次考核，
                         完成{employeeStats.completed_assessments}次。
                       </>

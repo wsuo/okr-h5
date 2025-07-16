@@ -119,6 +119,10 @@ export const teamUtils = {
   formatEvaluationStatus(member: TeamMember): string {
     const { evaluation_status } = member
     
+    if (!evaluation_status) {
+      return '未知'
+    }
+    
     if (evaluation_status.self_completed && evaluation_status.leader_completed) {
       return '已完成'
     } else if (evaluation_status.self_completed) {
@@ -135,6 +139,10 @@ export const teamUtils = {
    */
   getStatusColor(member: TeamMember): string {
     const { evaluation_status } = member
+    
+    if (!evaluation_status) {
+      return 'text-gray-600 bg-gray-100 border-gray-200'
+    }
     
     if (evaluation_status.self_completed && evaluation_status.leader_completed) {
       return 'text-green-600 bg-green-100 border-green-200'
