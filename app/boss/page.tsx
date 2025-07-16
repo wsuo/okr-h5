@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts"
-import { TrendingUp, Users, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { TrendingUp, Users, Award, Building2, Search, Activity, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
 import { safeParseUserInfo } from "@/lib/utils"
@@ -19,7 +19,8 @@ import {
   AssessmentStatistics,
   PerformanceTrends,
   EvaluationStatistics,
-  OkrStatistics
+  PerformanceListItem,
+  UserStatisticsDetail
 } from "@/lib/statistics"
 import { toast } from "sonner"
 
@@ -38,7 +39,14 @@ export default function BossDashboard() {
   const [assessmentStats, setAssessmentStats] = useState<AssessmentStatistics | null>(null)
   const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null)
   const [evaluationStats, setEvaluationStats] = useState<EvaluationStatistics | null>(null)
-  const [okrStats, setOkrStats] = useState<OkrStatistics | null>(null)
+  const [performanceList, setPerformanceList] = useState<PerformanceListItem[]>([])
+  const [userStatsDetail, setUserStatsDetail] = useState<UserStatisticsDetail[]>([])
+
+  // Date range for API queries
+  const [dateRange, setDateRange] = useState({
+    start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
+    end_date: new Date().toISOString().split('T')[0] // today
+  })
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -64,7 +72,8 @@ export default function BossDashboard() {
         assessmentStatsResponse,
         trendsResponse,
         evaluationStatsResponse,
-        okrStatsResponse
+        performanceListResponse,
+        userStatsDetailResponse
       ] = await Promise.all([
         statisticsService.getDashboardStatistics(),
         statisticsService.getUserStatistics(),
@@ -72,7 +81,12 @@ export default function BossDashboard() {
         statisticsService.getAssessmentStatistics(),
         statisticsService.getPerformanceTrends(),
         statisticsService.getEvaluationStatistics(),
-        statisticsService.getOkrStatistics()
+        statisticsService.getPerformanceList(dateRange),
+        statisticsService.getUserStatisticsDetail({
+          ...dateRange,
+          time_dimension: 'week',
+          group_by: 'user'
+        })
       ])
 
       // Set data if requests are successful
@@ -94,8 +108,11 @@ export default function BossDashboard() {
       if (evaluationStatsResponse.code === 200) {
         setEvaluationStats(evaluationStatsResponse.data)
       }
-      if (okrStatsResponse.code === 200) {
-        setOkrStats(okrStatsResponse.data)
+      if (performanceListResponse.code === 200) {
+        setPerformanceList(performanceListResponse.data || [])
+      }
+      if (userStatsDetailResponse.code === 200) {
+        setUserStatsDetail(userStatsDetailResponse.data || [])
       }
 
     } catch (error: any) {
@@ -110,7 +127,12 @@ export default function BossDashboard() {
   // Helper functions for data processing
   const processScoreDistribution = () => {
     if (!dashboardData?.score_distribution) return []
-    return dashboardData.score_distribution.map(item => ({
+    // 兼容API可能返回对象而非数组的情况
+    const distribution = Array.isArray(dashboardData.score_distribution)
+      ? dashboardData.score_distribution
+      : Object.entries(dashboardData.score_distribution).map(([range, count]) => ({ range, count: count as number, percentage: 0 /* 可以在此计算百分比 */ }))
+
+    return distribution.map(item => ({
       ...item,
       color: item.range.includes('90-100') ? '#10b981' :
              item.range.includes('80-89') ? '#3b82f6' :
@@ -141,23 +163,48 @@ export default function BossDashboard() {
   }
 
   const processEmployeeData = () => {
-    if (!userStats?.user_list) return []
-    return userStats.user_list.map(user => ({
-      id: user.id.toString(),
-      name: user.name,
-      department: user.department,
-      position: user.position,
-      lastScore: user.latest_score,
-      avgScore: user.average_score,
-      trend: user.score_trend,
-      totalAssessments: user.total_assessments,
-      completedAssessments: user.completed_assessments,
-      lastAssessmentDate: user.last_assessment_date
+    if (!performanceList || performanceList.length === 0) return []
+    return performanceList.map(item => ({
+      id: item.employee.id,
+      name: item.employee.name,
+      username: item.employee.username,
+      department: item.employee.department,
+      position: item.employee.position,
+      lastScore: item.scores.final_score,
+      avgScore: (item.scores.self_score + item.scores.leader_score) / 2,
+      selfScore: item.scores.self_score,
+      leaderScore: item.scores.leader_score,
+      finalScore: item.scores.final_score,
+      trend: item.scores.leader_score > item.scores.self_score ? 'up' :
+             item.scores.leader_score < item.scores.self_score ? 'down' : 'stable',
+      assessment: item.assessment,
+      completion: item.completion,
+      selfCompleted: item.completion.self_completed,
+      leaderCompleted: item.completion.leader_completed,
+      selfSubmittedAt: item.completion.self_submitted_at,
+      leaderSubmittedAt: item.completion.leader_submitted_at
     }))
   }
 
-  // Get filtered employees
+  const processUserStatsDetailData = () => {
+    return userStatsDetail.map(user => ({
+      userId: user.user_id,
+      username: user.user_username,
+      name: user.user_name,
+      department: user.department_name,
+      totalAssessments: parseInt(user.total_assessments),
+      selfCompleted: parseInt(user.self_completed),
+      leaderCompleted: parseInt(user.leader_completed),
+      avgSelfScore: parseFloat(user.avg_self_score),
+      avgLeaderScore: parseFloat(user.avg_leader_score),
+      selfCompletionRate: (parseInt(user.self_completed) / parseInt(user.total_assessments)) * 100,
+      leaderCompletionRate: (parseInt(user.leader_completed) / parseInt(user.total_assessments)) * 100
+    }))
+  }
+
+  // Get processed data
   const allEmployees = processEmployeeData()
+  const userStatsDetailProcessed = processUserStatsDetailData()
   const scoreDistribution = processScoreDistribution()
   const departmentAverage = processDepartmentData()
   const trendData = processTrendData()
@@ -307,24 +354,7 @@ export default function BossDashboard() {
         </div>
 
         {/* 新增统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">OKR统计</p>
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {okrStats?.total_okrs || 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    完成: {okrStats?.completed_okrs || 0} |
-                    进度: {okrStats?.average_progress?.toFixed(1) || '0.0'}%
-                  </p>
-                </div>
-                <Target className="w-8 h-8 text-indigo-600" />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -414,8 +444,106 @@ export default function BossDashboard() {
           </Card>
         </div>
 
-        {/* 新增图表区域 */}
+        {/* 用户统计详细分析图表 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* 员工完成率对比 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>员工完成率分析</CardTitle>
+              <CardDescription>各员工自评与领导评分完成率对比</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={userStatsDetailProcessed.slice(0, 10)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${(value as number).toFixed(1)}%`,
+                      name === 'selfCompletionRate' ? '自评完成率' : '领导评分完成率'
+                    ]}
+                  />
+                  <Bar dataKey="selfCompletionRate" fill="#3b82f6" name="自评完成率" />
+                  <Bar dataKey="leaderCompletionRate" fill="#10b981" name="领导评分完成率" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* 员工平均分对比 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>员工评分对比</CardTitle>
+              <CardDescription>各员工自评与领导评分平均分对比</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={userStatsDetailProcessed.slice(0, 10)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${(value as number).toFixed(1)}分`,
+                      name === 'avgSelfScore' ? '自评平均分' : '领导评分平均分'
+                    ]}
+                  />
+                  <Bar dataKey="avgSelfScore" fill="#f59e0b" name="自评平均分" />
+                  <Bar dataKey="avgLeaderScore" fill="#ef4444" name="领导评分平均分" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 部门维度分析 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* 部门参与度分析 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>部门参与度分析</CardTitle>
+              <CardDescription>各部门考核参与情况统计</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={
+                  Object.entries(
+                    userStatsDetailProcessed.reduce((acc, user) => {
+                      if (!acc[user.department]) {
+                        acc[user.department] = {
+                          department: user.department,
+                          totalAssessments: 0,
+                          avgCompletionRate: 0,
+                          userCount: 0
+                        }
+                      }
+                      acc[user.department].totalAssessments += user.totalAssessments
+                      acc[user.department].avgCompletionRate += (user.selfCompletionRate + user.leaderCompletionRate) / 2
+                      acc[user.department].userCount += 1
+                      return acc
+                    }, {} as any)
+                  ).map(([dept, data]: [string, any]) => ({
+                    department: dept,
+                    totalAssessments: data.totalAssessments,
+                    avgCompletionRate: data.avgCompletionRate / data.userCount
+                  }))
+                }>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="department" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      name === 'totalAssessments' ? `${value}次` : `${(value as number).toFixed(1)}%`,
+                      name === 'totalAssessments' ? '总考核次数' : '平均完成率'
+                    ]}
+                  />
+                  <Bar dataKey="totalAssessments" fill="#8b5cf6" name="总考核次数" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
           {/* 评估完成率饼图 */}
           <Card>
             <CardHeader>
@@ -444,27 +572,6 @@ export default function BossDashboard() {
                   </Pie>
                   <Tooltip />
                 </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* 部门完成率对比 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>部门完成率对比</CardTitle>
-              <CardDescription>各部门评估完成率情况</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={departmentAverage}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="department" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip
-                    formatter={(value) => [`${(value as number).toFixed(1)}%`, '完成率']}
-                  />
-                  <Bar dataKey="completionRate" fill="#8b5cf6" />
-                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
@@ -552,81 +659,161 @@ export default function BossDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {filteredEmployees.map((employee) => (
-                <div key={employee.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-lg">{employee.name}</h3>
-                      <p className="text-sm text-gray-600">
-                        {employee.department} · {employee.position}
-                      </p>
+                <div key={employee.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
+                  {/* 员工基本信息 */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg">{employee.name}</h3>
+                        <p className="text-sm text-gray-600">@{employee.username}</p>
+                        <p className="text-sm text-gray-600">{employee.position} · {employee.department}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-2xl font-bold ${getScoreColor(employee.lastScore)}`}>
-                          {employee.lastScore}
-                        </span>
-                        <span className="text-lg">{getTrendIcon(employee.trend)}</span>
+                      <div className={`text-2xl font-bold ${getScoreColor(employee.finalScore)}`}>
+                        {employee.finalScore?.toFixed(1) || '--'}
                       </div>
-                      <p className="text-sm text-gray-600">最近得分</p>
+                      <div className="text-xs text-gray-500">最终得分</div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                    <div>
-                      <span className="text-gray-600">平均得分：</span>
-                      <span className={`font-semibold ${getScoreColor(employee.avgScore)}`}>
-                        {employee.avgScore?.toFixed(1) || '--'}
+
+                  {/* 考核信息 */}
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-gray-900 mb-2">考核信息</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">考核标题：</span>
+                        <span className="font-medium">{employee.assessment?.title || '--'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">考核周期：</span>
+                        <span className="font-medium">{employee.assessment?.period || '--'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">考核状态：</span>
+                        <Badge className={
+                          employee.assessment?.status === 'active'
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }>
+                          {employee.assessment?.status === 'active' ? '进行中' : '已结束'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">考核时间：</span>
+                        <span className="text-xs text-gray-500">
+                          {employee.assessment?.start_date ?
+                            `${new Date(employee.assessment.start_date).toLocaleDateString()} - ${new Date(employee.assessment.end_date).toLocaleDateString()}` :
+                            '--'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 评分详情 */}
+                  <div className="grid grid-cols-3 gap-4 text-sm mb-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <div className={`text-xl font-bold ${getScoreColor(employee.selfScore)}`}>
+                        {employee.selfScore?.toFixed(1) || '--'}
+                      </div>
+                      <div className="text-xs text-gray-600">自评得分</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <div className={`text-xl font-bold ${getScoreColor(employee.leaderScore)}`}>
+                        {employee.leaderScore?.toFixed(1) || '--'}
+                      </div>
+                      <div className="text-xs text-gray-600">领导评分</div>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                      <div className={`text-xl font-bold ${getScoreColor(employee.finalScore)}`}>
+                        {employee.finalScore?.toFixed(1) || '--'}
+                      </div>
+                      <div className="text-xs text-gray-600">最终得分</div>
+                    </div>
+                  </div>
+
+                  {/* 完成状态 */}
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${employee.selfCompleted ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span className="text-gray-600">自评完成：</span>
+                      <span className={`font-medium ${employee.selfCompleted ? 'text-green-600' : 'text-gray-500'}`}>
+                        {employee.selfCompleted ? '已完成' : '未完成'}
                       </span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${employee.leaderCompleted ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span className="text-gray-600">领导评分：</span>
+                      <span className={`font-medium ${employee.leaderCompleted ? 'text-green-600' : 'text-gray-500'}`}>
+                        {employee.leaderCompleted ? '已完成' : '未完成'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 提交时间 */}
+                  <div className="grid grid-cols-2 gap-4 text-xs text-gray-500 mb-4">
                     <div>
-                      <span className="text-gray-600">绩效等级：</span>
-                      <Badge
-                        variant="outline"
-                        className={
-                          employee.lastScore >= 90
-                            ? "text-green-600 border-green-600"
-                            : employee.lastScore >= 80
-                              ? "text-blue-600 border-blue-600"
-                              : employee.lastScore >= 70
-                                ? "text-yellow-600 border-yellow-600"
-                                : "text-red-600 border-red-600"
+                      <span>自评提交：</span>
+                      <span className="block">
+                        {employee.selfSubmittedAt ?
+                          new Date(employee.selfSubmittedAt).toLocaleString() :
+                          '未提交'
                         }
-                      >
-                        {employee.lastScore >= 90 ? "优秀" :
-                         employee.lastScore >= 80 ? "良好" :
-                         employee.lastScore >= 70 ? "合格" : "待改进"}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                    <div>
-                      <span className="text-gray-600">考核参与：</span>
-                      <span className="font-semibold">
-                        {employee.completedAssessments || 0}/{employee.totalAssessments || 0}
                       </span>
                     </div>
                     <div>
-                      <span className="text-gray-600">最近评估：</span>
-                      <span className="text-gray-500">
-                        {employee.lastAssessmentDate ?
-                          new Date(employee.lastAssessmentDate).toLocaleDateString() :
-                          '暂无'
+                      <span>领导提交：</span>
+                      <span className="block">
+                        {employee.leaderSubmittedAt ?
+                          new Date(employee.leaderSubmittedAt).toLocaleString() :
+                          '未提交'
                         }
                       </span>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full bg-transparent"
-                    onClick={() => router.push(`/boss/employee/${employee.id}`)}
-                  >
-                    查看详细绩效
-                  </Button>
+
+                  {/* 操作按钮 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <TrendingUp
+                        className={`w-4 h-4 ${
+                          employee.trend === "up"
+                            ? "text-green-600"
+                            : employee.trend === "down"
+                              ? "text-red-600"
+                              : "text-gray-600"
+                        }`}
+                      />
+                      <span className="text-sm text-gray-600">
+                        {employee.trend === "up" ? "领导评分更高" :
+                         employee.trend === "down" ? "自评更高" : "评分一致"}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/boss/employee/${employee.id}`)}
+                    >
+                      查看详细绩效
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
+
+            {filteredEmployees.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium mb-2">暂无员工数据</h3>
+                <p>没有找到符合条件的员工信息</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

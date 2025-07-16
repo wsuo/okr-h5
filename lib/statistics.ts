@@ -93,23 +93,47 @@ export interface UserStat {
   last_assessment_date: string
 }
 
-// OKR统计数据接口
-export interface OkrStatistics {
-  total_okrs: number
-  completed_okrs: number
-  average_progress: number
-  okr_list: OkrStat[]
+// 绩效列表数据接口
+export interface PerformanceListItem {
+  assessment: {
+    id: string
+    title: string
+    period: string
+    start_date: string
+    end_date: string
+    status: string
+  }
+  employee: {
+    id: string
+    name: string
+    username: string
+    position: string
+    department: string
+  }
+  scores: {
+    self_score: number
+    leader_score: number
+    final_score: number
+  }
+  completion: {
+    self_completed: boolean
+    leader_completed: boolean
+    self_submitted_at: string | null
+    leader_submitted_at: string | null
+  }
 }
 
-export interface OkrStat {
-  id: number
-  objective: string
+// 用户统计详细数据接口
+export interface UserStatisticsDetail {
+  user_id: string
+  user_username: string
   user_name: string
-  department: string
-  progress: number
-  self_rating: number
-  status: string
-  created_at: string
+  department_name: string
+  total_assessments: string
+  self_completed: string
+  leader_completed: string
+  avg_self_score: string
+  avg_leader_score: string
 }
 
 // 评估统计数据接口
@@ -164,6 +188,8 @@ export interface StatisticsQueryParams {
   department_id?: number
   user_id?: number
   assessment_id?: number
+  time_dimension?: string
+  group_by?: string
 }
 
 // 统计服务类
@@ -197,10 +223,17 @@ export class StatisticsService {
   }
 
   /**
-   * 获取OKR统计数据
+   * 获取绩效列表数据
    */
-  async getOkrStatistics(params?: StatisticsQueryParams): Promise<ApiResponse<OkrStatistics>> {
-    return apiClient.get<OkrStatistics>('/statistics/okrs', params)
+  async getPerformanceList(params?: StatisticsQueryParams): Promise<ApiResponse<PerformanceListItem[]>> {
+    return apiClient.get<PerformanceListItem[]>('/statistics/performance-list', params)
+  }
+
+  /**
+   * 获取用户统计详细数据
+   */
+  async getUserStatisticsDetail(params?: StatisticsQueryParams): Promise<ApiResponse<UserStatisticsDetail[]>> {
+    return apiClient.get<UserStatisticsDetail[]>('/statistics/users', params)
   }
 
   /**
