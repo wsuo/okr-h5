@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
@@ -15,7 +15,6 @@ import {
   statisticsService,
   DashboardStatistics,
   DepartmentStat,
-  PerformanceTrends,
   PerformanceListItem,
   UserStatisticsDetail
 } from "@/lib/statistics"
@@ -32,7 +31,6 @@ export default function BossDashboard() {
   // Statistics data states
   const [dashboardData, setDashboardData] = useState<DashboardStatistics | null>(null)
   const [departmentStats, setDepartmentStats] = useState<DepartmentStat[]>([])
-  const [performanceTrends, setPerformanceTrends] = useState<PerformanceTrends | null>(null)
   const [performanceList, setPerformanceList] = useState<PerformanceListItem[]>([])
   const [userStatsDetail, setUserStatsDetail] = useState<UserStatisticsDetail[]>([])
 
@@ -62,13 +60,11 @@ export default function BossDashboard() {
       const [
         dashboardResponse,
         departmentStatsResponse,
-        trendsResponse,
         performanceListResponse,
         userStatsDetailResponse
       ] = await Promise.all([
         statisticsService.getDashboardStatistics(),
         statisticsService.getDepartmentStatistics(),
-        statisticsService.getPerformanceTrends(),
         statisticsService.getPerformanceList(dateRange),
         statisticsService.getUserStatisticsDetail({
           ...dateRange,
@@ -83,9 +79,6 @@ export default function BossDashboard() {
       }
       if (departmentStatsResponse.code === 200) {
         setDepartmentStats(departmentStatsResponse.data || [])
-      }
-      if (trendsResponse.code === 200) {
-        setPerformanceTrends(trendsResponse.data)
       }
       if (performanceListResponse.code === 200) {
         setPerformanceList(performanceListResponse.data || [])
@@ -105,17 +98,31 @@ export default function BossDashboard() {
 
   // Helper functions for data processing
   const processScoreDistribution = () => {
-    if (!dashboardData?.score_distribution) return []
-    // 兼容API可能返回对象而非数组的情况
+    if (!dashboardData?.score_distribution) {
+      // Return default score ranges if no data available
+      return [
+        { range: '90-100', count: 0, percentage: 0, color: '#10b981' },
+        { range: '80-89', count: 0, percentage: 0, color: '#3b82f6' },
+        { range: '70-79', count: 0, percentage: 0, color: '#f59e0b' },
+        { range: '60-69', count: 0, percentage: 0, color: '#ef4444' }
+      ]
+    }
+
+    // Handle both array and object formats from API
     const distribution = Array.isArray(dashboardData.score_distribution)
       ? dashboardData.score_distribution
-      : Object.entries(dashboardData.score_distribution).map(([range, count]) => ({ range, count: count as number, percentage: 0 /* 可以在此计算百分比 */ }))
+      : Object.entries(dashboardData.score_distribution).map(([range, count]) => ({
+          range,
+          count: count as number,
+          percentage: 0
+        }))
 
     return distribution.map(item => ({
       ...item,
-      color: item.range.includes('90-100') ? '#10b981' :
-             item.range.includes('80-89') ? '#3b82f6' :
-             item.range.includes('70-79') ? '#f59e0b' : '#ef4444'
+      range: item.range, // Ensure range is properly formatted (e.g., "90-100", "80-89")
+      color: item.range.includes('90') || item.range.includes('100') ? '#10b981' :
+             item.range.includes('80') || item.range.includes('89') ? '#3b82f6' :
+             item.range.includes('70') || item.range.includes('79') ? '#f59e0b' : '#ef4444'
     }))
   }
 
@@ -130,16 +137,7 @@ export default function BossDashboard() {
     }))
   }
 
-  const processTrendData = () => {
-    if (!performanceTrends?.monthly_trends) return []
-    return performanceTrends.monthly_trends.map(trend => ({
-      month: trend.month,
-      avgScore: trend.average_score,
-      selfAverage: trend.self_average,
-      leaderAverage: trend.leader_average,
-      completionRate: trend.completion_rate
-    }))
-  }
+
 
   const processEmployeeData = () => {
     if (!performanceList || performanceList.length === 0) return []
@@ -166,19 +164,26 @@ export default function BossDashboard() {
   }
 
   const processUserStatsDetailData = () => {
-    return userStatsDetail.map(user => ({
-      userId: user.user_id,
-      username: user.user_username,
-      name: user.user_name,
-      department: user.department_name,
-      totalAssessments: parseInt(user.total_assessments),
-      selfCompleted: parseInt(user.self_completed),
-      leaderCompleted: parseInt(user.leader_completed),
-      avgSelfScore: parseFloat(user.avg_self_score),
-      avgLeaderScore: parseFloat(user.avg_leader_score),
-      selfCompletionRate: (parseInt(user.self_completed) / parseInt(user.total_assessments)) * 100,
-      leaderCompletionRate: (parseInt(user.leader_completed) / parseInt(user.total_assessments)) * 100
-    }))
+    return userStatsDetail.map(user => {
+      const totalAssessments = parseInt(user.total_assessments) || 1 // Avoid division by zero
+      const selfCompleted = parseInt(user.self_completed) || 0
+      const leaderCompleted = parseInt(user.leader_completed) || 0
+
+      return {
+        userId: user.user_id,
+        username: user.user_username,
+        name: user.user_name,
+        department: user.department_name,
+        totalAssessments,
+        selfCompleted,
+        leaderCompleted,
+        avgSelfScore: parseFloat(user.avg_self_score) || 0,
+        avgLeaderScore: parseFloat(user.avg_leader_score) || 0,
+        // Calculate completion rates with proper handling of edge cases
+        selfCompletionRate: totalAssessments > 0 ? (selfCompleted / totalAssessments) * 100 : 0,
+        leaderCompletionRate: totalAssessments > 0 ? (leaderCompleted / totalAssessments) * 100 : 0
+      }
+    })
   }
 
   // Get processed data
@@ -186,7 +191,6 @@ export default function BossDashboard() {
   const userStatsDetailProcessed = processUserStatsDetailData()
   const scoreDistribution = processScoreDistribution()
   const departmentAverage = processDepartmentData()
-  const trendData = processTrendData()
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600"
@@ -488,10 +492,11 @@ export default function BossDashboard() {
                   <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
                   <YAxis domain={[0, 100]} />
                   <Tooltip
-                    formatter={(value, name) => [
-                      `${(value as number).toFixed(1)}分`,
-                      name === 'avgSelfScore' ? '自评平均分' : '领导评分平均分'
-                    ]}
+                    formatter={(value, name, props) => {
+                      // Use the dataKey to determine the correct label
+                      const label = props.dataKey === 'avgSelfScore' ? '自评平均分' : '领导评分平均分'
+                      return [`${(value as number).toFixed(1)}分`, label]
+                    }}
                   />
                   <Bar dataKey="avgSelfScore" fill="#f59e0b" name="自评平均分" />
                   <Bar dataKey="avgLeaderScore" fill="#ef4444" name="领导评分平均分" />
@@ -503,53 +508,7 @@ export default function BossDashboard() {
 
 
 
-        {/* 绩效趋势图 */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>绩效趋势分析</CardTitle>
-            <CardDescription>公司整体绩效趋势变化</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis domain={['dataMin - 5', 'dataMax + 5']} />
-                <Tooltip
-                  formatter={(value, name) => [
-                    `${(value as number).toFixed(1)}${name === 'completionRate' ? '%' : '分'}`,
-                    name === 'avgScore' ? '综合平均分' :
-                    name === 'selfAverage' ? '自评平均分' :
-                    name === 'leaderAverage' ? '领导评分' : '完成率'
-                  ]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="avgScore"
-                  stroke="#3b82f6"
-                  strokeWidth={3}
-                  name="综合平均分"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="selfAverage"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="自评平均分"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="leaderAverage"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="领导评分"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+
 
         {/* 员工列表 */}
         <Card>
