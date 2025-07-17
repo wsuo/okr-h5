@@ -32,15 +32,11 @@ export default function LoginPage() {
     clearError()
 
     const success = await login(username, password)
-    console.log('Login success:', success)
     
     if (success) {
       // 添加延迟以确保用户信息已存储
       setTimeout(() => {
-        const user = authService.getCurrentUser()
-        console.log('Current user after login:', user)
         const defaultRoute = authService.getDefaultRoute()
-        console.log('Default route:', defaultRoute)
         router.push(defaultRoute)
       }, 100)
     }
@@ -90,16 +86,6 @@ export default function LoginPage() {
               登录
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 mb-2">测试账号（密码均为：123456）：</p>
-            <div className="text-xs text-gray-500 space-y-1">
-              <div>管理员：admin</div>
-              <div>老板：boss</div>
-              <div>部门领导：lisi（李四）、zhaoliu（赵六）</div>
-              <div>员工：zhangsan（张三）、wangwu（王五）</div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
