@@ -3,7 +3,7 @@
  */
 
 // API 基础配置
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010'
 export const API_PREFIX = '/api/v1'
 
 // 请求响应接口定义
@@ -32,7 +32,8 @@ class ApiClient {
   private baseURL: string
 
   constructor(baseURL: string = API_BASE_URL) {
-    this.baseURL = baseURL
+    // 如果 baseURL 已经包含 /api/v1，则移除重复部分
+    this.baseURL = baseURL.replace(/\/api\/v1$/, '')
   }
 
   private async request<T>(

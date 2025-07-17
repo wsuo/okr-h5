@@ -76,6 +76,12 @@ rm -rf .next
 echo "重新构建项目..."
 npm run build
 
+# 8. 输出访问提示
+echo "构建完成，如果浏览器缓存导致无法访问，请："
+echo "1. 按 Ctrl+Shift+R 强制刷新"
+echo "2. 或者使用版本号访问：http://okr.gerenukagro.com/?v=$(date +%Y%m%d%H%M%S)"
+echo "3. 或者使用无痕模式访问"
+
 # 8. 重启服务
 echo "重启服务..."
 pm2 start okr-frontend

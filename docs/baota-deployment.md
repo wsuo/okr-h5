@@ -182,17 +182,32 @@ server {
     access_log /www/wwwroot/okr.gerenukagro.com/logs/nginx_access.log;
     error_log /www/wwwroot/okr.gerenukagro.com/logs/nginx_error.log;
     
-    # 静态文件处理
+    # 静态文件处理 - 优先尝试本地文件，不存在则转发给 Next.js
     location /_next/static/ {
+        try_files $uri @nextjs;
         alias /www/wwwroot/okr.gerenukagro.com/.next/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
     
     location /static/ {
+        try_files $uri @nextjs;
         alias /www/wwwroot/okr.gerenukagro.com/public/;
         expires 1y;
         add_header Cache-Control "public, immutable";
+    }
+    
+    # Next.js 应用服务器
+    location @nextjs {
+        proxy_pass http://localhost:3020;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
     }
     
     # API 代理（如果后端 API 在同一服务器）
