@@ -3,7 +3,7 @@
  */
 
 // API 基础配置
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010'
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || ''
 export const API_PREFIX = '/api/v1'
 
 // 请求响应接口定义
