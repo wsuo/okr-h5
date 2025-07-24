@@ -237,5 +237,60 @@ export function usePermission() {
     isBoss: () => authService.hasRole('boss'),
     isLead: () => authService.hasRole('leader'),
     isEmployee: () => authService.hasRole('employee'),
+    
+    // Boss评分权限检查
+    canDoBossEvaluation: (targetUser: any) => {
+      if (!user || !targetUser) return false
+      // 检查当前用户是否是目标用户的上级（即目标用户直属领导的领导）
+      return user.id === targetUser?.leader?.leader?.id
+    },
+    
+    // 检查是否可以查看Boss评分结果
+    canViewBossEvaluation: (targetUser: any) => {
+      if (!user) return false
+      // 管理员和Boss角色可以查看所有人的Boss评分
+      if (authService.hasRole('admin') || authService.hasRole('boss')) return true
+      // 目标用户本人可以查看自己的Boss评分
+      if (user.id === targetUser?.id) return true
+      // 直属领导可以查看下属的Boss评分
+      if (user.id === targetUser?.leader?.id) return true
+      // Boss可以查看自己评分过的用户
+      if (user.id === targetUser?.leader?.leader?.id) return true
+      return false
+    }
+  }
+}
+
+// Boss评分权限检查Hook
+export function useBossEvaluationPermission() {
+  const { user } = useAuth()
+  const permission = usePermission()
+
+  return {
+    // 检查是否可以对指定用户进行Boss评分
+    canEvaluate: (targetUserId: number, targetUser?: any) => {
+      return permission.canDoBossEvaluation(targetUser)
+    },
+    
+    // 检查是否可以查看Boss评分任务列表
+    canViewTasks: () => {
+      // 只有Boss角色或管理员可以看到Boss评分任务
+      return authService.hasRole('boss') || authService.hasRole('admin')
+    },
+    
+    // 检查是否可以查看Boss评分结果
+    canViewResults: (targetUser: any) => {
+      return permission.canViewBossEvaluation(targetUser)
+    },
+    
+    // 获取当前用户可以进行Boss评分的下属列表
+    getEvaluableSubordinates: (allUsers: any[]) => {
+      if (!user || !allUsers) return []
+      
+      // 找到当前用户作为leader.leader的所有用户
+      return allUsers.filter(targetUser => 
+        targetUser?.leader?.leader?.id === user.id
+      )
+    }
   }
 }

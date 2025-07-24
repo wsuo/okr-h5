@@ -138,11 +138,12 @@ export default function BossDashboard() {
   const processDepartmentData = () => {
     return departmentStats.map(dept => ({
       department: dept.name,
-      avgScore: ((dept.avg_self_score + dept.avg_leader_score) / 2),
+      avgScore: ((dept.avg_self_score + dept.avg_leader_score + (dept.avg_boss_score || 0)) / 3),
       selfScore: dept.avg_self_score,
       leaderScore: dept.avg_leader_score,
+      bossScore: dept.avg_boss_score || 0,
       count: dept.user_count,
-      completionRate: ((dept.self_completion_rate + dept.leader_completion_rate) / 2)
+      completionRate: ((dept.self_completion_rate + dept.leader_completion_rate + (dept.boss_completion_rate || 0)) / 3)
     }))
   }
 
@@ -157,9 +158,10 @@ export default function BossDashboard() {
       department: item.employee.department,
       position: item.employee.position,
       lastScore: item.scores.final_score,
-      avgScore: (item.scores.self_score + item.scores.leader_score) / 2,
+      avgScore: (item.scores.self_score + item.scores.leader_score + (item.scores.boss_score || 0)) / 3,
       selfScore: item.scores.self_score,
       leaderScore: item.scores.leader_score,
+      bossScore: item.scores.boss_score || 0,
       finalScore: item.scores.final_score,
       trend: item.scores.leader_score > item.scores.self_score ? 'up' :
              item.scores.leader_score < item.scores.self_score ? 'down' : 'stable',
@@ -167,8 +169,10 @@ export default function BossDashboard() {
       completion: item.completion,
       selfCompleted: item.completion.self_completed,
       leaderCompleted: item.completion.leader_completed,
+      bossCompleted: item.completion.boss_completed || false,
       selfSubmittedAt: item.completion.self_submitted_at,
-      leaderSubmittedAt: item.completion.leader_submitted_at
+      leaderSubmittedAt: item.completion.leader_submitted_at,
+      bossSubmittedAt: item.completion.boss_submitted_at || null
     }))
   }
 
@@ -437,6 +441,25 @@ export default function BossDashboard() {
           </Card>
         </div>
 
+        {/* Boss评分统计卡片 */}
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+          {/* Boss评分平均分 */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Boss评分平均分</p>
+                  <p className="text-2xl font-bold text-violet-600">
+                    {dashboardData?.overview.boss_average?.toFixed(1) || '0.0'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">老板评估得分</p>
+                </div>
+                <Award className="w-8 h-8 text-violet-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
 
 
         {/* 数据图表区域 */}
@@ -473,7 +496,7 @@ export default function BossDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>部门绩效对比</CardTitle>
-              <CardDescription>各部门自评与领导评分对比</CardDescription>
+              <CardDescription>各部门三维度评分对比</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -485,11 +508,13 @@ export default function BossDashboard() {
                     formatter={(value, name) => [
                       `${(value as number).toFixed(1)}分`,
                       name === 'selfScore' ? '自评平均分' :
-                      name === 'leaderScore' ? '领导评分' : '综合平均分'
+                      name === 'leaderScore' ? '领导评分' : 
+                      name === 'bossScore' ? 'Boss评分' : '综合平均分'
                     ]}
                   />
                   <Bar dataKey="selfScore" fill="#3b82f6" name="自评" />
                   <Bar dataKey="leaderScore" fill="#10b981" name="领导评分" />
+                  <Bar dataKey="bossScore" fill="#8b5cf6" name="Boss评分" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -711,7 +736,7 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 评分详情 */}
-                  <div className="grid grid-cols-3 gap-4 text-sm mb-4">
+                  <div className="grid grid-cols-4 gap-4 text-sm mb-4">
                     <div className="text-center p-3 bg-blue-50 rounded-lg">
                       <div className={`text-xl font-bold ${getScoreColor(employee.selfScore)}`}>
                         {employee.selfScore?.toFixed(1) || '--'}
@@ -724,6 +749,12 @@ export default function BossDashboard() {
                       </div>
                       <div className="text-xs text-gray-600">领导评分</div>
                     </div>
+                    <div className="text-center p-3 bg-violet-50 rounded-lg">
+                      <div className={`text-xl font-bold ${getScoreColor(employee.bossScore || 0)}`}>
+                        {employee.bossScore?.toFixed(1) || '--'}
+                      </div>
+                      <div className="text-xs text-gray-600">Boss评分</div>
+                    </div>
                     <div className="text-center p-3 bg-purple-50 rounded-lg">
                       <div className={`text-xl font-bold ${getScoreColor(employee.finalScore)}`}>
                         {employee.finalScore?.toFixed(1) || '--'}
@@ -733,7 +764,7 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 完成状态 */}
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                  <div className="grid grid-cols-3 gap-4 text-sm mb-4">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${employee.selfCompleted ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                       <span className="text-gray-600">自评完成：</span>
@@ -748,10 +779,17 @@ export default function BossDashboard() {
                         {employee.leaderCompleted ? '已完成' : '未完成'}
                       </span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${employee.bossCompleted ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                      <span className="text-gray-600">Boss评分：</span>
+                      <span className={`font-medium ${employee.bossCompleted ? 'text-green-600' : 'text-gray-500'}`}>
+                        {employee.bossCompleted ? '已完成' : '未完成'}
+                      </span>
+                    </div>
                   </div>
 
                   {/* 提交时间 */}
-                  <div className="grid grid-cols-2 gap-4 text-xs text-gray-500 mb-4">
+                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-4">
                     <div>
                       <span>自评提交：</span>
                       <span className="block">
@@ -766,6 +804,15 @@ export default function BossDashboard() {
                       <span className="block">
                         {employee.leaderSubmittedAt ?
                           new Date(employee.leaderSubmittedAt).toLocaleString() :
+                          '未提交'
+                        }
+                      </span>
+                    </div>
+                    <div>
+                      <span>Boss提交：</span>
+                      <span className="block">
+                        {employee.bossSubmittedAt ?
+                          new Date(employee.bossSubmittedAt).toLocaleString() :
                           '未提交'
                         }
                       </span>

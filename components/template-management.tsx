@@ -557,7 +557,8 @@ export default function TemplateManagement() {
     if (config.scoring_rules) {
       const selfWeight = (config.scoring_rules.self_evaluation?.weight_in_final || 0) * 100
       const leaderWeight = (config.scoring_rules.leader_evaluation?.weight_in_final || 0) * 100
-      const scoringRulesWeightSum = Math.round(selfWeight + leaderWeight)
+      const bossWeight = (config.scoring_rules.boss_evaluation?.weight_in_final || 0) * 100
+      const scoringRulesWeightSum = Math.round(selfWeight + leaderWeight + bossWeight)
       if (scoringRulesWeightSum !== 100) {
         errors.push(`评分规则权重总和为 ${scoringRulesWeightSum}%，应为 100%`)
       }
@@ -1418,7 +1419,7 @@ export default function TemplateManagement() {
                       <h5 className="font-medium text-sm">评分规则配置</h5>
                       <p className="text-xs text-gray-600">设置员工自评和领导评分的权重分配，总权重必须为100%</p>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* 员工自评配置 */}
                         <div className="p-3 bg-white rounded border">
                           <div className="flex items-center justify-between mb-3">
@@ -1435,7 +1436,7 @@ export default function TemplateManagement() {
                                       self_evaluation: {
                                         enabled: checked,
                                         description: template.config.scoring_rules?.self_evaluation?.description || "员工自我评估",
-                                        weight_in_final: template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4
+                                        weight_in_final: template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.36
                                       }
                                     }
                                   }
@@ -1459,7 +1460,7 @@ export default function TemplateManagement() {
                                         self_evaluation: {
                                           enabled: template.config.scoring_rules?.self_evaluation?.enabled || true,
                                           description: e.target.value,
-                                          weight_in_final: template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4
+                                          weight_in_final: template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.36
                                         }
                                       }
                                     }
@@ -1476,7 +1477,7 @@ export default function TemplateManagement() {
                                 type="number"
                                 min="0"
                                 max="100"
-                                value={Math.round((template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4) * 100)}
+                                value={Math.round((template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.36) * 100)}
                                 onChange={(e) => {
                                   const percentage = parseInt(e.target.value) || 0
                                   const updatedTemplate = {
@@ -1496,7 +1497,7 @@ export default function TemplateManagement() {
                                   updateTemplateInState(updatedTemplate)
                                 }}
                                 className="text-sm"
-                                placeholder="40"
+                                placeholder="36"
                               />
                             </div>
                           </div>
@@ -1518,7 +1519,7 @@ export default function TemplateManagement() {
                                       leader_evaluation: {
                                         enabled: checked,
                                         description: template.config.scoring_rules?.leader_evaluation?.description || "直属领导评估",
-                                        weight_in_final: template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6
+                                        weight_in_final: template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.54
                                       }
                                     }
                                   }
@@ -1542,7 +1543,7 @@ export default function TemplateManagement() {
                                         leader_evaluation: {
                                           enabled: template.config.scoring_rules?.leader_evaluation?.enabled || true,
                                           description: e.target.value,
-                                          weight_in_final: template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6
+                                          weight_in_final: template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.54
                                         }
                                       }
                                     }
@@ -1559,7 +1560,7 @@ export default function TemplateManagement() {
                                 type="number"
                                 min="0"
                                 max="100"
-                                value={Math.round((template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6) * 100)}
+                                value={Math.round((template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.54) * 100)}
                                 onChange={(e) => {
                                   const percentage = parseInt(e.target.value) || 0
                                   const updatedTemplate = {
@@ -1579,8 +1580,119 @@ export default function TemplateManagement() {
                                   updateTemplateInState(updatedTemplate)
                                 }}
                                 className="text-sm"
-                                placeholder="60"
+                                placeholder="54"
                               />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Boss评分配置 */}
+                        <div className="p-3 bg-white rounded border">
+                          <div className="flex items-center justify-between mb-3">
+                            <Label className="text-sm font-medium">上级(Boss)评估</Label>
+                            <Switch
+                              checked={template.config.scoring_rules?.boss_evaluation?.enabled || false}
+                              onCheckedChange={(checked) => {
+                                const updatedTemplate = {
+                                  ...template,
+                                  config: {
+                                    ...template.config,
+                                    scoring_rules: {
+                                      ...template.config.scoring_rules,
+                                      boss_evaluation: {
+                                        enabled: checked,
+                                        description: template.config.scoring_rules?.boss_evaluation?.description || "上级(Boss)评估",
+                                        weight_in_final: template.config.scoring_rules?.boss_evaluation?.weight_in_final || 0.10,
+                                        is_optional: template.config.scoring_rules?.boss_evaluation?.is_optional !== false
+                                      }
+                                    }
+                                  }
+                                }
+                                updateTemplateInState(updatedTemplate)
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs">描述</Label>
+                              <Input
+                                value={template.config.scoring_rules?.boss_evaluation?.description || "上级(Boss)评估"}
+                                onChange={(e) => {
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        boss_evaluation: {
+                                          enabled: template.config.scoring_rules?.boss_evaluation?.enabled || false,
+                                          description: e.target.value,
+                                          weight_in_final: template.config.scoring_rules?.boss_evaluation?.weight_in_final || 0.10,
+                                          is_optional: template.config.scoring_rules?.boss_evaluation?.is_optional !== false
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                                className="text-sm"
+                                placeholder="上级(Boss)评估"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">权重 (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={Math.round((template.config.scoring_rules?.boss_evaluation?.weight_in_final || 0.10) * 100)}
+                                onChange={(e) => {
+                                  const percentage = parseInt(e.target.value) || 0
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        boss_evaluation: {
+                                          enabled: template.config.scoring_rules?.boss_evaluation?.enabled || false,
+                                          description: template.config.scoring_rules?.boss_evaluation?.description || "上级(Boss)评估",
+                                          weight_in_final: percentage / 100,
+                                          is_optional: template.config.scoring_rules?.boss_evaluation?.is_optional !== false
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                                className="text-sm"
+                                placeholder="10"
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                id="boss-optional"
+                                checked={template.config.scoring_rules?.boss_evaluation?.is_optional !== false}
+                                onCheckedChange={(checked) => {
+                                  const updatedTemplate = {
+                                    ...template,
+                                    config: {
+                                      ...template.config,
+                                      scoring_rules: {
+                                        ...template.config.scoring_rules,
+                                        boss_evaluation: {
+                                          enabled: template.config.scoring_rules?.boss_evaluation?.enabled || false,
+                                          description: template.config.scoring_rules?.boss_evaluation?.description || "上级(Boss)评估",
+                                          weight_in_final: template.config.scoring_rules?.boss_evaluation?.weight_in_final || 0.10,
+                                          is_optional: checked
+                                        }
+                                      }
+                                    }
+                                  }
+                                  updateTemplateInState(updatedTemplate)
+                                }}
+                              />
+                              <Label htmlFor="boss-optional" className="text-xs">可选项</Label>
                             </div>
                           </div>
                         </div>
@@ -1617,9 +1729,10 @@ export default function TemplateManagement() {
                       
                       {/* 权重验证提示 */}
                       {(() => {
-                        const selfWeight = (template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.4) * 100
-                        const leaderWeight = (template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.6) * 100
-                        const total = Math.round(selfWeight + leaderWeight)
+                        const selfWeight = (template.config.scoring_rules?.self_evaluation?.weight_in_final || 0.36) * 100
+                        const leaderWeight = (template.config.scoring_rules?.leader_evaluation?.weight_in_final || 0.54) * 100
+                        const bossWeight = (template.config.scoring_rules?.boss_evaluation?.weight_in_final || 0.10) * 100
+                        const total = Math.round(selfWeight + leaderWeight + bossWeight)
                         const isValid = total === 100
                         
                         if (!isValid) {
@@ -1729,9 +1842,10 @@ export default function TemplateManagement() {
                               </span>
                             </div>
                             {(() => {
-                              const selfWeight = (template.config.scoring_rules.self_evaluation?.weight_in_final || 0.4) * 100
-                              const leaderWeight = (template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.6) * 100
-                              const total = Math.round(selfWeight + leaderWeight)
+                              const selfWeight = (template.config.scoring_rules.self_evaluation?.weight_in_final || 0.36) * 100
+                              const leaderWeight = (template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.54) * 100
+                              const bossWeight = (template.config.scoring_rules.boss_evaluation?.weight_in_final || 0.10) * 100
+                              const total = Math.round(selfWeight + leaderWeight + bossWeight)
                               const isValid = total === 100
                               
                               return (

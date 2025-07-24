@@ -5,7 +5,7 @@
 import { apiClient, ApiResponse, PaginatedResponse } from './api'
 
 // 评估类型
-export type EvaluationType = 'self' | 'leader'
+export type EvaluationType = 'self' | 'leader' | 'boss'
 
 // 评估状态
 export type EvaluationStatus = 'draft' | 'submitted' | 'completed'
@@ -24,6 +24,7 @@ export interface Evaluation {
   score?: number
   self_review?: string
   leader_review?: string
+  boss_review?: string
   feedback?: string  // Backend alias for leader_review
   strengths?: string
   improvements?: string
@@ -86,6 +87,11 @@ export interface ScoringRules {
     enabled: boolean
     weight_in_final: number
   }
+  boss_evaluation?: {
+    enabled: boolean
+    weight_in_final: number
+    is_optional?: boolean
+  }
   calculation_method: string
 }
 
@@ -142,9 +148,11 @@ export interface EvaluationProgress {
   total_participants: number
   self_completed_count: number
   leader_completed_count: number
+  boss_completed_count: number
   fully_completed_count: number
   self_completion_rate: number
   leader_completion_rate: number
+  boss_completion_rate: number
   overall_completion_rate: number
   participants: ProgressParticipant[]
   deadline: string
@@ -158,8 +166,10 @@ export interface ProgressParticipant {
   department: string
   self_status: 'pending' | 'completed'
   leader_status: 'pending' | 'completed'
+  boss_status: 'pending' | 'completed'
   self_completed_at?: string
   leader_completed_at?: string
+  boss_completed_at?: string
 }
 
 // 下属评分任务接口
@@ -182,6 +192,7 @@ export interface EvaluationComparison {
   user_name: string
   self_evaluation?: ComparisonEvaluation
   leader_evaluation?: ComparisonEvaluation
+  boss_evaluation?: ComparisonEvaluation
   comparison: ComparisonResult
   comparison_analysis?: ComparisonAnalysis  // Extended structure for detailed analysis
 }
@@ -272,6 +283,26 @@ export interface SubmitDetailedLeaderRequest {
   strengths?: string
   improvements?: string
   detailed_scores: DetailedScore[]
+}
+
+// 提交详细Boss评分请求
+export interface SubmitDetailedBossRequest {
+  assessment_id: number
+  evaluatee_id: number
+  boss_review: string
+  strengths?: string
+  improvements?: string
+  detailed_scores: DetailedScore[]
+}
+
+// 提交简单Boss评分请求
+export interface SubmitBossEvaluationRequest {
+  assessment_id: number
+  evaluatee_id: number
+  score: number
+  feedback: string
+  strengths?: string
+  improvements?: string
 }
 
 // 传统评分请求（兼容性）
@@ -463,7 +494,38 @@ export class EvaluationService {
   }
 
   /**
-   * 19. 删除评估
+   * 19. 提交详细Boss评分
+   */
+  async submitDetailedBossEvaluation(data: SubmitDetailedBossRequest): Promise<ApiResponse<DetailedEvaluation>> {
+    return apiClient.post<DetailedEvaluation>('/evaluations/detailed-boss', data)
+  }
+
+  /**
+   * 20. 提交简单Boss评分
+   */
+  async submitBossEvaluation(data: SubmitBossEvaluationRequest): Promise<ApiResponse<Evaluation>> {
+    return apiClient.post<Evaluation>('/evaluations/boss', data)
+  }
+
+  /**
+   * 21. 获取Boss评估任务列表
+   */
+  async getBossEvaluationTasks(assessment_id?: number): Promise<ApiResponse<EvaluationTask[]>> {
+    const queryParams: Record<string, any> = { type: 'boss' }
+    if (assessment_id) queryParams.assessment_id = assessment_id
+
+    return apiClient.get<EvaluationTask[]>('/evaluations/my-tasks', queryParams)
+  }
+
+  /**
+   * 22. 检查Boss评分权限
+   */
+  async checkBossEvaluationPermission(assessmentId: number, evaluateeId: number): Promise<ApiResponse<{ canEvaluate: boolean; message?: string }>> {
+    return apiClient.get<{ canEvaluate: boolean; message?: string }>(`/evaluations/boss-permission/${assessmentId}/${evaluateeId}`)
+  }
+
+  /**
+   * 23. 删除评估
    */
   async deleteEvaluation(id: number): Promise<ApiResponse<void>> {
     return apiClient.delete<void>(`/evaluations/${id}`)
@@ -531,7 +593,8 @@ export const evaluationUtils = {
   getTypeText(type: EvaluationType): string {
     const typeMap = {
       self: '自评',
-      leader: '领导评分'
+      leader: '领导评分',
+      boss: '上级评分'
     }
     return typeMap[type] || '未知'
   },
@@ -698,5 +761,93 @@ export const evaluationUtils = {
    */
   generateTaskId(type: EvaluationType, assessmentId: number, evaluateeId: number): string {
     return `${type}_${assessmentId}_${evaluateeId}`
+  },
+
+  /**
+   * 检查Boss评分权限
+   */
+  canDoBossEvaluation(currentUser: any, targetUser: any): boolean {
+    // 检查当前用户是否是目标用户的上级（即目标用户直属领导的领导）
+    return currentUser?.id === targetUser?.leader?.leader?.id
+  },
+
+  /**
+   * 计算三维度评估进度
+   */
+  calculateThreeDimensionProgress(participant: ProgressParticipant, bossEnabled: boolean = false): {
+    completed: number
+    total: number
+    percentage: number
+  } {
+    let completed = 0
+    let total = 2 // 自评 + 领导评分
+
+    if (participant.self_status === 'completed') completed++
+    if (participant.leader_status === 'completed') completed++
+
+    // 如果启用Boss评分，增加到总数中
+    if (bossEnabled) {
+      total++
+      if (participant.boss_status === 'completed') completed++
+    }
+
+    return {
+      completed,
+      total,
+      percentage: Math.round((completed / total) * 100)
+    }
+  },
+
+  /**
+   * 获取评估权重配置
+   */
+  getEvaluationWeights(scoringRules: ScoringRules): {
+    selfWeight: number
+    leaderWeight: number
+    bossWeight: number
+    hasBossEvaluation: boolean
+  } {
+    const bossEvaluation = scoringRules.boss_evaluation
+    const hasBossEvaluation = bossEvaluation?.enabled && (bossEvaluation?.weight_in_final || 0) > 0
+
+    return {
+      selfWeight: scoringRules.self_evaluation.weight_in_final,
+      leaderWeight: scoringRules.leader_evaluation.weight_in_final,
+      bossWeight: bossEvaluation?.weight_in_final || 0,
+      hasBossEvaluation
+    }
+  },
+
+  /**
+   * 计算最终评分（支持三维度）
+   */
+  calculateFinalScore(
+    selfScore: number | null,
+    leaderScore: number | null,
+    bossScore: number | null,
+    weights: { selfWeight: number, leaderWeight: number, bossWeight: number }
+  ): number {
+    let totalScore = 0
+    let totalWeight = 0
+
+    // 自评分数
+    if (selfScore !== null) {
+      totalScore += selfScore * weights.selfWeight
+      totalWeight += weights.selfWeight
+    }
+
+    // 领导评分
+    if (leaderScore !== null) {
+      totalScore += leaderScore * weights.leaderWeight
+      totalWeight += weights.leaderWeight
+    }
+
+    // Boss评分（可选）
+    if (bossScore !== null && weights.bossWeight > 0) {
+      totalScore += bossScore * weights.bossWeight
+      totalWeight += weights.bossWeight
+    }
+
+    return totalWeight > 0 ? totalScore / totalWeight : 0
   }
 }

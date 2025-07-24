@@ -377,7 +377,7 @@ export default function EmployeeEvaluationResultPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {/* 自评得分 */}
               <div className="text-center">
                 <div className="mb-3">
@@ -397,25 +397,20 @@ export default function EmployeeEvaluationResultPage() {
                       {getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).level}
                     </Badge>
                     {getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).description && (
-                      <div className="text-xs text-gray-500 max-w-32 mx-auto">
+                      <div className="text-xs text-gray-500">
                         {getOverallScoreLevel(Number(comparisonData.self_evaluation.score)).description}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500">未完成</div>
-                )}
-                {comparisonData.self_evaluation?.submitted_at && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    {evaluationUtils.formatDateTime(comparisonData.self_evaluation.submitted_at)}
-                  </div>
+                  <div className="text-xs text-gray-500">未完成</div>
                 )}
               </div>
-
+              
               {/* 领导评分 */}
               <div className="text-center">
                 <div className="mb-3">
-                  <div className="text-3xl font-bold text-purple-600">
+                  <div className="text-3xl font-bold text-green-600">
                     {comparisonData.leader_evaluation?.score 
                       ? Number(comparisonData.leader_evaluation.score).toFixed(1)
                       : '--'}
@@ -431,49 +426,113 @@ export default function EmployeeEvaluationResultPage() {
                       {getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).level}
                     </Badge>
                     {getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).description && (
-                      <div className="text-xs text-gray-500 max-w-32 mx-auto">
+                      <div className="text-xs text-gray-500">
                         {getOverallScoreLevel(Number(comparisonData.leader_evaluation.score)).description}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500">未完成</div>
+                  <div className="text-xs text-gray-500">未完成</div>
                 )}
-                {comparisonData.leader_evaluation?.submitted_at && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    {evaluationUtils.formatDateTime(comparisonData.leader_evaluation.submitted_at)}
+              </div>
+
+              {/* Boss评分 */}
+              <div className="text-center">
+                <div className="mb-3">
+                  <div className="text-3xl font-bold text-purple-600">
+                    {comparisonData.boss_evaluation?.score 
+                      ? Number(comparisonData.boss_evaluation.score).toFixed(1)
+                      : '--'}
+                  </div>
+                  <div className="text-sm text-gray-600">上级评分</div>
+                </div>
+                {comparisonData.boss_evaluation?.score ? (
+                  <div className="space-y-2">
+                    <Badge 
+                      variant="outline" 
+                      className={`${getOverallScoreLevel(Number(comparisonData.boss_evaluation.score)).bgColor} ${getOverallScoreLevel(Number(comparisonData.boss_evaluation.score)).color} ${getOverallScoreLevel(Number(comparisonData.boss_evaluation.score)).borderColor}`}
+                    >
+                      {getOverallScoreLevel(Number(comparisonData.boss_evaluation.score)).level}
+                    </Badge>
+                    {getOverallScoreLevel(Number(comparisonData.boss_evaluation.score)).description && (
+                      <div className="text-xs text-gray-500">
+                        {getOverallScoreLevel(Number(comparisonData.boss_evaluation.score)).description}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-gray-500">
+                    {templateData?.scoring_rules?.boss_evaluation?.enabled ? '未完成' : '不适用'}
                   </div>
                 )}
               </div>
 
-              {/* 分差 */}
+              {/* 分差分析 */}
               <div className="text-center">
                 <div className="mb-3">
-                  <div className={`text-3xl font-bold flex items-center justify-center gap-2 ${
-                    getScoreDifferenceValue(comparisonData) !== undefined
-                      ? getDifferenceColor(getScoreDifferenceValue(comparisonData))
-                      : 'text-gray-600'
-                  }`}>
-                    {getScoreDifferenceValue(comparisonData) !== undefined
-                      ? getDifferenceIcon(getScoreDifferenceValue(comparisonData))
-                      : <Minus className="w-4 h-4 text-gray-600" />
-                    }
-                    {getScoreDifferenceValue(comparisonData) !== undefined
-                      ? Math.abs(Number(getScoreDifferenceValue(comparisonData))).toFixed(1)
-                      : '--'
-                    }
+                  <div className="space-y-1">
+                    {/* 自评与领导评分差 */}
+                    {comparisonData.self_evaluation?.score && comparisonData.leader_evaluation?.score && (
+                      <div className="flex items-center justify-center gap-1">
+                        {(() => {
+                          const diff = Number(comparisonData.leader_evaluation.score) - Number(comparisonData.self_evaluation.score)
+                          return (
+                            <>
+                              {diff > 0 ? (
+                                <TrendingUp className="w-4 h-4 text-green-500" />
+                              ) : diff < 0 ? (
+                                <TrendingDown className="w-4 h-4 text-red-500" />
+                              ) : (
+                                <Minus className="w-4 h-4 text-gray-400" />
+                              )}
+                              <span className={`text-sm font-medium ${
+                                diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-600'
+                              }`}>
+                                {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+                              </span>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    )}
+                    
+                    {/* Boss评分与领导评分差 */}
+                    {comparisonData.boss_evaluation?.score && comparisonData.leader_evaluation?.score && (
+                      <div className="flex items-center justify-center gap-1">
+                        {(() => {
+                          const diff = Number(comparisonData.boss_evaluation.score) - Number(comparisonData.leader_evaluation.score)
+                          return (
+                            <>
+                              {diff > 0 ? (
+                                <TrendingUp className="w-3 h-3 text-purple-500" />
+                              ) : diff < 0 ? (
+                                <TrendingDown className="w-3 h-3 text-orange-500" />
+                              ) : (
+                                <Minus className="w-3 h-3 text-gray-400" />
+                              )}
+                              <span className={`text-xs ${
+                                diff > 0 ? 'text-purple-600' : diff < 0 ? 'text-orange-600' : 'text-gray-600'
+                              }`}>
+                                Boss {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+                              </span>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-sm text-gray-600">分差</div>
+                  <div className="text-sm text-gray-600">评分差异</div>
                 </div>
-                <div className="text-sm text-gray-500">
-                  {getScoreDifferenceValue(comparisonData) !== undefined
-                    ? getScoreDifferenceValue(comparisonData) > 0
-                      ? '领导评分更高'
-                      : getScoreDifferenceValue(comparisonData) < 0
-                        ? '自评更高'
-                        : '评分一致'
-                    : '暂无对比数据'
-                  }
+                
+                <div className="space-y-1">
+                  <div className="text-xs text-gray-500">
+                    领导 vs 自评
+                  </div>
+                  {comparisonData.boss_evaluation?.score && (
+                    <div className="text-xs text-gray-500">
+                      上级 vs 领导
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -481,10 +540,11 @@ export default function EmployeeEvaluationResultPage() {
         </Card>
 
         <Tabs defaultValue="comparison" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="comparison">分项对比</TabsTrigger>
             <TabsTrigger value="self">自评详情</TabsTrigger>
             <TabsTrigger value="leader">领导评分</TabsTrigger>
+            <TabsTrigger value="boss" disabled={!comparisonData.boss_evaluation}>上级评分</TabsTrigger>
           </TabsList>
 
           <TabsContent value="comparison" className="space-y-4">
@@ -572,7 +632,7 @@ export default function EmployeeEvaluationResultPage() {
                               {/* 等级差异提示 */}
                               {selfLevel.level !== leaderLevel.level && (
                                 <div className="mt-2 text-xs text-gray-500 bg-yellow-50 p-2 rounded">
-                                  等级差异：自评为“{selfLevel.level}”，领导评价为“{leaderLevel.level}”
+                                  等级差异：自评为"{selfLevel.level}"，领导评价为"{leaderLevel.level}"
                                 </div>
                               )}
                             </div>
@@ -766,6 +826,98 @@ export default function EmployeeEvaluationResultPage() {
                   <div className="text-center py-8 text-gray-500">
                     <MessageSquare className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                     <p>领导尚未完成评分</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="boss" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="w-5 h-5 text-purple-600" />
+                  上级评分详情
+                </CardTitle>
+                <CardDescription>
+                  上级对您的评估内容和详细评分
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {comparisonData.boss_evaluation ? (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-purple-600 mb-2">
+                        {Number(comparisonData.boss_evaluation.score).toFixed(1)}
+                      </div>
+                      <div className="text-gray-600">
+                        {getScoreLevel(Number(comparisonData.boss_evaluation.score))}
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      {comparisonData.boss_evaluation.detailed_scores.map((category) => (
+                        <div key={category.categoryId} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-semibold">
+                              {getCategoryName(category.categoryId)}
+                            </h3>
+                            <Badge variant="outline">
+                              {Number(category.categoryScore).toFixed(1)} 分
+                            </Badge>
+                          </div>
+                          <div className="space-y-2">
+                            {category.items.map((item) => {
+                              const itemLevel = getItemScoreLevel(item.score, category.categoryId, item.itemId)
+                              return (
+                                <div key={item.itemId} className="p-3 bg-purple-50 rounded-lg">
+                                  {/* 项目标题和分数 */}
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <span className="font-medium truncate">
+                                        {getItemName(category.categoryId, item.itemId)}
+                                      </span>
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs whitespace-nowrap ${itemLevel.bgColor} ${itemLevel.color} ${itemLevel.borderColor}`}
+                                      >
+                                        {itemLevel.level}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-right flex-shrink-0">
+                                      <span className="text-purple-600 font-medium text-lg">
+                                        {Number(item.score).toFixed(1)}
+                                      </span>
+                                      <span className="text-xs text-gray-500 ml-1">分</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 等级描述和评论 */}
+                                  <div className="space-y-1">
+                                    {itemLevel.description && (
+                                      <div className="text-xs text-gray-500 bg-white/50 px-2 py-1 rounded">
+                                        {itemLevel.description}
+                                      </div>
+                                    )}
+                                    {item.comment && (
+                                      <p className="text-sm text-gray-600 bg-white/50 px-2 py-1 rounded">{item.comment}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p>
+                      {templateData?.scoring_rules?.boss_evaluation?.enabled 
+                        ? '上级尚未完成评分' 
+                        : '此考核不包含上级评分'}
+                    </p>
                   </div>
                 )}
               </CardContent>

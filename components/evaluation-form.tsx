@@ -32,7 +32,8 @@ import {
   CreateEvaluationDraftRequest,
   UpdateEvaluationDraftRequest,
   SubmitDetailedSelfRequest,
-  SubmitDetailedLeaderRequest
+  SubmitDetailedLeaderRequest,
+  SubmitDetailedBossRequest
 } from "@/lib/evaluation"
 
 interface EvaluationFormProps {
@@ -112,7 +113,7 @@ export default function EvaluationForm({
     if (existingDraft) {
       // 加载现有草稿
       const scores = existingDraft.detailed_scores || []
-      const review = existingDraft.self_review || existingDraft.leader_review || existingDraft.feedback || ''
+      const review = existingDraft.self_review || existingDraft.leader_review || existingDraft.boss_review || existingDraft.feedback || ''
       const strengthsValue = existingDraft.strengths || ''
       const improvementsValue = existingDraft.improvements || ''
       
@@ -245,6 +246,7 @@ export default function EvaluationForm({
       const draftData = {
         self_review: type === 'self' ? cleanText(overallReview) : undefined,
         leader_review: type === 'leader' ? cleanText(overallReview) : undefined,
+        boss_review: type === 'boss' ? cleanText(overallReview) : undefined,
         strengths: cleanText(strengths),
         improvements: cleanText(improvements),
         detailed_scores: detailedScores.length > 0 ? detailedScores : undefined
@@ -253,6 +255,7 @@ export default function EvaluationForm({
       // 验证是否有实际内容需要保存
       const hasContent = draftData.self_review || 
                         draftData.leader_review || 
+                        draftData.boss_review ||
                         draftData.strengths || 
                         draftData.improvements || 
                         (draftData.detailed_scores && draftData.detailed_scores.length > 0)
@@ -281,9 +284,9 @@ export default function EvaluationForm({
           throw new Error('创建草稿失败: 缺少必需参数 (assessmentId 或 type)')
         }
         
-        // 验证领导评分时必须有 evaluateeId
-        if (type === 'leader' && !evaluateeId) {
-          throw new Error('创建草稿失败: 领导评分必须指定被评估员工ID')
+        // 验证领导评分或Boss评分时必须有 evaluateeId
+        if ((type === 'leader' || type === 'boss') && !evaluateeId) {
+          throw new Error(`创建草稿失败: ${type === 'leader' ? '领导评分' : 'Boss评分'}必须指定被评估员工ID`)
         }
         
         const createData: CreateEvaluationDraftRequest = {
@@ -430,7 +433,7 @@ export default function EvaluationForm({
         }
         await evaluationService.submitDetailedSelfEvaluation(submitData)
         toast.success('自评提交成功')
-      } else {
+      } else if (type === 'leader') {
         if (!evaluateeId) {
           toast.error('缺少被评估人信息')
           return
@@ -445,6 +448,21 @@ export default function EvaluationForm({
         }
         await evaluationService.submitDetailedLeaderEvaluation(submitData)
         toast.success('领导评分提交成功')
+      } else if (type === 'boss') {
+        if (!evaluateeId) {
+          toast.error('缺少被评估人信息')
+          return
+        }
+        const submitData: SubmitDetailedBossRequest = {
+          assessment_id: assessmentId,
+          evaluatee_id: evaluateeId,
+          boss_review: overallReview,
+          strengths,
+          improvements,
+          detailed_scores: detailedScores
+        }
+        await evaluationService.submitDetailedBossEvaluation(submitData)
+        toast.success('上级评分提交成功')
       }
 
       onSubmit?.()
@@ -511,7 +529,7 @@ export default function EvaluationForm({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg">
-                {type === 'self' ? '自我评估' : '领导评分'}
+                {type === 'self' ? '自我评估' : type === 'leader' ? '领导评分' : '上级评分'}
               </CardTitle>
               <p className="text-sm text-gray-600 mt-1">
                 {template.assessment_title} · {template.assessment_period}
@@ -626,11 +644,17 @@ export default function EvaluationForm({
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="overall-review" className="text-sm font-medium">
-                {type === 'self' ? '自我评价' : '评价意见'} *
+                {type === 'self' ? '自我评价' : type === 'leader' ? '评价意见' : '上级评价'} *
               </Label>
               <Textarea
                 id="overall-review"
-                placeholder={type === 'self' ? '请简要总结本期工作表现...' : '请对该员工的工作表现进行评价...'}
+                placeholder={
+                  type === 'self' 
+                    ? '请简要总结本期工作表现...' 
+                    : type === 'leader'
+                      ? '请对该员工的工作表现进行评价...'
+                      : '请从上级视角对该员工进行整体评价...'
+                }
                 value={overallReview}
                 onChange={(e) => handleOverallReviewChange(e.target.value)}
                 disabled={submitting}
@@ -716,10 +740,10 @@ export default function EvaluationForm({
                     <AlertDialogHeader>
                       <AlertDialogTitle className="flex items-center gap-2">
                         <AlertTriangle className="w-5 h-5 text-orange-500" />
-                        确认提交{type === 'self' ? '自评' : '评分'}
+                        确认提交{type === 'self' ? '自评' : type === 'leader' ? '评分' : '上级评分'}
                       </AlertDialogTitle>
                       <AlertDialogDescription>
-                        您确定要提交{type === 'self' ? '自评' : '对该员工的评分'}吗？
+                        您确定要提交{type === 'self' ? '自评' : type === 'leader' ? '对该员工的评分' : '上级评分'}吗？
                         <br />
                         <span className="text-red-600 font-medium">提交后将无法修改，请确认所有评分内容准确无误。</span>
                       </AlertDialogDescription>

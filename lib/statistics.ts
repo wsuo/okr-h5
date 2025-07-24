@@ -15,6 +15,7 @@ export interface DashboardStatistics {
     average_score: number
     self_average: number
     leader_average: number
+    boss_average: number  // 新增Boss评分平均分
   }
   department_stats: DepartmentStat[]
   recent_assessments: RecentAssessment[]
@@ -29,8 +30,10 @@ export interface DepartmentStat {
   participant_count: number
   avg_self_score: number
   avg_leader_score: number
+  avg_boss_score: number  // 新增Boss评分平均分
   self_completion_rate: number
   leader_completion_rate: number
+  boss_completion_rate: number  // 新增Boss评分完成率
 }
 
 // 最近考核数据接口
@@ -68,6 +71,7 @@ export interface AssessmentStat {
   participant_count: number
   self_completion_rate: number
   leader_completion_rate: number
+  boss_completion_rate: number  // 新增Boss评分完成率
   overall_completion_rate: number
   average_score: number
   created_at: string
@@ -113,13 +117,16 @@ export interface PerformanceListItem {
   scores: {
     self_score: number
     leader_score: number
+    boss_score?: number  // 新增Boss评分
     final_score: number
   }
   completion: {
     self_completed: boolean
     leader_completed: boolean
+    boss_completed?: boolean  // 新增Boss评分完成状态
     self_submitted_at: string | null
     leader_submitted_at: string | null
+    boss_submitted_at?: string | null  // 新增Boss评分提交时间
   }
 }
 
