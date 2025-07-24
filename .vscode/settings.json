@@ -1,0 +1,16 @@
+{
+  // 其他配置...
+  
+  // 为集成终端添加环境变量
+  "terminal.integrated.env.osx": {
+    "PATH": "${env:HOME}/.local/bin:${env:PATH}"
+  },
+  
+  // 或者为所有平台配置
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "zsh",
+      "args": ["-l"]  // 使用登录 shell，确保加载所有配置
+    }
+  }
+}
