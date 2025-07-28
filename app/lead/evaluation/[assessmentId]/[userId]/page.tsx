@@ -521,7 +521,7 @@ export default function LeaderEvaluationPage() {
         })()}
 
         {/* 草稿恢复提醒 */}
-        {existingDraft && !viewMode && (
+        {existingDraft && existingDraft.detailed_scores && !viewMode && (
           <Alert className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50">
             <FileText className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
@@ -547,7 +547,7 @@ export default function LeaderEvaluationPage() {
           assessmentId={assessmentId}
           evaluateeId={userId}
           type="leader"
-          existingDraft={existingDraft}
+          existingDraft={existingDraft && existingDraft.detailed_scores ? existingDraft : undefined}
           onSubmit={handleSubmitSuccess}
           onSubmitError={handleSubmitError}
           onSaveDraft={handleDraftSaved}

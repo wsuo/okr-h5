@@ -442,4 +442,514 @@ Unhandled Runtime ErrorError: Cannot read properties of undefined (reading 'enab
     "path": "/api/v1/evaluations/my?assessment_id=17"
 }
   
+  ultrathink
+  页面：http://localhost:3020/lead/evaluation/17/7
+ 我先跟你描述一个问题：我作为领导，首次点击页面上的开始评分，准备给员工评分的时候，我发现页面上有一个 ‘检测到未完成的评分草稿，已为您自动加载。上次保存时间: 2025/7/28 23:57:38’ ，这明显是不对的，因为我是第一次进来，哪里来的草稿。
+ 我注意到你请求的接口是：http://localhost:3010/api/v1/evaluations?assessment_id=17&evaluatee_id=7&type=leader
+ 返回值：
+ {    "code": 200,    "message": "success",    "data": {        "items": [            {                "id": 17,                "type": "leader",                "score": "0.00",                "feedback": null,                "strengths": null,                "improvements": null,                "detailed_scores": null,
+ 
+ 你可以根据 detailed_scores 判断，作为领导，如果 detailed_scores 字段为空，那就说明领导是第一次点进来，那么就没有评分，那么就不用展示那一段提示信息。
+ 
+ ultrathink
+ 接口 http://localhost:3010/api/v1/evaluations/comparison/17/7
+ 返回值：{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "assessment_id": 17,
+        "user_id": 7,
+        "self_evaluation": {
+            "id": 16,
+            "type": "self",
+            "score": "98.36",
+            "feedback": "似懂非懂风光好风光不放过",
+            "strengths": "发个好人是听歌风格v说",
+            "improvements": "啊是我如果我二哥说过额",
+            "detailed_scores": [
+                {
+                    "items": [
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683517930",
+                            "comment": ""
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683526856",
+                            "comment": ""
+                        },
+                        {
+                            "score": 97,
+                            "itemId": "item_1753683527398",
+                            "comment": ""
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683527894",
+                            "comment": ""
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683528466",
+                            "comment": "asdfasfadsfasfewfaesfaswfaw"
+                        }
+                    ],
+                    "categoryId": "category_1753683181378",
+                    "categoryScore": 98.4
+                },
+                {
+                    "items": [
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683578973",
+                            "comment": ""
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683585110",
+                            "comment": ""
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683585710",
+                            "comment": ""
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683586161",
+                            "comment": ""
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683586593",
+                            "comment": "fgbgdfgdfgdgd"
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683587064",
+                            "comment": ""
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683587494",
+                            "comment": "asfasfawer24r34r43"
+                        }
+                    ],
+                    "categoryId": "category_1753683487867",
+                    "categoryScore": 98.3
+                }
+            ],
+            "status": "submitted",
+            "submitted_at": "2025-07-27T23:56:23.000Z",
+            "created_at": "2025-07-28T07:55:19.000Z",
+            "updated_at": "2025-07-28T07:56:23.000Z",
+            "evaluator": {
+                "id": 7,
+                "username": "wyx",
+                "password": "$2b$10$YfQAOclk1CIMFrP4.vDUluGJAC00hoBPKnT5fd9pTRMrjF3KEBlgu",
+                "name": "wyx",
+                "email": "wangsuoo@example.com",
+                "phone": "13800138000",
+                "avatar": null,
+                "status": 1,
+                "join_date": "2023-03-15",
+                "position": "全栈工程师",
+                "department_id": 1,
+                "leader_id": 3,
+                "created_at": "2025-07-08T01:43:10.000Z",
+                "updated_at": "2025-07-16T06:53:18.000Z",
+                "deleted_at": null
+            },
+            "detailed_scores_with_template": [
+                {
+                    "items": [
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683517930",
+                            "comment": "",
+                            "itemName": "工作饱和度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683526856",
+                            "comment": "",
+                            "itemName": "工作执行度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 97,
+                            "itemId": "item_1753683527398",
+                            "comment": "",
+                            "itemName": "工作完成度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683527894",
+                            "comment": "",
+                            "itemName": "工作效率",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683528466",
+                            "comment": "asdfasfadsfasfewfaesfaswfaw",
+                            "itemName": "工作质量",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        }
+                    ],
+                    "categoryId": "category_1753683181378",
+                    "categoryScore": 98.4,
+                    "categoryName": "工作绩效",
+                    "categoryWeight": 60
+                },
+                {
+                    "items": [
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683578973",
+                            "comment": "",
+                            "itemName": "工作态度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683585110",
+                            "comment": "",
+                            "itemName": "审批流程",
+                            "itemWeight": 15,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683585710",
+                            "comment": "",
+                            "itemName": "日常出勤",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 98,
+                            "itemId": "item_1753683586161",
+                            "comment": "",
+                            "itemName": "工作汇报",
+                            "itemWeight": 15,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683586593",
+                            "comment": "fgbgdfgdfgdgd",
+                            "itemName": "团队活动",
+                            "itemWeight": 10,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683587064",
+                            "comment": "",
+                            "itemName": "办公室环境维护",
+                            "itemWeight": 10,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 99,
+                            "itemId": "item_1753683587494",
+                            "comment": "asfasfawer24r34r43",
+                            "itemName": "规章制度遵守",
+                            "itemWeight": 10,
+                            "maxScore": 100
+                        }
+                    ],
+                    "categoryId": "category_1753683487867",
+                    "categoryScore": 98.3,
+                    "categoryName": "日常管理",
+                    "categoryWeight": 40
+                }
+            ]
+        },
+        "leader_evaluation": {
+            "id": 17,
+            "type": "leader",
+            "score": "88.04",
+            "feedback": "个好结果环境",
+            "strengths": "发个人格人格",
+            "improvements": "4而哥哥 地方好人",
+            "detailed_scores": [
+                {
+                    "items": [
+                        {
+                            "score": 80,
+                            "itemId": "item_1753683517930",
+                            "comment": ""
+                        },
+                        {
+                            "score": 89,
+                            "itemId": "item_1753683526856",
+                            "comment": ""
+                        },
+                        {
+                            "score": 92,
+                            "itemId": "item_1753683527398",
+                            "comment": ""
+                        },
+                        {
+                            "score": 93,
+                            "itemId": "item_1753683527894",
+                            "comment": ""
+                        },
+                        {
+                            "score": 86,
+                            "itemId": "item_1753683528466",
+                            "comment": "阿斯顿发送地方"
+                        }
+                    ],
+                    "categoryId": "category_1753683181378",
+                    "categoryScore": 88.00000000000001
+                },
+                {
+                    "items": [
+                        {
+                            "score": 88,
+                            "itemId": "item_1753683578973",
+                            "comment": ""
+                        },
+                        {
+                            "score": 84,
+                            "itemId": "item_1753683585110",
+                            "comment": ""
+                        },
+                        {
+                            "score": 100,
+                            "itemId": "item_1753683585710",
+                            "comment": ""
+                        },
+                        {
+                            "score": 76,
+                            "itemId": "item_1753683586161",
+                            "comment": ""
+                        },
+                        {
+                            "score": 91,
+                            "itemId": "item_1753683586593",
+                            "comment": ""
+                        },
+                        {
+                            "score": 88,
+                            "itemId": "item_1753683587064",
+                            "comment": ""
+                        },
+                        {
+                            "score": 86,
+                            "itemId": "item_1753683587494",
+                            "comment": "啊实打实大"
+                        }
+                    ],
+                    "categoryId": "category_1753683487867",
+                    "categoryScore": 88.1
+                }
+            ],
+            "status": "submitted",
+            "submitted_at": "2025-07-28T00:28:10.000Z",
+            "created_at": "2025-07-28T07:57:38.000Z",
+            "updated_at": "2025-07-28T08:28:09.000Z",
+            "evaluator": {
+                "id": 3,
+                "username": "lisi",
+                "password": "$2b$10$YfQAOclk1CIMFrP4.vDUluGJAC00hoBPKnT5fd9pTRMrjF3KEBlgu",
+                "name": "李四",
+                "email": "ws28213@yeah.net",
+                "phone": "13800138000",
+                "avatar": null,
+                "status": 1,
+                "join_date": "2022-08-10",
+                "position": "技术经理",
+                "department_id": 1,
+                "leader_id": null,
+                "created_at": "2025-07-07T15:21:33.000Z",
+                "updated_at": "2025-07-09T03:42:07.000Z",
+                "deleted_at": null
+            },
+            "detailed_scores_with_template": [
+                {
+                    "items": [
+                        {
+                            "score": 80,
+                            "itemId": "item_1753683517930",
+                            "comment": "",
+                            "itemName": "工作饱和度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 89,
+                            "itemId": "item_1753683526856",
+                            "comment": "",
+                            "itemName": "工作执行度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 92,
+                            "itemId": "item_1753683527398",
+                            "comment": "",
+                            "itemName": "工作完成度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 93,
+                            "itemId": "item_1753683527894",
+                            "comment": "",
+                            "itemName": "工作效率",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 86,
+                            "itemId": "item_1753683528466",
+                            "comment": "阿斯顿发送地方",
+                            "itemName": "工作质量",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        }
+                    ],
+                    "categoryId": "category_1753683181378",
+                    "categoryScore": 88,
+                    "categoryName": "工作绩效",
+                    "categoryWeight": 60
+                },
+                {
+                    "items": [
+                        {
+                            "score": 88,
+                            "itemId": "item_1753683578973",
+                            "comment": "",
+                            "itemName": "工作态度",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 84,
+                            "itemId": "item_1753683585110",
+                            "comment": "",
+                            "itemName": "审批流程",
+                            "itemWeight": 15,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 100,
+                            "itemId": "item_1753683585710",
+                            "comment": "",
+                            "itemName": "日常出勤",
+                            "itemWeight": 20,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 76,
+                            "itemId": "item_1753683586161",
+                            "comment": "",
+                            "itemName": "工作汇报",
+                            "itemWeight": 15,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 91,
+                            "itemId": "item_1753683586593",
+                            "comment": "",
+                            "itemName": "团队活动",
+                            "itemWeight": 10,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 88,
+                            "itemId": "item_1753683587064",
+                            "comment": "",
+                            "itemName": "办公室环境维护",
+                            "itemWeight": 10,
+                            "maxScore": 100
+                        },
+                        {
+                            "score": 86,
+                            "itemId": "item_1753683587494",
+                            "comment": "啊实打实大",
+                            "itemName": "规章制度遵守",
+                            "itemWeight": 10,
+                            "maxScore": 100
+                        }
+                    ],
+                    "categoryId": "category_1753683487867",
+                    "categoryScore": 88.1,
+                    "categoryName": "日常管理",
+                    "categoryWeight": 40
+                }
+            ]
+        },
+        "comparison_analysis": {
+            "self_vs_leader": {
+                "score_difference": 10.319999999999993,
+                "self_higher": true,
+                "agreement_level": "low"
+            }
+        }
+    },
+    "timestamp": "2025-07-28T08:28:35.050Z",
+    "path": "/api/v1/evaluations/comparison/17/7"
+}
+
+这个是评分对比的接口，缺少 ‘当前评估是否完成’ 的字段，前端不知道这个评估是否完成了，因为只返回了员工自评和领导评分的信息，但是不知道老板评分的进度，所以就无法推断出当前评估的状态。
+并且请你根据评分的情况，返回当前评分的总分，员工自评+领导评分 * 0.9 ，这个公式需要读取配置，读取评估的 ‘template_config’ 配置，然后计算一个当前的得分，如果没有领导评分就只计算自评分数的最终分。
+
+ultrathink
+我修改了这个接口的返回值：
+},        "boss_evaluation": null,        "evaluation_status": {            "is_completed": false,            "completion_status": "waiting_for_boss",            "has_self_evaluation": true,            "has_leader_evaluation": true,            "has_boss_evaluation": false,            "boss_enabled": true,            "scoring_mode": "two_tier_weighted",            "current_score": 92.17,            "score_breakdown": {                "self_score": 98.36,                "leader_score": 88.04,                "boss_score": 0,                "weighted_self_score": 39.343999999999994,                "weighted_leader_score": 52.824000000000005,                "weighted_boss_score": 0            },            "weight_config": {                "self_weight": 0.36000000000000004,                "leader_weight": 0.54,                "boss_weight": 0.1,                "boss_enabled": true            }        },        "comparison_analysis": {            "self_vs_leader": {                "score_difference": 10.319999999999993,                "self_higher": true,                "agreement_level": "low"            }        }    },    "timestamp": "2025-07-28T08:41:05.039Z",    "path": "/api/v1/evaluations/comparison/17/7"}
+
+在 ‘http://localhost:3020/lead/evaluation/result/17?userId=7’ 页面
+
+修改内容总结
+
+  1. 增加了老板评分信息：
+    - 新增 boss_evaluation 字段，包含老板评分的详细信息
+    - 包含老板评分的详细分项和模板信息
+  2. 增加了评估状态信息：
+    - evaluation_status 对象包含完整的评估状态信息：
+        - is_completed: 评估是否完全完成
+      - completion_status: 完成状态（pending、partial、waiting_for_boss、completed）
+      - has_self_evaluation、has_leader_evaluation、has_boss_evaluation: 各阶段完成状态
+      - boss_enabled: 是否启用Boss评分
+  3. 增加了当前得分计算：
+    - current_score: 根据配置计算的当前总分
+    - score_breakdown: 详细的分数分解
+    - weight_config: 权重配置信息
+    - scoring_mode: 评分模式（traditional 或 two_tier_weighted）
+    
+ 你在前端展示的时候，需要根据这些字段进行判断，你目前展示了：自评得分：98.4领导评分：88.0 最终得分：88.0，你这个最终得分是错误的，需要展示 ‘当前得分’，取值current_score 。需要在页面的这个元素的位置（document.querySelector("#radix-«r0»-content-overview > div > div.p-6.pt-0 > div > div > div.flex.items-center.justify-between.mb-3 > div.inline-flex.items-center.rounded-full.border.px-2\\.5.py-0\\.5.text-xs.font-semibold.transition-colors.focus\\:outline-none.focus\\:ring-2.focus\\:ring-ring.focus\\:ring-offset-2.hover\\:bg-primary\\/80.bg-green-100.text-green-800.border-green-200")）展示 这个字段 "completion_status": "waiting_for_boss", 的中文标签名称。
+
+在 ‘http://localhost:3020/lead/evaluation/result/17?userId=7’ 页面
+
+调用了这个接口：
+{    "code": 200,    "message": "success",    "data": {        "assessment_id": 17,        "assessment_title": "2025年05月绩效考核",        "total_participants": 1,        "self_completed_count": 1,        "leader_completed_count": 1,        "boss_completed_count": 0,        "fully_completed_count": 0,        "self_completion_rate": 100,        "leader_completion_rate": 100,        "boss_completion_rate": 0,        "overall_completion_rate": 0,        "participants": [            {                "user_id": 7,                "user_name": "wyx",                "department": "技术部",                "self_status": "completed",                "leader_status": "completed",                "boss_status": "not_started",                "self_completed_at": "2025-07-27T23:56:23.000Z",                "leader_completed_at": "2025-07-28T00:28:10.000Z",                "boss_completed_at": null            }        ],        "deadline": "2025-07-31",        "days_remaining": 3,        "is_overdue": false    },    "timestamp": "2025-07-28T08:28:34.979Z",    "path": "/api/v1/evaluations/progress/17"}
+
+如果 boss_status 有值，需要根据这个字段判断：
+
+ "self_status": "completed",                "leader_status": "completed",                "boss_status": "not_started" 这三个字段都是 completed 才能说明当前评估是已完成的。如果是其他状态，请你展示其他状态对应的中文标签，以提示用户。
   
+  
+  ultrathink
+  请你测试你刚才生成的接口文档，逐个测试，老板账号密码为 boss/123456 ，如果没有问题，请你测试后恢复原数据，我自己再手动测试。
+  
+  
+  我觉得你没有理解逻辑，我现在如果是在两层加权模式下面，流程是员工自评，领导评分，然后是老板评分，只有员工和领导是需要绑定上下级关系的，而老板和任何人都不需要绑定上下级关系就可以评分，只要有一个考核，他是两层加权模式，并且已经领导评分完毕了，那么这就是老板的一个待办，接下来就是要交给老板评分来完成最后一步。请你根据这个逻辑修改相关接口。
+  
+  ultrathink
+  还是有问题，老板评分时候不需要读取模板的评分项目，因为老板是统筹的角度去评分的，老板评分的内容应该只是一句话（非必填），因为老板的时间很少，他不可能一个项目一个项目的去评分，也不了解员工，所以老板是最终总结的角色，只需要输入分数、评语，即可，我们后端对这块内容做一个保存，前端查询的时候返回给前端即可。
+  
+  请你继续，测试并修改完成之后，更新 业务 下面的文档。

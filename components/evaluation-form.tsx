@@ -629,6 +629,7 @@ export default function EvaluationForm({
                 value={scoreItem}
                 onChange={(value) => updateScoreItem(item.id, value)}
                 disabled={submitting}
+                globalScoringCriteria={template.scoring_criteria}
               />
             )
           })}

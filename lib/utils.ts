@@ -23,3 +23,32 @@ export function safeParseUserInfo(key: string = "userInfo") {
     return null
   }
 }
+
+/**
+ * 检查用户是否具有指定角色
+ * @param userInfo 用户信息对象
+ * @param targetRole 目标角色
+ * @returns 是否具有该角色
+ */
+export function hasRole(userInfo: any, targetRole: string): boolean {
+  if (!userInfo) return false
+  
+  return userInfo.username === targetRole || 
+         (userInfo.roles && Array.isArray(userInfo.roles) && userInfo.roles.includes(targetRole)) ||
+         (userInfo.role && userInfo.role === targetRole) ||
+         (userInfo.user_role && userInfo.user_role === targetRole) ||
+         (userInfo.type && userInfo.type === targetRole)
+}
+
+/**
+ * 检查用户是否是Boss
+ * @param userInfo 用户信息对象
+ * @returns 是否是Boss
+ */
+export function isBossUser(userInfo: any): boolean {
+  if (!userInfo) return false
+  
+  return userInfo.username === 'boss' || 
+         userInfo.name === '公司老板' ||
+         hasRole(userInfo, 'boss')
+}

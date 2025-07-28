@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
-import { safeParseUserInfo } from "@/lib/utils"
+import { safeParseUserInfo, isBossUser } from "@/lib/utils"
 import {
   statisticsService,
   DashboardStatistics,
@@ -18,6 +18,11 @@ import {
   PerformanceListItem,
   UserStatisticsDetail
 } from "@/lib/statistics"
+import {
+  evaluationService,
+  BossTask,
+  evaluationUtils
+} from "@/lib/evaluation"
 import { toast } from "sonner"
 
 export default function BossDashboard() {
@@ -33,6 +38,10 @@ export default function BossDashboard() {
   const [departmentStats, setDepartmentStats] = useState<DepartmentStat[]>([])
   const [performanceList, setPerformanceList] = useState<PerformanceListItem[]>([])
   const [userStatsDetail, setUserStatsDetail] = useState<UserStatisticsDetail[]>([])
+  
+  // Boss tasks state
+  const [bossTasks, setBossTasks] = useState<BossTask[]>([])
+  const [pendingTasksCount, setPendingTasksCount] = useState(0)
 
   // Date range for API queries
   const [dateRange, setDateRange] = useState({
@@ -56,12 +65,13 @@ export default function BossDashboard() {
       setLoading(true)
       setError("")
 
-      // Load all statistics data in parallel
+      // Load all statistics data and boss tasks in parallel
       const [
         dashboardResponse,
         departmentStatsResponse,
         performanceListResponse,
-        userStatsDetailResponse
+        userStatsDetailResponse,
+        bossTasksResponse
       ] = await Promise.all([
         statisticsService.getDashboardStatistics(),
         statisticsService.getDepartmentStatistics(),
@@ -70,7 +80,8 @@ export default function BossDashboard() {
           ...dateRange,
           time_dimension: 'week',
           group_by: 'user'
-        })
+        }),
+        evaluationService.getBossTasks()
       ])
 
       // Set data if requests are successful
@@ -85,6 +96,12 @@ export default function BossDashboard() {
       }
       if (userStatsDetailResponse.code === 200) {
         setUserStatsDetail(userStatsDetailResponse.data || [])
+      }
+      if (bossTasksResponse.code === 200) {
+        const tasks = bossTasksResponse.data || []
+        setBossTasks(tasks)
+        const pendingTasks = tasks.filter(task => task.status === 'pending')
+        setPendingTasksCount(pendingTasks.length)
       }
 
     } catch (error: any) {
@@ -274,7 +291,7 @@ export default function BossDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <BossHeader userInfo={userInfo} />
+        <BossHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
         <div className="container mx-auto p-4 max-w-7xl">
           <div className="flex items-center justify-center h-96">
             <div className="flex items-center gap-2">
@@ -290,7 +307,7 @@ export default function BossDashboard() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <BossHeader userInfo={userInfo} />
+        <BossHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
         <div className="container mx-auto p-4 max-w-7xl">
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
@@ -307,13 +324,75 @@ export default function BossDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <BossHeader userInfo={userInfo} />
+      <BossHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
 
       <div className="container mx-auto p-4 max-w-7xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">全员绩效看板</h1>
           <p className="text-gray-600">公司整体绩效数据分析</p>
         </div>
+
+        {/* Boss 待办任务卡片 */}
+        {pendingTasksCount > 0 && (
+          <Card className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-yellow-800">
+                <Crown className="w-5 h-5" />
+                Boss 待办任务
+              </CardTitle>
+              <CardDescription className="text-yellow-700">
+                您有 <strong className="text-yellow-800">{pendingTasksCount}</strong> 项待评分任务
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {bossTasks.filter(task => task.status === 'pending').slice(0, 3).map((task) => (
+                  <div key={task.id} className="flex items-center justify-between p-3 bg-white/60 rounded-lg border border-yellow-300">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-600" />
+                        <span className="font-medium text-gray-900">{task.evaluatee_name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {task.evaluatee_department}
+                        </Badge>
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {task.assessment_title} · 截止：{evaluationUtils.formatDate(task.deadline)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      {task.is_overdue && (
+                        <Badge variant="destructive" className="text-xs">
+                          已逾期
+                        </Badge>
+                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => router.push(`/boss/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
+                        className="bg-yellow-600 hover:bg-yellow-700"
+                      >
+                        立即评分
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                {pendingTasksCount > 3 && (
+                  <div className="text-center pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/boss/evaluation')}
+                      className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+                    >
+                      查看全部 {pendingTasksCount} 项任务
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 总体统计 - 重新设计以充分利用仪表板API数据 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

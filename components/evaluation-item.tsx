@@ -16,6 +16,7 @@ interface EvaluationItemComponentProps {
   onChange: (value: DetailedScoreItem) => void
   disabled?: boolean
   showComment?: boolean
+  globalScoringCriteria?: ScoringCriteria  // 全局评分标准（从模板传入）
 }
 
 export default function EvaluationItemComponent({
@@ -23,7 +24,8 @@ export default function EvaluationItemComponent({
   value,
   onChange,
   disabled = false,
-  showComment = true
+  showComment = true,
+  globalScoringCriteria
 }: EvaluationItemComponentProps) {
   const [showCriteria, setShowCriteria] = useState(false)
 
@@ -44,10 +46,26 @@ export default function EvaluationItemComponent({
     })
   }
 
-  const getScoreLevel = (score: number, criteria: ScoringCriteria) => {
-    if (score >= criteria.excellent.min) return { level: 'excellent', label: '优秀', color: 'bg-green-100 text-green-800' }
-    if (score >= criteria.good.min) return { level: 'good', label: '良好', color: 'bg-blue-100 text-blue-800' }
-    if (score >= criteria.average.min) return { level: 'average', label: '一般', color: 'bg-yellow-100 text-yellow-800' }
+  const getScoreLevel = (score: number, criteria?: ScoringCriteria) => {
+    // 提供默认的评分标准，防止 criteria 不存在或结构不完整
+    const defaultCriteria = {
+      excellent: { min: 90, description: "优秀：超额完成目标，表现突出" },
+      good: { min: 80, description: "良好：完成目标，表现符合预期" },
+      average: { min: 70, description: "一般：基本完成目标，表现一般" },
+      poor: { min: 0, description: "较差：未完成目标，表现不佳" }
+    }
+    
+    // 优先使用项目自身的评分标准，其次使用全局评分标准，最后使用默认标准
+    const safeCriteria = criteria || globalScoringCriteria || defaultCriteria
+    
+    // 确保每个等级都存在
+    const excellent = safeCriteria.excellent || defaultCriteria.excellent
+    const good = safeCriteria.good || defaultCriteria.good
+    const average = safeCriteria.average || defaultCriteria.average
+    
+    if (score >= excellent.min) return { level: 'excellent', label: '优秀', color: 'bg-green-100 text-green-800' }
+    if (score >= good.min) return { level: 'good', label: '良好', color: 'bg-blue-100 text-blue-800' }
+    if (score >= average.min) return { level: 'average', label: '一般', color: 'bg-yellow-100 text-yellow-800' }
     return { level: 'poor', label: '较差', color: 'bg-red-100 text-red-800' }
   }
 
@@ -135,30 +153,51 @@ export default function EvaluationItemComponent({
           <div className="bg-gray-50 rounded-lg p-4 space-y-2">
             <h4 className="text-sm font-medium text-gray-700">评分标准</h4>
             <div className="grid grid-cols-1 gap-2 text-xs">
-              <div className="flex items-center gap-2 p-2 bg-green-50 rounded">
-                <Badge className="bg-green-100 text-green-800 text-xs">
-                  {item.scoring_criteria.excellent.min}+
-                </Badge>
-                <span>{item.scoring_criteria.excellent.description}</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 bg-blue-50 rounded">
-                <Badge className="bg-blue-100 text-blue-800 text-xs">
-                  {item.scoring_criteria.good.min}+
-                </Badge>
-                <span>{item.scoring_criteria.good.description}</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded">
-                <Badge className="bg-yellow-100 text-yellow-800 text-xs">
-                  {item.scoring_criteria.average.min}+
-                </Badge>
-                <span>{item.scoring_criteria.average.description}</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 bg-red-50 rounded">
-                <Badge className="bg-red-100 text-red-800 text-xs">
-                  {item.scoring_criteria.poor.min}+
-                </Badge>
-                <span>{item.scoring_criteria.poor.description}</span>
-              </div>
+              {(() => {
+                // 提供默认的评分标准，防止 scoring_criteria 不存在或结构不完整
+                const defaultCriteria = {
+                  excellent: { min: 90, description: "优秀：超额完成目标，表现突出" },
+                  good: { min: 80, description: "良好：完成目标，表现符合预期" },
+                  average: { min: 70, description: "一般：基本完成目标，表现一般" },
+                  poor: { min: 0, description: "较差：未完成目标，表现不佳" }
+                }
+                
+                // 优先使用项目自身的评分标准，其次使用全局评分标准，最后使用默认标准
+                const safeCriteria = item.scoring_criteria || globalScoringCriteria || defaultCriteria
+                const excellent = safeCriteria.excellent || defaultCriteria.excellent
+                const good = safeCriteria.good || defaultCriteria.good
+                const average = safeCriteria.average || defaultCriteria.average
+                const poor = safeCriteria.poor || defaultCriteria.poor
+                
+                return (
+                  <>
+                    <div className="flex items-center gap-2 p-2 bg-green-50 rounded">
+                      <Badge className="bg-green-100 text-green-800 text-xs">
+                        {excellent.min}+
+                      </Badge>
+                      <span>{excellent.description}</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded">
+                      <Badge className="bg-blue-100 text-blue-800 text-xs">
+                        {good.min}+
+                      </Badge>
+                      <span>{good.description}</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded">
+                      <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+                        {average.min}+
+                      </Badge>
+                      <span>{average.description}</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 bg-red-50 rounded">
+                      <Badge className="bg-red-100 text-red-800 text-xs">
+                        {poor.min}+
+                      </Badge>
+                      <span>{poor.description}</span>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </div>
         )}

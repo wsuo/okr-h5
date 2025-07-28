@@ -117,6 +117,28 @@ export default function EvaluationComparisonPage() {
     return ((leaderScore - selfScore) / selfScore) * 100
   }
 
+  // 完成状态中文映射
+  const getCompletionStatusLabel = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      'pending': '待处理',
+      'partial': '部分完成',
+      'waiting_for_boss': '等待老板评分',
+      'completed': '已完成'
+    }
+    return statusMap[status] || status
+  }
+
+  // 完成状态样式映射
+  const getCompletionStatusStyle = (status: string) => {
+    const styleMap: { [key: string]: string } = {
+      'pending': 'bg-gray-100 text-gray-800 border-gray-200',
+      'partial': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'waiting_for_boss': 'bg-blue-100 text-blue-800 border-blue-200',
+      'completed': 'bg-green-100 text-green-800 border-green-200'
+    }
+    return styleMap[status] || 'bg-gray-100 text-gray-800 border-gray-200'
+  }
+
   if (!userInfo) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -215,7 +237,7 @@ export default function EvaluationComparisonPage() {
         </div>
 
         {/* 总体对比概览 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -246,6 +268,29 @@ export default function EvaluationComparisonPage() {
                   </p>
                 </div>
                 <BarChart3 className="w-8 h-8 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-green-700">当前得分</p>
+                  <p className={`text-2xl font-bold ${getScoreColor(safeToNumber(comparisonData.evaluation_status?.current_score))}`}>
+                    {safeToFixed(comparisonData.evaluation_status?.current_score)}
+                  </p>
+                  <p className="text-xs text-green-600">
+                    {comparisonData.evaluation_status?.current_score ? getScoreLevel(safeToNumber(comparisonData.evaluation_status.current_score)) : '--'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  {comparisonData.evaluation_status?.completion_status && (
+                    <Badge className={getCompletionStatusStyle(comparisonData.evaluation_status.completion_status)}>
+                      {getCompletionStatusLabel(comparisonData.evaluation_status.completion_status)}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -29,6 +29,8 @@ interface TeamMemberResult {
   self_score?: number
   leader_score?: number
   final_score?: number
+  current_score?: number
+  completion_status?: string
   comparison?: EvaluationComparison
   last_updated?: string
 }
@@ -65,6 +67,28 @@ export default function LeadEvaluationResultPage() {
   // 安全获取对比差值
   const getOverallDifference = (comparison: any): number => {
     return comparison?.comparison?.overall_difference ?? 0
+  }
+
+  // 完成状态中文映射
+  const getCompletionStatusLabel = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      'pending': '待处理',
+      'partial': '部分完成',
+      'waiting_for_boss': '等待老板评分',
+      'completed': '已完成'
+    }
+    return statusMap[status] || status
+  }
+
+  // 完成状态样式映射
+  const getCompletionStatusStyle = (status: string) => {
+    const styleMap: { [key: string]: string } = {
+      'pending': 'bg-gray-100 text-gray-800 border-gray-200',
+      'partial': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'waiting_for_boss': 'bg-blue-100 text-blue-800 border-blue-200',
+      'completed': 'bg-green-100 text-green-800 border-green-200'
+    }
+    return styleMap[status] || 'bg-gray-100 text-gray-800 border-gray-200'
   }
 
   const loadData = useCallback(async () => {
@@ -111,6 +135,8 @@ export default function LeadEvaluationResultPage() {
               self_score: comparison?.self_evaluation?.score,
               leader_score: comparison?.leader_evaluation?.score,
               final_score: assessmentParticipant?.final_score || comparison?.leader_evaluation?.score || comparison?.self_evaluation?.score,
+              current_score: comparison?.evaluation_status?.current_score,
+              completion_status: comparison?.evaluation_status?.completion_status,
               comparison,
               last_updated: participant.leader_completed_at || participant.self_completed_at
             } as TeamMemberResult
@@ -129,6 +155,8 @@ export default function LeadEvaluationResultPage() {
               self_status: participant.self_status,
               leader_status: participant.leader_status,
               final_score: assessmentParticipant?.final_score,
+              current_score: undefined,
+              completion_status: undefined,
               last_updated: participant.leader_completed_at || participant.self_completed_at
             } as TeamMemberResult
           }
@@ -176,7 +204,15 @@ export default function LeadEvaluationResultPage() {
     return "待改进"
   }
 
-  const getStatusBadge = (selfStatus: string, leaderStatus: string) => {
+  const getStatusBadge = (selfStatus: string, leaderStatus: string, completionStatus?: string) => {
+    // 如果有完成状态，优先显示完成状态
+    if (completionStatus) {
+      return <Badge className={getCompletionStatusStyle(completionStatus)}>
+        {getCompletionStatusLabel(completionStatus)}
+      </Badge>
+    }
+    
+    // 否则使用原有逻辑
     if (selfStatus === 'completed' && leaderStatus === 'completed') {
       return <Badge className="bg-green-100 text-green-800 border-green-200">全部完成</Badge>
     }
@@ -375,7 +411,7 @@ export default function LeadEvaluationResultPage() {
                           <h3 className="font-semibold text-lg">{result.user_name}</h3>
                           <p className="text-sm text-gray-600">{result.department}</p>
                         </div>
-                        {getStatusBadge(result.self_status, result.leader_status)}
+                        {getStatusBadge(result.self_status, result.leader_status, result.completion_status)}
                       </div>
                       
                       <div className="grid grid-cols-3 gap-4 text-sm mb-3">
@@ -392,9 +428,9 @@ export default function LeadEvaluationResultPage() {
                           </span>
                         </div>
                         <div>
-                          <span className="text-gray-600">最终得分：</span>
-                          <span className={`font-semibold ${getScoreColor(safeToNumber(result.final_score))}`}>
-                            {safeToFixed(result.final_score)}
+                          <span className="text-gray-600">当前得分：</span>
+                          <span className={`font-semibold ${getScoreColor(safeToNumber(result.current_score || result.final_score))}`}>
+                            {safeToFixed(result.current_score || result.final_score)}
                           </span>
                         </div>
                       </div>
@@ -455,10 +491,10 @@ export default function LeadEvaluationResultPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-green-600">
-                              {safeToFixed(result.final_score)}
+                              {safeToFixed(result.current_score || result.final_score)}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {result.final_score ? getScoreLevel(safeToNumber(result.final_score)) : ''}
+                              {(result.current_score || result.final_score) ? getScoreLevel(safeToNumber(result.current_score || result.final_score)) : ''}
                             </div>
                           </div>
                         </div>
@@ -521,7 +557,7 @@ export default function LeadEvaluationResultPage() {
                             <h3 className="font-semibold text-lg">{result.user_name}</h3>
                             <p className="text-sm text-gray-600">{result.department}</p>
                           </div>
-                          {getStatusBadge(result.self_status, result.leader_status)}
+                          {getStatusBadge(result.self_status, result.leader_status, result.completion_status)}
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4 text-sm mb-3">

@@ -76,6 +76,11 @@ export interface EvaluationTemplate {
   total_score: number
   scoring_rules: ScoringRules
   categories: EvaluationCategory[]
+  scoring_criteria?: ScoringCriteria  // 全局评分标准（可选，用于两层加权模式）
+  usage_instructions?: {
+    for_leaders: string[]
+    for_employees: string[]
+  }
 }
 
 // 评分模式类型
@@ -128,7 +133,7 @@ export interface EvaluationItem {
   description: string
   weight: number
   max_score: number
-  scoring_criteria: ScoringCriteria
+  scoring_criteria?: ScoringCriteria  // 可选，在两层加权模式下可能不存在
 }
 
 export interface ScoringCriteria {
@@ -313,6 +318,67 @@ export interface SubmitDetailedBossRequest {
   detailed_scores: DetailedScore[]
 }
 
+// 老板评分任务接口
+export interface BossTask {
+  id: string
+  assessment_id: number
+  assessment_title: string
+  assessment_period: string
+  type: 'boss'
+  evaluatee_id: number
+  evaluatee_name: string
+  evaluatee_department: string
+  status: TaskStatus
+  deadline: string
+  is_overdue: boolean
+  evaluation_id?: number
+  last_updated?: string
+}
+
+// 下属信息接口
+export interface SubordinateInfo {
+  subordinate_id: number
+  subordinate_name: string
+  subordinate_department: string
+  status: string
+  self_evaluation_completed: boolean
+  self_evaluation_completed_at?: string
+  leader_evaluation_id?: number
+  leader_evaluation_completed_at?: string
+  last_updated?: string
+}
+
+// 老板简化评分模板接口
+export interface BossEvaluationTemplate {
+  assessment_id: number
+  assessment_title: string
+  version: string
+  scoring_method: string
+  total_score: number
+  scoring_rules: {
+    scoring_mode: string
+    two_tier_config?: {
+      boss_weight: number
+      employee_leader_weight: number
+      self_weight_in_employee_leader: number
+      leader_weight_in_employee_leader: number
+    }
+    calculation_method: string
+  }
+  categories: []  // 简化模式为空数组
+  usage_instructions: {
+    for_leaders: string[]
+    for_employees: string[]
+  }
+  current_user_id: number
+  evaluation_type: 'boss'
+  evaluatee_id: number
+  evaluatee_name: string
+  current_status: string
+  is_boss_simplified: boolean
+  boss_evaluation_note: string
+}
+
 // 提交简单Boss评分请求
 export interface SubmitBossEvaluationRequest {
   assessment_id: number
@@ -481,6 +547,57 @@ export class EvaluationService {
    */
   async getDetailedEvaluation(id: number): Promise<ApiResponse<DetailedEvaluation>> {
     return apiClient.get<DetailedEvaluation>(`/evaluations/detailed/${id}`)
+  }
+
+  /**
+   * 15. 获取老板待办任务
+   */
+  async getBossTasks(assessment_id?: number): Promise<ApiResponse<BossTask[]>> {
+    const queryParams: Record<string, any> = {}
+    if (assessment_id) queryParams.assessment_id = assessment_id
+    
+    return apiClient.get<BossTask[]>('/evaluations/my-tasks', queryParams)
+  }
+
+  /**
+   * 16. 获取下属列表（老板视角）
+   */
+  async getSubordinatesForBoss(assessmentId: number): Promise<ApiResponse<SubordinateInfo[]>> {
+    return apiClient.get<SubordinateInfo[]>(`/evaluations/subordinates/${assessmentId}`)
+  }
+
+  /**
+   * 17. 获取老板简化评分模板
+   */
+  async getBossEvaluationTemplate(assessmentId: number, userId: number): Promise<ApiResponse<BossEvaluationTemplate>> {
+    return apiClient.get<BossEvaluationTemplate>(`/evaluations/template/${assessmentId}/user/${userId}`)
+  }
+
+  /**
+   * 18. 提交老板简化评分
+   */
+  async submitBossEvaluation(data: SubmitBossEvaluationRequest): Promise<ApiResponse<Evaluation>> {
+    return apiClient.post<Evaluation>('/evaluations/boss', data)
+  }
+
+  /**
+   * 19. 获取完整评估详情（包含老板评分）
+   */
+  async getCompleteEvaluationDetails(
+    assessmentId: number, 
+    userId: number, 
+    params?: {
+      include_details?: boolean
+      include_comments?: boolean
+      include_comparison?: boolean
+    }
+  ): Promise<ApiResponse<any>> {
+    const queryParams: Record<string, any> = {}
+    if (params?.include_details !== undefined) queryParams.include_details = params.include_details
+    if (params?.include_comments !== undefined) queryParams.include_comments = params.include_comments
+    if (params?.include_comparison !== undefined) queryParams.include_comparison = params.include_comparison
+    
+    return apiClient.get<any>(`/evaluations/assessment/${assessmentId}/user/${userId}/complete`, queryParams)
   }
 
   /**
