@@ -3,6 +3,7 @@
  */
 
 import { apiClient, ApiResponse } from './api'
+import { ScoringRules, TwoTierScoringConfig } from './evaluation'
 
 // 评分标准接口
 export interface ScoringCriteria {

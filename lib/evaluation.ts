@@ -78,21 +78,39 @@ export interface EvaluationTemplate {
   categories: EvaluationCategory[]
 }
 
+// 评分模式类型
+export type ScoringMode = 'simple_weighted' | 'two_tier_weighted'
+
+// 两层加权配置接口
+export interface TwoTierScoringConfig {
+  employee_leader_weight: number     // A: 员工+领导评估的权重 (第一层)
+  boss_weight: number                // B: 老板评估的权重 (第一层)
+  self_weight_in_employee_leader: number     // C: 员工自评在员工+领导评估中的权重 (第二层)
+  leader_weight_in_employee_leader: number  // D: 领导评分在员工+领导评估中的权重 (第二层)
+  // 维度权重应使用 categories 中的 weight 字段，不在此处重复定义
+}
+
 export interface ScoringRules {
   self_evaluation: {
     enabled: boolean
+    description?: string
     weight_in_final: number
   }
   leader_evaluation: {
     enabled: boolean
+    description?: string
     weight_in_final: number
   }
   boss_evaluation?: {
     enabled: boolean
+    description?: string
     weight_in_final: number
     is_optional?: boolean
   }
   calculation_method: string
+  // 新增：评分模式配置
+  scoring_mode?: ScoringMode
+  two_tier_config?: TwoTierScoringConfig
 }
 
 export interface EvaluationCategory {

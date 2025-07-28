@@ -30,6 +30,7 @@ import {
 import { Plus, Settings, Edit, Trash2, AlertTriangle, ChevronDown, ChevronRight, Star, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Template, templateService, templateUtils, TemplateListQuery, CreateTemplateDto, UpdateTemplateDto } from "@/lib/template"
+import { ScoringMode, TwoTierScoringConfig } from "@/lib/evaluation"
 import { User, userService } from "@/lib/user"
 import { toast } from "sonner"
 
@@ -77,7 +78,8 @@ export default function TemplateManagement() {
           description: "直属领导评估",
           weight_in_final: 0.6
         },
-        calculation_method: "weighted_average"
+        calculation_method: "weighted_average",
+        scoring_mode: "simple_weighted"
       },
       scoring_method: "weighted",
       usage_instructions: {
@@ -286,7 +288,8 @@ export default function TemplateManagement() {
             description: "直属领导评估",
             weight_in_final: 0.6
           },
-          calculation_method: "weighted_average"
+          calculation_method: "weighted_average",
+          scoring_mode: "simple_weighted"
         },
         scoring_method: "weighted",
         usage_instructions: {
@@ -328,7 +331,27 @@ export default function TemplateManagement() {
     try {
       setSubmitting(true)
       setError("")
-      await templateService.createTemplate(formData)
+      
+      // 清理配置：在两层加权模式下移除无用的权重配置
+      let cleanedFormData = { ...formData }
+      if (cleanedFormData.config.scoring_rules?.scoring_mode === 'two_tier_weighted') {
+        // 在两层加权模式下，完全重构 scoring_rules 只保留必要字段
+        const cleanedScoringRules = {
+          scoring_mode: 'two_tier_weighted' as const,
+          calculation_method: cleanedFormData.config.scoring_rules.calculation_method,
+          two_tier_config: {
+            employee_leader_weight: cleanedFormData.config.scoring_rules.two_tier_config?.employee_leader_weight || 80,
+            boss_weight: cleanedFormData.config.scoring_rules.two_tier_config?.boss_weight || 20,
+            self_weight_in_employee_leader: cleanedFormData.config.scoring_rules.two_tier_config?.self_weight_in_employee_leader || 60,
+            leader_weight_in_employee_leader: cleanedFormData.config.scoring_rules.two_tier_config?.leader_weight_in_employee_leader || 40
+            // 不包含 work_performance_weight 和 daily_management_weight
+          }
+          // 不包含 self_evaluation, leader_evaluation, boss_evaluation
+        }
+        cleanedFormData.config.scoring_rules = cleanedScoringRules
+      }
+      
+      await templateService.createTemplate(cleanedFormData)
       setIsCreateDialogOpen(false)
       resetForm()
       fetchTemplates()
@@ -372,11 +395,30 @@ export default function TemplateManagement() {
       setSubmitting(true)
       setError("")
       
+      // 清理配置：在两层加权模式下移除无用的权重配置
+      let cleanedConfig = { ...template.config }
+      if (cleanedConfig.scoring_rules?.scoring_mode === 'two_tier_weighted') {
+        // 在两层加权模式下，完全重构 scoring_rules 只保留必要字段
+        const cleanedScoringRules = {
+          scoring_mode: 'two_tier_weighted' as const,
+          calculation_method: cleanedConfig.scoring_rules.calculation_method,
+          two_tier_config: {
+            employee_leader_weight: cleanedConfig.scoring_rules.two_tier_config?.employee_leader_weight || 80,
+            boss_weight: cleanedConfig.scoring_rules.two_tier_config?.boss_weight || 20,
+            self_weight_in_employee_leader: cleanedConfig.scoring_rules.two_tier_config?.self_weight_in_employee_leader || 60,
+            leader_weight_in_employee_leader: cleanedConfig.scoring_rules.two_tier_config?.leader_weight_in_employee_leader || 40
+            // 不包含 work_performance_weight 和 daily_management_weight
+          }
+          // 不包含 self_evaluation, leader_evaluation, boss_evaluation
+        }
+        cleanedConfig.scoring_rules = cleanedScoringRules
+      }
+      
       const updateData: UpdateTemplateDto = {
         name: template.name,
         description: template.description,
         type: template.type,
-        config: template.config,
+        config: cleanedConfig,
         is_default: template.is_default,
         status: template.status
       }
@@ -555,12 +597,35 @@ export default function TemplateManagement() {
 
     // 检查评分规则权重总和
     if (config.scoring_rules) {
-      const selfWeight = (config.scoring_rules.self_evaluation?.weight_in_final || 0) * 100
-      const leaderWeight = (config.scoring_rules.leader_evaluation?.weight_in_final || 0) * 100
-      const bossWeight = (config.scoring_rules.boss_evaluation?.weight_in_final || 0) * 100
-      const scoringRulesWeightSum = Math.round(selfWeight + leaderWeight + bossWeight)
-      if (scoringRulesWeightSum !== 100) {
-        errors.push(`评分规则权重总和为 ${scoringRulesWeightSum}%，应为 100%`)
+      const scoringMode = config.scoring_rules.scoring_mode || 'simple_weighted'
+      
+      if (scoringMode === 'simple_weighted') {
+        // 简单加权模式验证
+        const selfWeight = (config.scoring_rules.self_evaluation?.weight_in_final || 0) * 100
+        const leaderWeight = (config.scoring_rules.leader_evaluation?.weight_in_final || 0) * 100
+        const bossWeight = (config.scoring_rules.boss_evaluation?.weight_in_final || 0) * 100
+        const scoringRulesWeightSum = Math.round(selfWeight + leaderWeight + bossWeight)
+        if (scoringRulesWeightSum !== 100) {
+          errors.push(`评分规则权重总和为 ${scoringRulesWeightSum}%，应为 100%`)
+        }
+      } else if (scoringMode === 'two_tier_weighted') {
+        // 两层加权模式验证
+        const twoTierConfig = config.scoring_rules.two_tier_config
+        if (twoTierConfig) {
+          // 第一层权重验证
+          const firstLayerWeight = Math.round(twoTierConfig.employee_leader_weight + twoTierConfig.boss_weight)
+          if (firstLayerWeight !== 100) {
+            errors.push(`第一层权重总和为 ${firstLayerWeight}%，应为 100%`)
+          }
+          
+          // 第二层权重验证
+          const secondLayerWeight = Math.round(twoTierConfig.self_weight_in_employee_leader + twoTierConfig.leader_weight_in_employee_leader)
+          if (secondLayerWeight !== 100) {
+            errors.push(`第二层权重总和为 ${secondLayerWeight}%，应为 100%`)
+          }
+        } else {
+          errors.push('两层加权模式配置缺失')
+        }
       }
     }
 
@@ -1417,8 +1482,75 @@ export default function TemplateManagement() {
                   {editingTemplateId === template.id && (
                     <div className="space-y-4 mb-6 p-4 bg-green-50 rounded-lg">
                       <h5 className="font-medium text-sm">评分规则配置</h5>
-                      <p className="text-xs text-gray-600">设置员工自评和领导评分的权重分配，总权重必须为100%</p>
+                      <p className="text-xs text-gray-600">设置评分模式和权重分配</p>
                       
+                      {/* 评分模式选择器 */}
+                      <div>
+                        <Label className="text-xs">评分模式</Label>
+                        <Select
+                          value={template.config.scoring_rules?.scoring_mode || 'simple_weighted'}
+                          onValueChange={(value: ScoringMode) => {
+                            let updatedScoringRules = {
+                              ...template.config.scoring_rules,
+                              scoring_mode: value
+                            }
+                            
+                            if (value === 'two_tier_weighted') {
+                              // 切换到两层加权模式：完全重构 scoring_rules
+                              updatedScoringRules = {
+                                scoring_mode: 'two_tier_weighted',
+                                calculation_method: updatedScoringRules.calculation_method,
+                                two_tier_config: updatedScoringRules.two_tier_config || {
+                                  employee_leader_weight: 80,
+                                  boss_weight: 20,
+                                  self_weight_in_employee_leader: 60,
+                                  leader_weight_in_employee_leader: 40
+                                }
+                                // 完全移除 self_evaluation, leader_evaluation, boss_evaluation
+                              }
+                            } else {
+                              // 切换到简单加权模式：恢复传统配置
+                              updatedScoringRules = {
+                                scoring_mode: 'simple_weighted',
+                                calculation_method: updatedScoringRules.calculation_method,
+                                self_evaluation: {
+                                  enabled: true,
+                                  description: "员工自我评估",
+                                  weight_in_final: 0.4
+                                },
+                                leader_evaluation: {
+                                  enabled: true,
+                                  description: "直属领导评估",
+                                  weight_in_final: 0.6
+                                }
+                                // 移除 two_tier_config
+                              }
+                            }
+                            
+                            const updatedTemplate = {
+                              ...template,
+                              config: {
+                                ...template.config,
+                                scoring_rules: updatedScoringRules
+                              }
+                            }
+                            updateTemplateInState(updatedTemplate)
+                          }}
+                        >
+                          <SelectTrigger className="w-full text-sm">
+                            <SelectValue placeholder="选择评分模式" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="simple_weighted">简单加权模式</SelectItem>
+                            <SelectItem value="two_tier_weighted">两层加权模式</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* 条件渲染：根据评分模式显示不同的配置界面 */}
+                      {(template.config.scoring_rules?.scoring_mode || 'simple_weighted') === 'simple_weighted' ? (
+                        // 简单加权模式配置
+                        <>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* 员工自评配置 */}
                         <div className="p-3 bg-white rounded border">
@@ -1749,6 +1881,215 @@ export default function TemplateManagement() {
                           )
                         }
                       })()}
+                        </>
+                      ) : (
+                        // 两层加权模式配置
+                        <div className="space-y-6">
+                          <div className="p-4 bg-blue-50 rounded-lg border">
+                            <h6 className="font-medium text-sm mb-3 text-blue-800">两层加权评分模式</h6>
+                            <p className="text-xs text-blue-600 mb-6">
+                              采用两层权重分配机制，第一层决定总体评估来源的权重，第二层细化员工+领导评估内部的权重分配
+                            </p>
+                            
+                            {/* 第一层权重配置 */}
+                            <div className="mb-6">
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                                <Label className="text-sm font-medium text-blue-700">第一层：总体评估权重分配</Label>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg border-2 border-blue-200">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  <span className="text-xs text-gray-600 whitespace-nowrap">员工+领导评估</span>
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={template.config.scoring_rules?.two_tier_config?.employee_leader_weight || 80}
+                                      onChange={(e) => {
+                                        const percentage = parseInt(e.target.value) || 80
+                                        const updatedTemplate = {
+                                          ...template,
+                                          config: {
+                                            ...template.config,
+                                            scoring_rules: {
+                                              ...template.config.scoring_rules,
+                                              two_tier_config: {
+                                                ...template.config.scoring_rules?.two_tier_config,
+                                                employee_leader_weight: percentage,
+                                                boss_weight: 100 - percentage
+                                              }
+                                            }
+                                          }
+                                        }
+                                        updateTemplateInState(updatedTemplate)
+                                      }}
+                                      className="text-sm w-16 h-8"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  
+                                  <span className="text-xs text-gray-600 whitespace-nowrap">Boss评估</span>
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={template.config.scoring_rules?.two_tier_config?.boss_weight || 20}
+                                      onChange={(e) => {
+                                        const percentage = parseInt(e.target.value) || 20
+                                        const updatedTemplate = {
+                                          ...template,
+                                          config: {
+                                            ...template.config,
+                                            scoring_rules: {
+                                              ...template.config.scoring_rules,
+                                              two_tier_config: {
+                                                ...template.config.scoring_rules?.two_tier_config,
+                                                boss_weight: percentage,
+                                                employee_leader_weight: 100 - percentage
+                                              }
+                                            }
+                                          }
+                                        }
+                                        updateTemplateInState(updatedTemplate)
+                                      }}
+                                      className="text-sm w-16 h-8"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  
+                                  {/* 第一层验证提示 - 内联显示 */}
+                                  {(() => {
+                                    const config = template.config.scoring_rules?.two_tier_config
+                                    if (!config) return null
+                                    const firstLayerTotal = Math.round(config.employee_leader_weight + config.boss_weight)
+                                    const isFirstLayerValid = firstLayerTotal === 100
+                                    
+                                    return (
+                                      <div className={`px-2 py-1 border rounded text-xs whitespace-nowrap ${isFirstLayerValid ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                                        总计: {firstLayerTotal}% {isFirstLayerValid ? '✓' : '⚠️'}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* 第二层权重配置 */}
+                            <div className="mb-4">
+                              <div className="flex items-center gap-2 mb-4">
+                                <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                                <Label className="text-sm font-medium text-purple-700">第二层：员工+领导评估内部权重分配</Label>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg border-2 border-purple-200">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                  <span className="text-xs text-gray-600 whitespace-nowrap">员工自评</span>
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={template.config.scoring_rules?.two_tier_config?.self_weight_in_employee_leader || 60}
+                                      onChange={(e) => {
+                                        const percentage = parseInt(e.target.value) || 60
+                                        const updatedTemplate = {
+                                          ...template,
+                                          config: {
+                                            ...template.config,
+                                            scoring_rules: {
+                                              ...template.config.scoring_rules,
+                                              two_tier_config: {
+                                                ...template.config.scoring_rules?.two_tier_config,
+                                                self_weight_in_employee_leader: percentage,
+                                                leader_weight_in_employee_leader: 100 - percentage
+                                              }
+                                            }
+                                          }
+                                        }
+                                        updateTemplateInState(updatedTemplate)
+                                      }}
+                                      className="text-sm w-16 h-8"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  
+                                  <span className="text-xs text-gray-600 whitespace-nowrap">领导评分</span>
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={template.config.scoring_rules?.two_tier_config?.leader_weight_in_employee_leader || 40}
+                                      onChange={(e) => {
+                                        const percentage = parseInt(e.target.value) || 40
+                                        const updatedTemplate = {
+                                          ...template,
+                                          config: {
+                                            ...template.config,
+                                            scoring_rules: {
+                                              ...template.config.scoring_rules,
+                                              two_tier_config: {
+                                                ...template.config.scoring_rules?.two_tier_config,
+                                                leader_weight_in_employee_leader: percentage,
+                                                self_weight_in_employee_leader: 100 - percentage
+                                              }
+                                            }
+                                          }
+                                        }
+                                        updateTemplateInState(updatedTemplate)
+                                      }}
+                                      className="text-sm w-16 h-8"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  
+                                  {/* 第二层验证提示 - 内联显示 */}
+                                  {(() => {
+                                    const config = template.config.scoring_rules?.two_tier_config
+                                    if (!config) return null
+                                    const secondLayerTotal = Math.round(config.self_weight_in_employee_leader + config.leader_weight_in_employee_leader)
+                                    const isSecondLayerValid = secondLayerTotal === 100
+                                    
+                                    return (
+                                      <div className={`px-2 py-1 border rounded text-xs whitespace-nowrap ${isSecondLayerValid ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                                        总计: {secondLayerTotal}% {isSecondLayerValid ? '✓' : '⚠️'}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* 整体配置状态 */}
+                            {(() => {
+                              const config = template.config.scoring_rules?.two_tier_config
+                              if (!config) return null
+                              
+                              const firstLayerTotal = Math.round(config.employee_leader_weight + config.boss_weight)
+                              const secondLayerTotal = Math.round(config.self_weight_in_employee_leader + config.leader_weight_in_employee_leader)
+                              const isFirstLayerValid = firstLayerTotal === 100
+                              const isSecondLayerValid = secondLayerTotal === 100
+                              const isValid = isFirstLayerValid && isSecondLayerValid
+                              
+                              if (isValid) {
+                                return (
+                                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                                    <div className="text-sm font-medium text-green-800">
+                                      ✅ 两层加权配置正确
+                                    </div>
+                                    <div className="text-xs text-green-600 mt-1">
+                                      所有权重配置均符合要求，可以保存模板
+                                    </div>
+                                  </div>
+                                )
+                              }
+                              
+                              return null
+                            })()}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   
@@ -1799,62 +2140,168 @@ export default function TemplateManagement() {
                       {template.config.scoring_rules && (
                         <div className="mb-4 p-3 bg-green-50 rounded-lg">
                           <h6 className="font-medium text-sm mb-2">评分规则配置</h6>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {/* 员工自评 */}
-                            <div className="p-2 bg-white rounded border">
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="font-medium text-sm text-blue-700">员工自我评估</div>
-                                <div className={`text-xs px-2 py-1 rounded ${template.config.scoring_rules.self_evaluation?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                  {template.config.scoring_rules.self_evaluation?.enabled ? '启用' : '禁用'}
-                                </div>
-                              </div>
-                              <div className="text-gray-600 text-xs mb-1">
-                                {template.config.scoring_rules.self_evaluation?.description || "员工自我评估"}
-                              </div>
-                              <div className="text-sm font-medium">
-                                权重: {Math.round((template.config.scoring_rules.self_evaluation?.weight_in_final || 0.4) * 100)}%
-                              </div>
-                            </div>
-                            
-                            {/* 领导评分 */}
-                            <div className="p-2 bg-white rounded border">
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="font-medium text-sm text-purple-700">直属领导评估</div>
-                                <div className={`text-xs px-2 py-1 rounded ${template.config.scoring_rules.leader_evaluation?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                  {template.config.scoring_rules.leader_evaluation?.enabled ? '启用' : '禁用'}
-                                </div>
-                              </div>
-                              <div className="text-gray-600 text-xs mb-1">
-                                {template.config.scoring_rules.leader_evaluation?.description || "直属领导评估"}
-                              </div>
-                              <div className="text-sm font-medium">
-                                权重: {Math.round((template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.6) * 100)}%
-                              </div>
-                            </div>
+                          
+                          {/* 评分模式显示 */}
+                          <div className="mb-3">
+                            <span className="text-xs text-gray-600">评分模式: </span>
+                            <span className="font-medium text-sm">
+                              {(template.config.scoring_rules.scoring_mode || 'simple_weighted') === 'two_tier_weighted' ? '两层加权模式' : '简单加权模式'}
+                            </span>
                           </div>
                           
-                          {/* 计算方法和权重验证 */}
-                          <div className="mt-3 flex items-center justify-between text-xs">
-                            <div>
-                              <span className="text-gray-600">计算方法: </span>
-                              <span className="font-medium">
-                                {template.config.scoring_rules.calculation_method === 'weighted_average' ? '加权平均' : '简单平均'}
-                              </span>
-                            </div>
-                            {(() => {
-                              const selfWeight = (template.config.scoring_rules.self_evaluation?.weight_in_final || 0.36) * 100
-                              const leaderWeight = (template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.54) * 100
-                              const bossWeight = (template.config.scoring_rules.boss_evaluation?.weight_in_final || 0.10) * 100
-                              const total = Math.round(selfWeight + leaderWeight + bossWeight)
-                              const isValid = total === 100
-                              
-                              return (
-                                <div className={`px-2 py-1 rounded ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                  权重总计: {total}% {isValid ? '✓' : '⚠️'}
+                          {/* 根据评分模式显示不同内容 */}
+                          {(template.config.scoring_rules.scoring_mode || 'simple_weighted') === 'two_tier_weighted' ? (
+                            // 两层加权模式显示
+                            template.config.scoring_rules.two_tier_config ? (
+                              <div className="space-y-4">
+                                <div className="p-3 bg-blue-50 rounded-lg border">
+                                  <h6 className="font-medium text-sm mb-3 text-blue-800">两层加权配置</h6>
+                                  
+                                  {/* 第一层权重显示 */}
+                                  <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                                      <span className="text-sm font-medium text-blue-700">第一层：总体评估权重分配</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="p-2 bg-white rounded border">
+                                        <div className="text-sm font-medium text-gray-700">员工+领导评估</div>
+                                        <div className="text-lg font-bold text-blue-600">
+                                          {template.config.scoring_rules.two_tier_config.employee_leader_weight}%
+                                        </div>
+                                      </div>
+                                      <div className="p-2 bg-white rounded border">
+                                        <div className="text-sm font-medium text-gray-700">Boss评估</div>
+                                        <div className="text-lg font-bold text-purple-600">
+                                          {template.config.scoring_rules.two_tier_config.boss_weight}%
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 第二层权重显示 */}
+                                  <div className="mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <div className="w-5 h-5 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                                      <span className="text-sm font-medium text-purple-700">第二层：员工+领导评估内部权重分配</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="p-2 bg-white rounded border">
+                                        <div className="text-sm font-medium text-gray-700">员工自评</div>
+                                        <div className="text-lg font-bold text-green-600">
+                                          {template.config.scoring_rules.two_tier_config.self_weight_in_employee_leader}%
+                                        </div>
+                                      </div>
+                                      <div className="p-2 bg-white rounded border">
+                                        <div className="text-sm font-medium text-gray-700">领导评分</div>
+                                        <div className="text-lg font-bold text-orange-600">
+                                          {template.config.scoring_rules.two_tier_config.leader_weight_in_employee_leader}%
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 维度权重配置显示（基于categories） */}
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-700 mb-2">维度权重配置</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {template.config.categories.map((category) => (
+                                        <div key={category.id} className="p-2 bg-white rounded border">
+                                          <div className="text-xs text-gray-600">{category.name}</div>
+                                          <div className="text-sm font-bold text-indigo-600">
+                                            {category.weight}%
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            {category.description}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 权重验证状态 */}
+                                  <div className="mt-3 pt-3 border-t border-blue-200">
+                                    {(() => {
+                                      const config = template.config.scoring_rules.two_tier_config
+                                      const firstLayerTotal = config.employee_leader_weight + config.boss_weight
+                                      const secondLayerTotal = config.self_weight_in_employee_leader + config.leader_weight_in_employee_leader
+                                      const isValid = firstLayerTotal === 100 && secondLayerTotal === 100
+                                      
+                                      return (
+                                        <div className={`text-xs px-2 py-1 rounded ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                          配置状态: {isValid ? '✅ 权重配置正确' : '⚠️ 权重配置有误'}
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
                                 </div>
-                              )
-                            })()}
-                          </div>
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                                两层加权配置缺失
+                              </div>
+                            )
+                          ) : (
+                            // 简单加权模式显示（原有逻辑）
+                            <>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {/* 员工自评 */}
+                                <div className="p-2 bg-white rounded border">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="font-medium text-sm text-blue-700">员工自我评估</div>
+                                    <div className={`text-xs px-2 py-1 rounded ${template.config.scoring_rules.self_evaluation?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                      {template.config.scoring_rules.self_evaluation?.enabled ? '启用' : '禁用'}
+                                    </div>
+                                  </div>
+                                  <div className="text-gray-600 text-xs mb-1">
+                                    {template.config.scoring_rules.self_evaluation?.description || "员工自我评估"}
+                                  </div>
+                                  <div className="text-sm font-medium">
+                                    权重: {Math.round((template.config.scoring_rules.self_evaluation?.weight_in_final || 0.4) * 100)}%
+                                  </div>
+                                </div>
+                                
+                                {/* 领导评分 */}
+                                <div className="p-2 bg-white rounded border">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="font-medium text-sm text-purple-700">直属领导评估</div>
+                                    <div className={`text-xs px-2 py-1 rounded ${template.config.scoring_rules.leader_evaluation?.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                      {template.config.scoring_rules.leader_evaluation?.enabled ? '启用' : '禁用'}
+                                    </div>
+                                  </div>
+                                  <div className="text-gray-600 text-xs mb-1">
+                                    {template.config.scoring_rules.leader_evaluation?.description || "直属领导评估"}
+                                  </div>
+                                  <div className="text-sm font-medium">
+                                    权重: {Math.round((template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.6) * 100)}%
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* 计算方法和权重验证 */}
+                              <div className="mt-3 flex items-center justify-between text-xs">
+                                <div>
+                                  <span className="text-gray-600">计算方法: </span>
+                                  <span className="font-medium">
+                                    {template.config.scoring_rules.calculation_method === 'weighted_average' ? '加权平均' : '简单平均'}
+                                  </span>
+                                </div>
+                                {(() => {
+                                  const selfWeight = (template.config.scoring_rules.self_evaluation?.weight_in_final || 0.36) * 100
+                                  const leaderWeight = (template.config.scoring_rules.leader_evaluation?.weight_in_final || 0.54) * 100
+                                  const bossWeight = (template.config.scoring_rules.boss_evaluation?.weight_in_final || 0.10) * 100
+                                  const total = Math.round(selfWeight + leaderWeight + bossWeight)
+                                  const isValid = total === 100
+                                  
+                                  return (
+                                    <div className={`px-2 py-1 rounded ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      权重总计: {total}% {isValid ? '✓' : '⚠️'}
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            </>
+                          )}
                         </div>
                       )}
                     </>
