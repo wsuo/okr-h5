@@ -323,9 +323,35 @@ export default function LeaderEvaluationPage() {
     )
   }
 
-  // 检查模板是否支持领导评分
-  const leaderEvaluationEnabled = template.scoring_rules.leader_evaluation.enabled
-  if (!leaderEvaluationEnabled) {
+  // 检查模板是否支持领导评分（兼容两种评分模式）
+  const getLeaderEvaluationConfig = (template: EvaluationTemplate) => {
+    const scoringMode = template.scoring_rules.scoring_mode || 'simple_weighted'
+    
+    if (scoringMode === 'two_tier_weighted') {
+      // 两层加权模式：领导评分始终启用，权重从二层配置中计算
+      const twoTierConfig = template.scoring_rules.two_tier_config
+      if (!twoTierConfig) {
+        return { enabled: false, weight: 0 }
+      }
+      
+      // 计算领导评分的最终权重：员工+领导评估权重 × 领导评分在其中的权重
+      const finalWeight = (twoTierConfig.employee_leader_weight / 100) * (twoTierConfig.leader_weight_in_employee_leader / 100)
+      return {
+        enabled: true,
+        weight: finalWeight * 100 // 转换为百分比
+      }
+    } else {
+      // 简单加权模式：使用传统配置
+      const leaderEval = template.scoring_rules.leader_evaluation
+      return {
+        enabled: leaderEval?.enabled || false,
+        weight: (leaderEval?.weight_in_final || 0) * 100
+      }
+    }
+  }
+  
+  const leaderEvaluationConfig = getLeaderEvaluationConfig(template)
+  if (!leaderEvaluationConfig.enabled) {
     return (
       <div className="min-h-screen bg-gray-50">
         <LeadHeader userInfo={userInfo} />
@@ -367,7 +393,7 @@ export default function LeaderEvaluationPage() {
             <div className="flex flex-wrap justify-center gap-4 text-sm">
               <div className="bg-background/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-border/30">
                 <span className="font-medium text-primary">领导评分权重:</span>
-                <span className="ml-1 font-bold">{(template.scoring_rules.leader_evaluation.weight_in_final * 100).toFixed(0)}%</span>
+                <span className="ml-1 font-bold">{leaderEvaluationConfig.weight.toFixed(0)}%</span>
               </div>
               <div className="bg-background/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-border/30">
                 <span className="font-medium text-primary">满分:</span>

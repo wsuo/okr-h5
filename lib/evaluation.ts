@@ -817,7 +817,7 @@ export const evaluationUtils = {
   },
 
   /**
-   * 获取评估权重配置
+   * 获取评估权重配置（兼容两种评分模式）
    */
   getEvaluationWeights(scoringRules: ScoringRules): {
     selfWeight: number
@@ -825,14 +825,43 @@ export const evaluationUtils = {
     bossWeight: number
     hasBossEvaluation: boolean
   } {
-    const bossEvaluation = scoringRules.boss_evaluation
-    const hasBossEvaluation = bossEvaluation?.enabled && (bossEvaluation?.weight_in_final || 0) > 0
-
-    return {
-      selfWeight: scoringRules.self_evaluation.weight_in_final,
-      leaderWeight: scoringRules.leader_evaluation.weight_in_final,
-      bossWeight: bossEvaluation?.weight_in_final || 0,
-      hasBossEvaluation
+    const scoringMode = scoringRules.scoring_mode || 'simple_weighted'
+    
+    if (scoringMode === 'two_tier_weighted') {
+      // 两层加权模式：从 two_tier_config 计算权重
+      const twoTierConfig = scoringRules.two_tier_config
+      if (!twoTierConfig) {
+        return {
+          selfWeight: 0,
+          leaderWeight: 0,
+          bossWeight: 0,
+          hasBossEvaluation: false
+        }
+      }
+      
+      // 计算各评估类型的最终权重
+      const employeeLeaderRatio = twoTierConfig.employee_leader_weight / 100
+      const selfWeight = employeeLeaderRatio * (twoTierConfig.self_weight_in_employee_leader / 100)
+      const leaderWeight = employeeLeaderRatio * (twoTierConfig.leader_weight_in_employee_leader / 100)
+      const bossWeight = twoTierConfig.boss_weight / 100
+      
+      return {
+        selfWeight,
+        leaderWeight,
+        bossWeight,
+        hasBossEvaluation: bossWeight > 0
+      }
+    } else {
+      // 简单加权模式：使用传统配置
+      const bossEvaluation = scoringRules.boss_evaluation
+      const hasBossEvaluation = bossEvaluation?.enabled && (bossEvaluation?.weight_in_final || 0) > 0
+      
+      return {
+        selfWeight: scoringRules.self_evaluation?.weight_in_final || 0,
+        leaderWeight: scoringRules.leader_evaluation?.weight_in_final || 0,
+        bossWeight: bossEvaluation?.weight_in_final || 0,
+        hasBossEvaluation
+      }
     }
   },
 

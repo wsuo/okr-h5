@@ -220,9 +220,35 @@ export default function EmployeeSelfEvaluationPage() {
     )
   }
 
-  // 检查模板是否支持自评
-  const selfEvaluationEnabled = template.scoring_rules.self_evaluation.enabled
-  if (!selfEvaluationEnabled) {
+  // 检查模板是否支持自评（兼容两种评分模式）
+  const getSelfEvaluationConfig = (template: EvaluationTemplate) => {
+    const scoringMode = template.scoring_rules.scoring_mode || 'simple_weighted'
+    
+    if (scoringMode === 'two_tier_weighted') {
+      // 两层加权模式：自评始终启用，权重从二层配置中计算
+      const twoTierConfig = template.scoring_rules.two_tier_config
+      if (!twoTierConfig) {
+        return { enabled: false, weight: 0 }
+      }
+      
+      // 计算自评的最终权重：员工+领导评估权重 × 自评在其中的权重
+      const finalWeight = (twoTierConfig.employee_leader_weight / 100) * (twoTierConfig.self_weight_in_employee_leader / 100)
+      return {
+        enabled: true,
+        weight: finalWeight * 100 // 转换为百分比
+      }
+    } else {
+      // 简单加权模式：使用传统配置
+      const selfEval = template.scoring_rules.self_evaluation
+      return {
+        enabled: selfEval?.enabled || false,
+        weight: (selfEval?.weight_in_final || 0) * 100
+      }
+    }
+  }
+  
+  const selfEvaluationConfig = getSelfEvaluationConfig(template)
+  if (!selfEvaluationConfig.enabled) {
     return (
       <div className="min-h-screen bg-gray-50">
         <EmployeeHeader userInfo={userInfo} />
@@ -264,7 +290,7 @@ export default function EmployeeSelfEvaluationPage() {
             <div className="flex flex-wrap justify-center gap-4 text-sm">
               <div className="bg-background/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-border/30">
                 <span className="font-medium text-primary">自评权重:</span>
-                <span className="ml-1 font-bold">{(template.scoring_rules.self_evaluation.weight_in_final * 100).toFixed(0)}%</span>
+                <span className="ml-1 font-bold">{selfEvaluationConfig.weight.toFixed(0)}%</span>
               </div>
               <div className="bg-background/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-border/30">
                 <span className="font-medium text-primary">满分:</span>
