@@ -2,7 +2,7 @@
  * 用户管理相关类型定义和服务
  */
 
-import { apiClient, ApiResponse, PaginatedResponse } from './api'
+import { apiClient, ApiResponse } from './api'
 
 // 用户信息接口
 export interface User {
@@ -101,7 +101,42 @@ export interface UserListResponse {
   hasPrev: boolean
 }
 
-// 重置密码请求接口
+// 评估历史记录接口
+export interface AssessmentHistory {
+  assessment_id: number
+  assessment_title: string
+  period: string
+  status: 'completed' | 'in_progress' | 'pending'
+  start_date: string
+  end_date: string
+  self_evaluation: {
+    completed: boolean
+    score: number | null
+    submitted_at: string | null
+    last_updated?: string | null
+  }
+  leader_evaluation: {
+    completed: boolean
+    score: number | null
+    submitted_at: string | null
+    last_updated?: string | null
+    leader_id?: number
+    leader_name?: string
+  }
+  boss_evaluation?: {
+    completed: boolean
+    score?: number
+    boss_id?: number
+    boss_name?: string
+    submitted_at?: string
+    last_updated?: string
+    required?: boolean
+  }
+  current_employee_score: number | null
+  final_score: number | null
+  final_level: string | null
+  weight_config?: any
+}
 export interface ResetPasswordDto {
   password: string
 }
@@ -193,6 +228,16 @@ class UserService {
       return await apiClient.get<LeaderListResponse>('/users/leaders/list')
     } catch (error) {
       console.error('Get leaders failed:', error)
+      throw error
+    }
+  }
+
+  // 获取用户考核历史记录
+  async getAssessmentsHistory(params?: { completion_stage?: 'self_only' | 'self_leader' | 'all_completed', year?: number }): Promise<ApiResponse<AssessmentHistory[]>> {
+    try {
+      return await apiClient.get<AssessmentHistory[]>('/users/me/assessments-history', params)
+    } catch (error) {
+      console.error('Get assessments history failed:', error)
       throw error
     }
   }

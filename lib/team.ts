@@ -18,6 +18,7 @@ export interface TeamMemberEvaluationStatus {
   final_score: number | null
   self_score: number | null
   leader_score: number | null
+  current_employee_score: number | null
 }
 
 export interface TeamMember {

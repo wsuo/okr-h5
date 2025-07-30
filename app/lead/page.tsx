@@ -93,8 +93,8 @@ export default function LeadDashboard() {
         
         // 计算平均分
         const scoresData = members
-          .filter(member => member.evaluation_status && member.evaluation_status.final_score !== null)
-          .map(member => member.evaluation_status.final_score!)
+          .filter(member => member.evaluation_status && (member.evaluation_status.final_score !== null || member.evaluation_status.current_employee_score !== null))
+          .map(member => member.evaluation_status.final_score ?? member.evaluation_status.current_employee_score!)
         
         const teamAverageScore = scoresData.length > 0 
           ? scoresData.reduce((sum, score) => sum + score, 0) / scoresData.length 
@@ -305,8 +305,13 @@ export default function LeadDashboard() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600">当前得分</p>
-                        <p className={`text-lg font-bold ${teamUtils.getScoreColor(member.evaluation_status?.final_score ?? 0)}`}>
-                          {member.evaluation_status?.final_score ? Number(member.evaluation_status.final_score).toFixed(1) : '--'}
+                        <p className={`text-lg font-bold ${teamUtils.getScoreColor((member.evaluation_status?.final_score ?? member.evaluation_status?.current_employee_score) ?? 0)}`}>
+                          {member.evaluation_status?.final_score ? 
+                            Number(member.evaluation_status.final_score).toFixed(1) : 
+                            member.evaluation_status?.current_employee_score ? 
+                              Number(member.evaluation_status.current_employee_score).toFixed(1) : 
+                              '--'
+                          }
                         </p>
                       </div>
                     </div>
