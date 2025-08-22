@@ -13,12 +13,15 @@ export interface TeamMemberAssessment {
 export interface TeamMemberEvaluationStatus {
   self_completed: boolean
   leader_completed: boolean
+  boss_completed?: boolean
   self_completed_at: string | null
   leader_completed_at: string | null
-  final_score: number | null
-  self_score: number | null
-  leader_score: number | null
-  current_employee_score: number | null
+  boss_completed_at?: string | null
+  final_score: number | string | null
+  self_score: number | string | null
+  leader_score: number | string | null
+  boss_score?: number | string | null
+  current_employee_score: number | string | null
 }
 
 export interface TeamMember {
@@ -67,18 +70,36 @@ export interface EmployeeAssessmentHistory {
   status: 'completed' | 'in_progress' | 'pending'
   start_date: string
   end_date: string
+  // 是否该员工本人已完成其需要完成的所有评分步骤
+  participant_completed?: boolean
   self_evaluation: {
     completed: boolean
     score: number | null
-    completed_at: string | null
+    submitted_at: string | null
+    last_updated?: string | null
   }
   leader_evaluation: {
     completed: boolean
     score: number | null
-    completed_at: string | null
+    submitted_at: string | null
+    last_updated?: string | null
+    leader_id?: number
+    leader_name?: string
+  }
+  // 可选：老板评分信息（如果启用了老板评分）
+  boss_evaluation?: {
+    completed: boolean
+    score?: number
+    boss_id?: number
+    boss_name?: string
+    submitted_at?: string
+    last_updated?: string
+    required?: boolean
   }
   final_score: number | null
   final_level: string | null
+  // 可选：用于计算最终得分的权重配置
+  weight_config?: any
 }
 
 // 团队服务类
