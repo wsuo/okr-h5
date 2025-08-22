@@ -444,7 +444,9 @@ export default function EmployeeEvaluationResultPage() {
                       ? Number(comparisonData.boss_evaluation.score).toFixed(1)
                       : '--'}
                   </div>
-                  <div className="text-sm text-gray-600">上级评分</div>
+                  <div className="text-sm text-gray-600">
+                    {comparisonData.evaluation_status?.boss_enabled ? '老板评分' : '上级评分'}
+                  </div>
                 </div>
                 {comparisonData.boss_evaluation?.score ? (
                   <div className="space-y-2">
@@ -530,7 +532,7 @@ export default function EmployeeEvaluationResultPage() {
                   </div>
                   {comparisonData.boss_evaluation?.score && (
                     <div className="text-xs text-gray-500">
-                      上级 vs 领导
+                      {comparisonData.evaluation_status?.boss_enabled ? '老板 vs 领导' : '上级 vs 领导'}
                     </div>
                   )}
                 </div>
@@ -544,7 +546,9 @@ export default function EmployeeEvaluationResultPage() {
             <TabsTrigger value="comparison">分项对比</TabsTrigger>
             <TabsTrigger value="self">自评详情</TabsTrigger>
             <TabsTrigger value="leader">领导评分</TabsTrigger>
-            <TabsTrigger value="boss" disabled={!comparisonData.boss_evaluation}>上级评分</TabsTrigger>
+            <TabsTrigger value="boss" disabled={!comparisonData.boss_evaluation}>
+              {comparisonData.evaluation_status?.boss_enabled ? '老板评分' : '上级评分'}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="comparison" className="space-y-4">
@@ -554,93 +558,115 @@ export default function EmployeeEvaluationResultPage() {
                 <CardDescription>各个评分项目的详细对比分析</CardDescription>
               </CardHeader>
               <CardContent>
-                {comparisonData.comparison?.category_differences ? (
+                {comparisonData.self_evaluation && comparisonData.leader_evaluation ? (
                 <div className="space-y-6">
-                  {comparisonData.comparison.category_differences.map((category) => (
-                    <div key={category.categoryId} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-lg">{category.category_name}</h3>
-                        <div className="flex items-center gap-2">
-                          {getDifferenceIcon(category.difference)}
-                          <span className={`font-medium ${getDifferenceColor(category.difference)}`}>
-                            {formatDifference(category.difference)}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div className="text-center p-3 bg-blue-50 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {Number(category.self_score).toFixed(1)}
+                  {comparisonData.self_evaluation.detailed_scores.map((selfCategory, index) => {
+                    // 找到对应的领导评分分类
+                    const leaderCategory = comparisonData.leader_evaluation?.detailed_scores.find(
+                      cat => cat.categoryId === selfCategory.categoryId
+                    )
+                    
+                    if (!leaderCategory) return null
+                    
+                    const categoryDifference = Number(leaderCategory.categoryScore) - Number(selfCategory.categoryScore)
+                    const categoryName = getCategoryName(selfCategory.categoryId)
+                    
+                    return (
+                      <div key={selfCategory.categoryId} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-semibold text-lg">{categoryName}</h3>
+                          <div className="flex items-center gap-2">
+                            {getDifferenceIcon(categoryDifference)}
+                            <span className={`font-medium ${getDifferenceColor(categoryDifference)}`}>
+                              {formatDifference(categoryDifference)}
+                            </span>
                           </div>
-                          <div className="text-sm text-gray-600">自评得分</div>
                         </div>
-                        <div className="text-center p-3 bg-purple-50 rounded-lg">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {Number(category.leader_score).toFixed(1)}
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div className="text-center p-3 bg-blue-50 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {Number(selfCategory.categoryScore).toFixed(1)}
+                            </div>
+                            <div className="text-sm text-gray-600">自评得分</div>
                           </div>
-                          <div className="text-sm text-gray-600">领导评分</div>
+                          <div className="text-center p-3 bg-purple-50 rounded-lg">
+                            <div className="text-2xl font-bold text-purple-600">
+                              {Number(leaderCategory.categoryScore).toFixed(1)}
+                            </div>
+                            <div className="text-sm text-gray-600">领导评分</div>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* 详细项目对比 */}
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-gray-700">详细项目对比</h4>
-                        {category.item_differences.map((item) => {
-                          const selfLevel = getItemScoreLevel(Number(item.self_score), category.categoryId, item.itemId)
-                          const leaderLevel = getItemScoreLevel(Number(item.leader_score), category.categoryId, item.itemId)
-                          return (
-                            <div key={item.itemId} className="bg-gray-50 rounded-lg p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="font-medium">{item.item_name}</span>
-                                <div className="flex items-center gap-2">
-                                  {getDifferenceIcon(item.difference)}
-                                  <span className={`text-sm ${getDifferenceColor(item.difference)}`}>
-                                    {formatDifference(item.difference)}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-gray-600 text-sm">自评：</span>
-                                    <span className="font-medium">{Number(item.self_score).toFixed(1)}</span>
+                        {/* 详细项目对比 */}
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-gray-700">详细项目对比</h4>
+                          {selfCategory.items.map((selfItem) => {
+                            // 找到对应的领导评分项目
+                            const leaderItem = leaderCategory.items.find(
+                              item => item.itemId === selfItem.itemId
+                            )
+                            
+                            if (!leaderItem) return null
+                            
+                            const itemDifference = Number(leaderItem.score) - Number(selfItem.score)
+                            const itemName = getItemName(selfCategory.categoryId, selfItem.itemId)
+                            const selfLevel = getItemScoreLevel(Number(selfItem.score), selfCategory.categoryId, selfItem.itemId)
+                            const leaderLevel = getItemScoreLevel(Number(leaderItem.score), selfCategory.categoryId, selfItem.itemId)
+                            
+                            return (
+                              <div key={selfItem.itemId} className="bg-gray-50 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="font-medium">{itemName}</span>
+                                  <div className="flex items-center gap-2">
+                                    {getDifferenceIcon(itemDifference)}
+                                    <span className={`text-sm ${getDifferenceColor(itemDifference)}`}>
+                                      {formatDifference(itemDifference)}
+                                    </span>
                                   </div>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs ${selfLevel.bgColor} ${selfLevel.color} ${selfLevel.borderColor}`}
-                                  >
-                                    {selfLevel.level}
-                                  </Badge>
                                 </div>
                                 
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-gray-600 text-sm">领导：</span>
-                                    <span className="font-medium">{Number(item.leader_score).toFixed(1)}</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-600 text-sm">自评：</span>
+                                      <span className="font-medium">{Number(selfItem.score).toFixed(1)}</span>
+                                    </div>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs ${selfLevel.bgColor} ${selfLevel.color} ${selfLevel.borderColor}`}
+                                    >
+                                      {selfLevel.level}
+                                    </Badge>
                                   </div>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs ${leaderLevel.bgColor} ${leaderLevel.color} ${leaderLevel.borderColor}`}
-                                  >
-                                    {leaderLevel.level}
-                                  </Badge>
+                                  
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-600 text-sm">领导：</span>
+                                      <span className="font-medium">{Number(leaderItem.score).toFixed(1)}</span>
+                                    </div>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs ${leaderLevel.bgColor} ${leaderLevel.color} ${leaderLevel.borderColor}`}
+                                    >
+                                      {leaderLevel.level}
+                                    </Badge>
+                                  </div>
                                 </div>
+                                
+                                {/* 等级差异提示 */}
+                                {selfLevel.level !== leaderLevel.level && (
+                                  <div className="mt-2 text-xs text-gray-500 bg-yellow-50 p-2 rounded">
+                                    等级差异：自评为"{selfLevel.level}"，领导评价为"{leaderLevel.level}"
+                                  </div>
+                                )}
                               </div>
-                              
-                              {/* 等级差异提示 */}
-                              {selfLevel.level !== leaderLevel.level && (
-                                <div className="mt-2 text-xs text-gray-500 bg-yellow-50 p-2 rounded">
-                                  等级差异：自评为"{selfLevel.level}"，领导评价为"{leaderLevel.level}"
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
+                            )
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
@@ -837,10 +863,10 @@ export default function EmployeeEvaluationResultPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="w-5 h-5 text-purple-600" />
-                  上级评分详情
+                  {comparisonData.evaluation_status?.boss_enabled ? '老板评分详情' : '上级评分详情'}
                 </CardTitle>
                 <CardDescription>
-                  上级对您的评估内容和详细评分
+                  {comparisonData.evaluation_status?.boss_enabled ? '老板对您的评估内容和详细评分' : '上级对您的评估内容和详细评分'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -854,6 +880,7 @@ export default function EmployeeEvaluationResultPage() {
                         {getScoreLevel(Number(comparisonData.boss_evaluation.score))}
                       </div>
                     </div>
+                    {comparisonData.boss_evaluation.detailed_scores ? (
                     <div className="space-y-4">
                       {comparisonData.boss_evaluation.detailed_scores.map((category) => (
                         <div key={category.categoryId} className="border rounded-lg p-4">
@@ -909,13 +936,59 @@ export default function EmployeeEvaluationResultPage() {
                         </div>
                       ))}
                     </div>
+                    ) : (
+                    <div className="space-y-4">
+                      {/* 显示反馈信息，无详细分项 */}
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4" />
+                          评估反馈
+                        </h3>
+                        
+                        <div className="space-y-3">
+                          {comparisonData.boss_evaluation.feedback && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">总体反馈</label>
+                              <p className="text-gray-600 bg-white p-3 rounded border">
+                                {comparisonData.boss_evaluation.feedback}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {comparisonData.boss_evaluation.strengths && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">优势与亮点</label>
+                              <p className="text-gray-600 bg-white p-3 rounded border">
+                                {comparisonData.boss_evaluation.strengths}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {comparisonData.boss_evaluation.improvements && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">改进建议</label>
+                              <p className="text-gray-600 bg-white p-3 rounded border">
+                                {comparisonData.boss_evaluation.improvements}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {comparisonData.boss_evaluation.submitted_at && (
+                            <div className="text-sm text-gray-500 pt-2 border-t">
+                              提交时间：{new Date(comparisonData.boss_evaluation.submitted_at).toLocaleString('zh-CN')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <Star className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                     <p>
                       {templateData?.scoring_rules?.boss_evaluation?.enabled 
-                        ? '上级尚未完成评分' 
+                        ? (comparisonData.evaluation_status?.boss_enabled ? '老板尚未完成评分' : '上级尚未完成评分')
                         : '此考核不包含上级评分'}
                     </p>
                   </div>

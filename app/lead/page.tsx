@@ -341,7 +341,7 @@ export default function LeadDashboard() {
                     </div>
 
                     {/* 评分状态 */}
-                    <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
                       <div>
                         <span className="text-gray-600">自评状态：</span>
                         <span className={`font-semibold ${member.evaluation_status?.self_completed ? 'text-green-600' : 'text-gray-400'}`}>
@@ -349,7 +349,7 @@ export default function LeadDashboard() {
                         </span>
                         {member.evaluation_status?.self_score && (
                           <span className="ml-1 text-gray-500">
-                            ({member.evaluation_status.self_score}分)
+                            ({Number(member.evaluation_status.self_score).toFixed(1)}分)
                           </span>
                         )}
                       </div>
@@ -360,10 +360,23 @@ export default function LeadDashboard() {
                         </span>
                         {member.evaluation_status?.leader_score && (
                           <span className="ml-1 text-gray-500">
-                            ({member.evaluation_status.leader_score}分)
+                            ({Number(member.evaluation_status.leader_score).toFixed(1)}分)
                           </span>
                         )}
                       </div>
+                      {typeof member.evaluation_status?.boss_completed !== 'undefined' && (
+                        <div>
+                          <span className="text-gray-600">老板评分：</span>
+                          <span className={`font-semibold ${member.evaluation_status?.boss_completed ? 'text-green-600' : 'text-orange-600'}`}>
+                            {member.evaluation_status?.boss_completed ? '已完成' : '待评分'}
+                          </span>
+                          {typeof member.evaluation_status?.boss_score !== 'undefined' && member.evaluation_status?.boss_score !== null && (
+                            <span className="ml-1 text-gray-500">
+                              ({Number(member.evaluation_status.boss_score).toFixed(1)}分)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* 操作按钮 */}

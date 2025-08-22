@@ -100,7 +100,7 @@ export default function BossEvaluationPage() {
       router.push(`/boss/evaluation/view/${task.evaluation_id}`)
     } else {
       // 如果没有evaluation_id，跳转到对比页面
-      router.push(`/lead/evaluation/comparison/${task.assessment_id}/${task.evaluatee_id}`)
+      router.push(`/boss/evaluation/comparison/${task.assessment_id}/${task.evaluatee_id}`)
     }
   }
 

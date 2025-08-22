@@ -542,14 +542,18 @@ export default function BossEvaluationViewPage() {
             返回评分列表
           </Button>
           
-          {comparison && (
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/lead/evaluation/comparison/${evaluation.assessment_id}/${evaluation.evaluatee_id}`)}
-            >
-              查看详细对比
-            </Button>
-          )}
+          {(() => {
+            const assessmentIdForLink = (evaluation as any)?.assessment_id || (evaluation as any)?.assessment?.id
+            const evaluateeIdForLink = (evaluation as any)?.evaluatee_id || (evaluation as any)?.evaluatee?.id
+            return comparison && assessmentIdForLink && evaluateeIdForLink ? (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/boss/evaluation/comparison/${assessmentIdForLink}/${evaluateeIdForLink}`)}
+              >
+                查看详细对比
+              </Button>
+            ) : null
+          })()}
         </div>
           </TabsContent>
 
