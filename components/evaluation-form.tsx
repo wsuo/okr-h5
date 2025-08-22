@@ -67,6 +67,8 @@ export default function EvaluationForm({
   const [isDirty, setIsDirty] = useState(false)
   const [initialDataHash, setInitialDataHash] = useState<string>('')
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+  const [showZeroScoreConfirm, setShowZeroScoreConfirm] = useState(false)
+  const [zeroScoreItems, setZeroScoreItems] = useState<Array<{categoryName: string, itemName: string}>>([])
 
   // 创建数据哈希用于比较
   const createDataHash = useCallback((scores: DetailedScore[], review: string, strengths: string, improvements: string) => {
@@ -396,6 +398,30 @@ export default function EvaluationForm({
     }
   }
 
+  // 检查0分项目
+  const checkZeroScoreItems = useCallback(() => {
+    const zeroItems: Array<{categoryName: string, itemName: string}> = []
+    
+    detailedScores.forEach(categoryScore => {
+      const category = template.categories.find(c => c.id === categoryScore.categoryId)
+      if (category) {
+        categoryScore.items.forEach(item => {
+          if (item.score === 0) {
+            const itemConfig = category.items.find(i => i.id === item.itemId)
+            if (itemConfig) {
+              zeroItems.push({
+                categoryName: category.name,
+                itemName: itemConfig.name
+              })
+            }
+          }
+        })
+      }
+    })
+    
+    return zeroItems
+  }, [detailedScores, template])
+
   // 触发提交确认
   const handleSubmit = () => {
     // 验证数据
@@ -412,8 +438,15 @@ export default function EvaluationForm({
       return
     }
 
-    // 显示确认弹窗
-    setShowSubmitConfirm(true)
+    // 检查是否有0分项目
+    const zeroItems = checkZeroScoreItems()
+    if (zeroItems.length > 0) {
+      setZeroScoreItems(zeroItems)
+      setShowZeroScoreConfirm(true)
+    } else {
+      // 没有0分项目，直接显示确认弹窗
+      setShowSubmitConfirm(true)
+    }
   }
 
   // 确认提交评估
@@ -432,7 +465,6 @@ export default function EvaluationForm({
           detailed_scores: detailedScores
         }
         await evaluationService.submitDetailedSelfEvaluation(submitData)
-        toast.success('自评提交成功')
       } else if (type === 'leader') {
         if (!evaluateeId) {
           toast.error('缺少被评估人信息')
@@ -447,7 +479,6 @@ export default function EvaluationForm({
           detailed_scores: detailedScores
         }
         await evaluationService.submitDetailedLeaderEvaluation(submitData)
-        toast.success('领导评分提交成功')
       } else if (type === 'boss') {
         if (!evaluateeId) {
           toast.error('缺少被评估人信息')
@@ -462,7 +493,6 @@ export default function EvaluationForm({
           detailed_scores: detailedScores
         }
         await evaluationService.submitDetailedBossEvaluation(submitData)
-        toast.success('上级评分提交成功')
       }
 
       onSubmit?.()
@@ -474,6 +504,12 @@ export default function EvaluationForm({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // 处理0分项目确认
+  const handleZeroScoreConfirm = () => {
+    setShowZeroScoreConfirm(false)
+    setShowSubmitConfirm(true)
   }
 
   // 导航到上一个分类
@@ -799,6 +835,48 @@ export default function EvaluationForm({
           </div>
         </CardContent>
       </Card>
+
+      {/* 0分项目确认弹窗 */}
+      <AlertDialog open={showZeroScoreConfirm} onOpenChange={setShowZeroScoreConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-5 h-5" />
+              发现0分评分项
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-3">
+                <p>检测到以下评分项为0分，请确认是否继续提交：</p>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 max-h-60 overflow-y-auto">
+                  <ul className="space-y-2">
+                    {zeroScoreItems.map((item, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-orange-600 mt-1">•</span>
+                        <span className="text-sm">
+                          <span className="font-medium">{item.categoryName}</span> - {item.itemName}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="text-sm text-gray-600">
+                  如果这些0分是您有意为之，请点击"确认无误"继续提交。
+                  如果需要修改，请点击"返回修改"。
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>返回修改</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleZeroScoreConfirm}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              确认无误
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
