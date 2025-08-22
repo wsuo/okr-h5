@@ -25,3 +25,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code specific files (do not commit)
+CODEX.md
+CLAUDE.md
+docs/
