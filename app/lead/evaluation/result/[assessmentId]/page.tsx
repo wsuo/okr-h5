@@ -26,13 +26,18 @@ interface TeamMemberResult {
   department: string
   self_status: 'pending' | 'completed'
   leader_status: 'pending' | 'completed'
+  boss_status?: 'pending' | 'completed'  // 新增老板评分状态
   self_score?: number
   leader_score?: number
+  boss_score?: number  // 新增老板评分
   final_score?: number
   current_score?: number
   completion_status?: string
   comparison?: EvaluationComparison
   last_updated?: string
+  self_completed_at?: string
+  leader_completed_at?: string
+  boss_completed_at?: string  // 新增老板评分完成时间
 }
 
 export default function LeadEvaluationResultPage() {
@@ -132,13 +137,18 @@ export default function LeadEvaluationResultPage() {
               department: participant.department,
               self_status: participant.self_status,
               leader_status: participant.leader_status,
+              boss_status: participant.boss_status,  // 新增老板评分状态
               self_score: comparison?.self_evaluation?.score,
               leader_score: comparison?.leader_evaluation?.score,
+              boss_score: comparison?.boss_evaluation?.score,  // 新增老板评分
               final_score: assessmentParticipant?.final_score || comparison?.leader_evaluation?.score || comparison?.self_evaluation?.score,
               current_score: comparison?.evaluation_status?.current_score,
               completion_status: comparison?.evaluation_status?.completion_status,
               comparison,
-              last_updated: participant.leader_completed_at || participant.self_completed_at
+              self_completed_at: participant.self_completed_at,
+              leader_completed_at: participant.leader_completed_at,
+              boss_completed_at: participant.boss_completed_at,  // 新增老板评分完成时间
+              last_updated: participant.boss_completed_at || participant.leader_completed_at || participant.self_completed_at
             } as TeamMemberResult
           } catch (error) {
             console.warn(`获取用户${participant.user_id}对比数据失败:`, error)
@@ -154,10 +164,14 @@ export default function LeadEvaluationResultPage() {
               department: participant.department,
               self_status: participant.self_status,
               leader_status: participant.leader_status,
+              boss_status: participant.boss_status,  // 新增老板评分状态
               final_score: assessmentParticipant?.final_score,
               current_score: undefined,
               completion_status: undefined,
-              last_updated: participant.leader_completed_at || participant.self_completed_at
+              self_completed_at: participant.self_completed_at,
+              leader_completed_at: participant.leader_completed_at,
+              boss_completed_at: participant.boss_completed_at,  // 新增老板评分完成时间
+              last_updated: participant.boss_completed_at || participant.leader_completed_at || participant.self_completed_at
             } as TeamMemberResult
           }
         })
@@ -332,7 +346,7 @@ export default function LeadEvaluationResultPage() {
 
         {/* 总体统计 */}
         {progressData && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -365,6 +379,18 @@ export default function LeadEvaluationResultPage() {
                     <p className="text-xs text-gray-500">{safeToFixed(progressData.leader_completion_rate, 0)}%</p>
                   </div>
                   <BarChart3 className="w-8 h-8 text-purple-600" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">老板评分</p>
+                    <p className="text-2xl font-bold text-indigo-600">{progressData.boss_completed_count}</p>
+                    <p className="text-xs text-gray-500">{safeToFixed(progressData.boss_completion_rate, 0)}%</p>
+                  </div>
+                  <BarChart3 className="w-8 h-8 text-indigo-600" />
                 </div>
               </CardContent>
             </Card>
@@ -414,7 +440,7 @@ export default function LeadEvaluationResultPage() {
                         {getStatusBadge(result.self_status, result.leader_status, result.completion_status)}
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
                         <div>
                           <span className="text-gray-600">自评得分：</span>
                           <span className={`font-semibold ${getScoreColor(safeToNumber(result.self_score))}`}>
@@ -427,9 +453,17 @@ export default function LeadEvaluationResultPage() {
                             {safeToFixed(result.leader_score)}
                           </span>
                         </div>
+                        {result.boss_score && (
+                          <div>
+                            <span className="text-gray-600">老板评分：</span>
+                            <span className={`font-semibold ${getScoreColor(safeToNumber(result.boss_score))}`}>
+                              {safeToFixed(result.boss_score)}
+                            </span>
+                          </div>
+                        )}
                         <div>
-                          <span className="text-gray-600">当前得分：</span>
-                          <span className={`font-semibold ${getScoreColor(safeToNumber(result.current_score || result.final_score))}`}>
+                          <span className="text-gray-600">最终得分：</span>
+                          <span className={`font-semibold text-lg ${getScoreColor(safeToNumber(result.current_score || result.final_score))}`}>
                             {safeToFixed(result.current_score || result.final_score)}
                           </span>
                         </div>
@@ -499,7 +533,7 @@ export default function LeadEvaluationResultPage() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
                           <div>
                             <span className="text-gray-600">自评得分：</span>
                             <span className="font-semibold">{safeToFixed(result.self_score)}</span>
@@ -508,6 +542,12 @@ export default function LeadEvaluationResultPage() {
                             <span className="text-gray-600">领导评分：</span>
                             <span className="font-semibold">{safeToFixed(result.leader_score)}</span>
                           </div>
+                          {result.boss_score && (
+                            <div>
+                              <span className="text-gray-600">老板评分：</span>
+                              <span className="font-semibold">{safeToFixed(result.boss_score)}</span>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center justify-between">
@@ -560,7 +600,7 @@ export default function LeadEvaluationResultPage() {
                           {getStatusBadge(result.self_status, result.leader_status, result.completion_status)}
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
                           <div className="flex items-center gap-2">
                             {result.self_status === 'completed' ? (
                               <CheckCircle className="w-4 h-4 text-green-600" />
@@ -577,6 +617,16 @@ export default function LeadEvaluationResultPage() {
                             )}
                             <span>领导评分：{result.leader_status === 'completed' ? '已完成' : '待完成'}</span>
                           </div>
+                          {result.boss_status && (
+                            <div className="flex items-center gap-2">
+                              {result.boss_status === 'completed' ? (
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                              )}
+                              <span>老板评分：{result.boss_status === 'completed' ? '已完成' : '待完成'}</span>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center justify-between">
@@ -644,7 +694,7 @@ export default function LeadEvaluationResultPage() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                        <div className={`grid ${result.boss_score ? 'grid-cols-4' : 'grid-cols-3'} gap-4 text-center mb-4`}>
                           <div className="p-3 bg-blue-50 rounded-lg">
                             <div className="text-2xl font-bold text-blue-600">
                               {safeToFixed(result.self_score)}
@@ -657,6 +707,14 @@ export default function LeadEvaluationResultPage() {
                             </div>
                             <div className="text-sm text-gray-600">领导评分</div>
                           </div>
+                          {result.boss_score && (
+                            <div className="p-3 bg-indigo-50 rounded-lg">
+                              <div className="text-2xl font-bold text-indigo-600">
+                                {safeToFixed(result.boss_score)}
+                              </div>
+                              <div className="text-sm text-gray-600">老板评分</div>
+                            </div>
+                          )}
                           <div className="p-3 bg-gray-50 rounded-lg">
                             <div className="text-2xl font-bold text-gray-600">
                               {result.self_score && result.leader_score 
@@ -664,7 +722,7 @@ export default function LeadEvaluationResultPage() {
                                 : '--'
                               }
                             </div>
-                            <div className="text-sm text-gray-600">分差</div>
+                            <div className="text-sm text-gray-600">领导-自评分差</div>
                           </div>
                         </div>
                         
