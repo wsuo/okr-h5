@@ -27,11 +27,14 @@ export interface AssessmentParticipant {
   }
   self_score?: number
   leader_score?: number
+  boss_score?: number  // 新增老板评分
   final_score?: number
   self_completed: boolean
   leader_completed: boolean
+  boss_completed: boolean  // 新增老板评分完成状态
   self_submitted_at?: string
   leader_submitted_at?: string
+  boss_submitted_at?: string  // 新增老板评分提交时间
   created_at: string
   updated_at: string
 }
@@ -41,6 +44,7 @@ export interface AssessmentStatistics {
   total_participants: number
   self_completed_count: number
   leader_completed_count: number
+  boss_completed_count: number  // 新增老板评分完成数量
   fully_completed_count: number
   average_score: number
   highest_score: number

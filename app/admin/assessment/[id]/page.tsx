@@ -461,7 +461,7 @@ export default function AssessmentDetailPage() {
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          {participant.self_completed && participant.leader_completed ? (
+                          {participant.self_completed && participant.leader_completed && participant.boss_completed ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200">已完成</Badge>
                           ) : (
                             <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">进行中</Badge>
@@ -469,7 +469,7 @@ export default function AssessmentDetailPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm mb-3">
                         <div>
                           <span className="text-gray-600">自评状态：</span>
                           <span className={participant.self_completed ? "text-green-600 font-medium" : "text-red-600"}>
@@ -482,21 +482,40 @@ export default function AssessmentDetailPage() {
                             {participant.leader_completed ? "已完成" : "未完成"}
                           </span>
                         </div>
+                        <div>
+                          <span className="text-gray-600">老板评分：</span>
+                          <span className={participant.boss_completed ? "text-green-600 font-medium" : "text-red-600"}>
+                            {participant.boss_completed ? "已完成" : "未完成"}
+                          </span>
+                        </div>
                         {participant.self_score && (
                           <div>
                             <span className="text-gray-600">自评得分：</span>
                             <span className="font-medium">{participant.self_score}</span>
                           </div>
                         )}
-                        {participant.final_score && (
+                        {participant.leader_score && (
                           <div>
-                            <span className="text-gray-600">最终得分：</span>
-                            <span className="font-medium text-blue-600">{participant.final_score}</span>
+                            <span className="text-gray-600">领导得分：</span>
+                            <span className="font-medium">{participant.leader_score}</span>
+                          </div>
+                        )}
+                        {participant.boss_score && (
+                          <div>
+                            <span className="text-gray-600">老板得分：</span>
+                            <span className="font-medium">{participant.boss_score}</span>
                           </div>
                         )}
                       </div>
+                      
+                      {participant.final_score && (
+                        <div className="mb-3">
+                          <span className="text-gray-600">最终得分：</span>
+                          <span className="font-medium text-blue-600 text-lg ml-2">{participant.final_score}</span>
+                        </div>
+                      )}
 
-                      {participant.self_completed && participant.leader_completed && (
+                      {participant.self_completed && participant.leader_completed && participant.boss_completed && (
                         <div className="mt-3">
                           <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                             <span>完成进度</span>
@@ -547,6 +566,23 @@ export default function AssessmentDetailPage() {
                         <Progress
                           value={
                             (assessmentDetail.statistics.leader_completed_count /
+                              assessmentDetail.statistics.total_participants) *
+                            100
+                          }
+                          className="w-20 h-2"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>老板评分完成</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">
+                          {assessmentDetail.statistics.boss_completed_count}/
+                          {assessmentDetail.statistics.total_participants}
+                        </span>
+                        <Progress
+                          value={
+                            (assessmentDetail.statistics.boss_completed_count /
                               assessmentDetail.statistics.total_participants) *
                             100
                           }
