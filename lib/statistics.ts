@@ -19,7 +19,7 @@ export interface DashboardStatistics {
   }
   department_stats: DepartmentStat[]
   recent_assessments: RecentAssessment[]
-  score_distribution: ScoreDistribution[]
+  score_distribution: ScoreDistribution[] | ScoreDistributionNew  // 支持两种格式
 }
 
 // 部门统计数据接口
@@ -52,6 +52,14 @@ export interface ScoreDistribution {
   range: string
   count: number
   percentage: number
+}
+
+// 新的分数分布格式
+export interface ScoreDistributionNew {
+  excellent: number
+  good: number
+  average: number
+  poor: number
 }
 
 // 考核统计数据接口
