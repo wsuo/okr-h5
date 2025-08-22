@@ -953,3 +953,124 @@ ultrathink
   还是有问题，老板评分时候不需要读取模板的评分项目，因为老板是统筹的角度去评分的，老板评分的内容应该只是一句话（非必填），因为老板的时间很少，他不可能一个项目一个项目的去评分，也不了解员工，所以老板是最终总结的角色，只需要输入分数、评语，即可，我们后端对这块内容做一个保存，前端查询的时候返回给前端即可。
   
   请你继续，测试并修改完成之后，更新 业务 下面的文档。
+
+---
+
+我需要你增加一个提示确认弹窗，应对这个场景：有的时候用户可能没看到某一项评分，导致略过了这一项，
+最终导致这一项为0分，我希望系统在提交之前检查每一项，如果有0分的项目，需要在提交的时候提醒用户
+哪一项还没有填写，让用户确认，如果用户依然点击确认无误，才提交。这个功能在员工端和领导端提交的时候都要添加。
+
+在 http://localhost:3020/employee/evaluation 页面
+调用了 http://localhost:3010/api/v1/evaluations?type=self 接口，返回值为：
+返回值 data.items 有6个，为什么前端只展示了一个？
+
+在 ‘http://localhost:3020/lead’页面
+调用了 ‘http://localhost:3010/api/v1/users/team-members’，这个接口的返回值为：
+
+{
+    "code": 200,
+    "message": "success",
+    "data": {
+        "members": [
+            {
+                "user_id": 9,
+                "user_name": "杨行行",
+                "email": "allan@agrochainhub.com",
+                "department": "市场部",
+                "position": "市场部老大",
+                "has_active_assessment": true,
+                "is_historical": false,
+                "last_updated": "2025-07-30T06:08:44.000Z",
+                "current_assessment": {
+                    "assessment_id": 17,
+                    "assessment_title": "2025年05月绩效考核",
+                    "status": "active",
+                    "start_date": "2025-05-01",
+                    "end_date": "2025-05-31",
+                    "period": "2025-05"
+                },
+                "evaluation_status": {
+                    "self_completed": true,
+                    "leader_completed": true,
+                    "self_completed_at": "2025-07-30T05:44:38.000Z",
+                    "leader_completed_at": "2025-07-30T06:08:46.000Z",
+                    "final_score": null,
+                    "self_score": "70.18",
+                    "leader_score": "80.58",
+                    "current_employee_score": 76.42
+                }
+            }
+        ],
+        "total_members": 1,
+        "active_assessments_count": 1,
+        "self_completed_count": 1,
+        "leader_completed_count": 1
+    },
+    "timestamp": "2025-07-30T08:07:54.868Z",
+    "path": "/api/v1/users/team-members"
+}
+
+我增加了 current_employee_score ，请你匹配页面中的 ‘当前得分’ 字段。如果 final_score 不是null，则展示这个字段的值。
+
+
+在员工自评的 ‘评估中心’ 的页面，我希望在 ‘已完成’ 下面再增加3个tab，分别展示 ‘已完成自评’、‘领导已完成评价’、‘已全部完成’，对应 只完成了自评、完成了自评+领导评价、完成了自评+领导评价+老板评价
+三种状态，我修改了原来的一个接口来兼容这种模式。
+
+关于接口，请你参考以下描述信息：
+我已经成功扩展了现有的 assessments-history 接口来满足您的需求，而不是新建接口。这是
+  最优的解决方案，因为现有接口已经包含了大部分所需功能。
+
+  实现的功能
+
+  1. 新增 completion_stage 参数
+
+  可以按完成阶段过滤评估记录：
+
+  // DTO定义
+  completion_stage?: "self_only" | "self_leader" | "all_completed"
+
+  过滤逻辑：
+  - self_only: 只完成自评，未完成领导评的记录
+  - self_leader: 完成自评+领导评，但未完成老板评的记录
+  - all_completed: 全部完成的记录（包括老板评分，如果需要的话）
+
+  2. 新增 boss_evaluation 字段
+
+  返回结果中包含老板评分的完整信息：
+
+  boss_evaluation?: {
+    completed: boolean;
+    score?: number;
+    boss_id?: number;
+    boss_name?: string;
+    submitted_at?: Date;
+    last_updated?: Date;
+  }
+
+  3. 完整的返回信息
+
+  接口现在返回：
+  - ✅ 考核基本信息（assessment_id, title, period, status等）
+  - ✅ 自评信息（完成状态、分数、完成时间）
+  - ✅ 领导评信息（完成状态、分数、完成时间、评估者信息）
+  - ✅ 老板评信息（完成状态、分数、完成时间、评估者信息）
+  - ✅ 当前员工加权分数（current_employee_score）
+  - ✅ 最终分数和等级
+  - ✅ 权重配置
+
+  接口使用示例
+
+  # 获取所有评估记录（默认行为，保持兼容性）
+  GET /api/v1/users/{userId}/assessments-history
+
+  # 获取只完成自评的记录
+  GET /api/v1/users/{userId}/assessments-history?completion_stage=self_only
+
+  # 获取完成自评+领导评的记录  
+  GET /api/v1/users/{userId}/assessments-history?completion_stage=self_leader
+
+  # 获取全部完成的记录
+  GET /api/v1/users/{userId}/assessments-history?completion_stage=all_completed
+
+  # 可以与其他参数组合使用
+  GET /api/v1/users/{userId}/assessments-history?completion_stage=self_only&year=2025

@@ -90,6 +90,11 @@ okr-h5/
 └── styles/                # 样式文件
 ```
 
+## 开发助手提示词
+
+- Claude Code 提示词: 见 `CLAUDE.md`
+- Codex CLI 提示词: 见 `CODEX.md`
+
 ## 开发计划
 
 - [ ] 后端API集成
