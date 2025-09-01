@@ -18,6 +18,34 @@ npm run start      # 启动生产服务器
 npm run lint       # 代码检查
 ```
 
+## 部署相关
+
+```bash
+# 查看部署指南
+./deploy.sh
+
+# 快速部署（日常更新）
+./deploy/quick-deploy.sh
+
+# 完整部署（重大更新）
+./deploy/deploy.sh
+
+# 回滚到上一版本
+./deploy/deploy.sh rollback
+```
+
+ssh root@47.239.124.157 "pm2 logs okr-frontend"
+
+**生产环境信息：**
+- 服务器: 47.239.124.157  
+- 域名: okr.gerenukagro.com
+- 前端端口: 3020
+- 后端端口: 3010
+- 部署目录: /www/wwwroot/okr.gerenukagro.com
+- 进程管理: PM2
+
+详细部署文档请查看: `deploy/README.md`
+
 ## 后端 API 配置
 
 - **API 基础地址**: `http://localhost:3000/api/v1`（后端）

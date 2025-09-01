@@ -262,7 +262,7 @@ export default function BossReportsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <BossHeader userInfo={userInfo} />
-        <div className="container mx-auto p-4 max-w-7xl">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
           <div className="flex items-center justify-center h-96">
             <div className="flex items-center gap-2">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -278,7 +278,7 @@ export default function BossReportsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <BossHeader userInfo={userInfo} />
-        <div className="container mx-auto p-4 max-w-7xl">
+        <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
               <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -296,32 +296,32 @@ export default function BossReportsPage() {
     <div className="min-h-screen bg-gray-50">
       <BossHeader userInfo={userInfo} />
 
-      <div className="container mx-auto p-4 max-w-7xl">
+      <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
         {/* 页面标题和筛选器 */}
-        <div className="mb-6">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-6 h-6" />
+        <div className="mb-4 sm:mb-6">
+          <div className="mb-3 sm:mb-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
               数据报表分析
             </h1>
-            <p className="text-gray-600">深度洞察企业绩效数据，助力决策优化</p>
+            <p className="text-sm sm:text-base text-gray-600">深度洞察企业绩效数据，助力决策优化</p>
           </div>
 
           {/* 筛选器 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                 <Filter className="w-5 h-5" />
                 数据筛选
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 {/* 时间范围筛选 */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <Calendar className="w-4 h-4 text-gray-500" />
                   <Select value={timeRange} onValueChange={setTimeRange}>
-                    <SelectTrigger className="w-32">
+                    <SelectTrigger className="w-full sm:w-32">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -335,10 +335,10 @@ export default function BossReportsPage() {
                 </div>
 
                 {/* 部门筛选 */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <Building2 className="w-4 h-4 text-gray-500" />
                   <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-full sm:w-40">
                       <SelectValue placeholder="选择部门" />
                     </SelectTrigger>
                     <SelectContent>
@@ -351,7 +351,7 @@ export default function BossReportsPage() {
                 </div>
 
                 {/* 搜索框 */}
-                <div className="flex-1 max-w-sm relative">
+                <div className="flex-1 min-w-0 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
                     placeholder="搜索员工或职位..."
@@ -366,70 +366,70 @@ export default function BossReportsPage() {
         </div>
 
         {/* 核心指标卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-6 mb-4 sm:mb-6">
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">总参与人数</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-xs sm:text-sm text-gray-600">总参与人数</p>
+                  <p className="text-lg sm:text-2xl font-bold text-blue-600">
                     {dashboardData?.overview.total_users || 0}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">当前周期参与</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">当前周期参与</p>
                 </div>
-                <Users className="w-8 h-8 text-blue-600" />
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">整体完成率</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-xs sm:text-sm text-gray-600">整体完成率</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-600">
                     {dashboardData?.overview.completion_rate?.toFixed(1) || '0.0'}%
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">所有评估完成率</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">所有评估完成率</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">平均绩效分</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-xs sm:text-sm text-gray-600">平均绩效分</p>
+                  <p className="text-lg sm:text-2xl font-bold text-purple-600">
                     {dashboardData?.overview.average_score?.toFixed(1) || '0.0'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">综合评估得分</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">综合评估得分</p>
                 </div>
-                <Award className="w-8 h-8 text-purple-600" />
+                <Award className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">活跃考核数</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-xs sm:text-sm text-gray-600">活跃考核数</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-600">
                     {dashboardData?.overview.active_assessments || 0}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">进行中的考核</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">进行中的考核</p>
                 </div>
-                <Activity className="w-8 h-8 text-orange-600" />
+                <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* 图表区域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* 绩效趋势图 */}
           <Card>
             <CardHeader>
@@ -438,7 +438,7 @@ export default function BossReportsPage() {
             </CardHeader>
             <CardContent>
               {processTrendsData().length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
                   <LineChart data={processTrendsData()}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
@@ -474,7 +474,7 @@ export default function BossReportsPage() {
               <CardDescription>各部门评分和完成率对比</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
                 <BarChart data={processDepartmentData()}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="department" />
@@ -498,7 +498,7 @@ export default function BossReportsPage() {
         </div>
 
         {/* 分数分布和详细数据 */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* 分数分布饼图 */}
           <Card className="lg:col-span-2">
             <CardHeader>
@@ -506,7 +506,7 @@ export default function BossReportsPage() {
               <CardDescription>员工绩效等级分布情况</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={380}>
+              <ResponsiveContainer width="100%" height={300} className="sm:h-[380px]">
                 <PieChart>
                   <Pie
                     data={processScoreDistribution()}
@@ -612,7 +612,7 @@ export default function BossReportsPage() {
             <CardDescription>当前筛选条件下的详细统计信息</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               <div className="space-y-3">
                 <h4 className="font-medium text-gray-900">评分维度对比</h4>
                 <div className="space-y-2">
