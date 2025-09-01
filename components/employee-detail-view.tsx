@@ -143,6 +143,49 @@ export default function EmployeeDetailView({
     return "待改进"
   }
 
+  // 获取评估完成状态的函数
+  const getEvaluationStatusBadge = (record: EmployeeAssessmentHistory) => {
+    // 如果全部评分环节都完成
+    if (record.participant_completed === true) {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-200">
+          考核已完成
+        </Badge>
+      )
+    }
+
+    // 检查各个阶段的完成情况
+    const selfCompleted = record.self_evaluation?.completed === true
+    const leaderCompleted = record.leader_evaluation?.completed === true
+    const bossCompleted = record.boss_evaluation?.completed === true
+
+    if (selfCompleted && leaderCompleted && bossCompleted) {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-200">
+          考核已完成
+        </Badge>
+      )
+    } else if (selfCompleted && leaderCompleted) {
+      return (
+        <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+          领导已评分
+        </Badge>
+      )
+    } else if (selfCompleted) {
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+          个人已完成
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+          未开始
+        </Badge>
+      )
+    }
+  }
+
   const getScoreBadge = (score: number) => {
     const level = getScoreLevel(score)
     const colorClass =
@@ -410,15 +453,7 @@ export default function EmployeeDetailView({
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            {typeof record.participant_completed === 'boolean' && (
-                              <Badge className={
-                                record.participant_completed 
-                                  ? "bg-green-100 text-green-800 border-green-200"
-                                  : "bg-gray-100 text-gray-800 border-gray-200"
-                              }>
-                                {record.participant_completed ? '个人已完成' : '个人未完成'}
-                              </Badge>
-                            )}
+                            {getEvaluationStatusBadge(record)}
                           </div>
                         </div>
 
