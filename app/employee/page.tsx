@@ -229,7 +229,7 @@ export default function EmployeeDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <EmployeeHeader userInfo={userInfo} />
-        <div className="container mx-auto p-4 max-w-4xl">
+        <div className="container mx-auto p-2 sm:p-4 max-w-4xl">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             <span className="ml-2 text-gray-600">加载评估数据...</span>
@@ -243,19 +243,19 @@ export default function EmployeeDashboard() {
     <div className="min-h-screen bg-gray-50">
       <EmployeeHeader userInfo={userInfo} />
 
-      <div className="container mx-auto p-4 max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="container mx-auto p-2 sm:p-4 max-w-4xl">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">我的绩效中心</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">我的绩效中心</h1>
             <p className="text-gray-600">查看和管理您的绩效考核</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
             <div className="text-sm text-gray-500">
               总共 {evaluationStatus.selfOnly.length + completedAssessments.length} 个评估记录
             </div>
             <Button
               onClick={() => router.push('/employee/evaluation')}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
             >
               <FileText className="w-4 h-4 mr-2" />
               评估中心
@@ -264,55 +264,55 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* 个人统计 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">最近得分</p>
-                  <p className={`text-2xl font-bold ${getScoreColor(stats.latestScore)}`}>
+                  <p className={`text-xl sm:text-2xl font-bold ${getScoreColor(stats.latestScore)}`}>
                     {stats.latestScore > 0 ? stats.latestScore.toFixed(1) : '--'}
                   </p>
                   <p className="text-xs text-gray-500">
                     {stats.latestScore > 0 ? getScoreLevel(stats.latestScore) : '暂无数据'}
                   </p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-green-600" />
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">平均得分</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
                     {stats.averageScore > 0 ? stats.averageScore.toFixed(1) : '--'}
                   </p>
                   <p className="text-xs text-gray-500">
                     {stats.averageScore > 0 ? getScoreLevel(stats.averageScore) : '暂无数据'}
                   </p>
                 </div>
-                <User className="w-8 h-8 text-blue-600" />
+                <User className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">待办事项</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.pendingCount}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600">{stats.pendingCount}</p>
                   <p className="text-xs text-gray-500">需处理</p>
                 </div>
-                <AlertCircle className="w-8 h-8 text-orange-600" />
+                <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* 待办事项 */}
-        <Card className="mb-6">
+        <Card className="mb-4 sm:mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="w-5 h-5" />
@@ -326,8 +326,8 @@ export default function EmployeeDashboard() {
                 {evaluationTasks
                   .filter(task => task.status === 'pending' || task.status === 'in_progress')
                   .map((task) => (
-                  <div key={task.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
+                  <div key={task.id} className="border rounded-lg p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
                       <h3 className="font-semibold">{task.assessment_title}</h3>
                       {getTaskStatusBadge(task)}
                     </div>
@@ -345,7 +345,7 @@ export default function EmployeeDashboard() {
                         </>
                       )}
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="text-sm text-gray-600">
                         类型: {evaluationUtils.getTypeText(task.type)} • 
                         被评估人: {task.evaluatee_name}
@@ -354,6 +354,7 @@ export default function EmployeeDashboard() {
                         onClick={() => router.push(`/employee/evaluation/${task.assessment_id}`)} 
                         size="sm"
                         variant={task.is_overdue ? "destructive" : "default"}
+                        className="w-full sm:w-auto"
                       >
                         {task.status === 'in_progress' ? '继续评分' : '开始评分'}
                       </Button>
@@ -372,7 +373,7 @@ export default function EmployeeDashboard() {
         </Card>
 
         {/* 评估状态 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* 已完成自评 */}
           <Card>
             <CardHeader>
@@ -387,7 +388,7 @@ export default function EmployeeDashboard() {
                 <div className="space-y-3">
                   {evaluationStatus.selfOnly.map((task) => (
                     <div key={task.id} className="border rounded-lg p-3 bg-blue-50">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
                         <h3 className="font-semibold text-sm">{task.assessment_title}</h3>
                         <Badge variant="outline" className="text-blue-600 border-blue-600">
                           待领导评分
@@ -396,7 +397,7 @@ export default function EmployeeDashboard() {
                       <div className="text-xs text-gray-600 mb-2">
                         {task.assessment_period} • 自评已完成
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <span className="text-xs text-gray-500">
                           提交时间：{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}
                         </span>
@@ -404,6 +405,7 @@ export default function EmployeeDashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => router.push(`/employee/evaluation/result/${task.assessment_id}`)}
+                          className="w-full sm:w-auto"
                         >
                           查看详情
                         </Button>
@@ -434,7 +436,7 @@ export default function EmployeeDashboard() {
                 <div className="space-y-3">
                   {completedAssessments.slice(0, 3).map((assessment) => (
                     <div key={assessment.id} className="border rounded-lg p-3 bg-green-50">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
                         <h3 className="font-semibold text-sm">{assessment.title}</h3>
                         <Badge variant="outline" className="text-green-600 border-green-600">
                           已完成
@@ -443,7 +445,7 @@ export default function EmployeeDashboard() {
                       <div className="text-xs text-gray-600 mb-2">
                         {assessment.period} • 考核已完成
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <span className="text-xs text-gray-500">
                           完成时间：{assessment.updated_at && evaluationUtils.formatDateTime(assessment.updated_at)}
                         </span>
@@ -451,6 +453,7 @@ export default function EmployeeDashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => router.push(`/employee/evaluation/result/${assessment.id}`)}
+                          className="w-full sm:w-auto"
                         >
                           查看结果
                         </Button>

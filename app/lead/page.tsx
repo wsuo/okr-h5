@@ -145,7 +145,7 @@ export default function LeadDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <LeadHeader userInfo={userInfo} />
-        <div className="container mx-auto p-4 max-w-4xl">
+        <div className="container mx-auto p-2 sm:p-4 max-w-4xl">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             <span className="ml-2 text-gray-600">加载团队数据...</span>
@@ -161,15 +161,15 @@ export default function LeadDashboard() {
     <div className="min-h-screen bg-gray-50">
       <LeadHeader userInfo={userInfo} />
 
-      <div className="container mx-auto p-4 max-w-4xl">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="container mx-auto p-2 sm:p-4 max-w-4xl">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">团队管理</h1>
-            <p className="text-gray-600">管理您的团队绩效考核</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">团队管理</h1>
+            <p className="text-sm sm:text-base text-gray-600">管理您的团队绩效考核</p>
           </div>
           <Button 
             onClick={() => router.push('/lead/evaluation')}
-            className="bg-purple-600 hover:bg-purple-700"
+            className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
           >
             <BookOpen className="w-4 h-4 mr-2" />
             评估中心
@@ -177,61 +177,61 @@ export default function LeadDashboard() {
         </div>
 
         {/* 团队统计 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">团队人数</p>
-                  <p className="text-2xl font-bold">{overallStats.totalMembers}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">团队人数</p>
+                  <p className="text-lg sm:text-2xl font-bold">{overallStats.totalMembers}</p>
                 </div>
-                <Users className="w-8 h-8 text-blue-600" />
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">待我评分</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                  <p className="text-xs sm:text-sm text-gray-600">待我评分</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-600">
                     {overallStats.pendingEvaluations}
                   </p>
                 </div>
-                <Clock className="w-8 h-8 text-orange-600" />
+                <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">团队平均分</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-xs sm:text-sm text-gray-600">团队平均分</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-600">
                     {overallStats.teamAverageScore > 0 ? overallStats.teamAverageScore.toFixed(1) : '--'}
                   </p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-green-600" />
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">完成率</p>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-xs sm:text-sm text-gray-600">完成率</p>
+                  <p className="text-lg sm:text-2xl font-bold text-purple-600">
                     {overallStats.completionRate.toFixed(0)}%
                   </p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-purple-600" />
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* 待我评分 */}
-        <Card className="mb-6">
+        <Card className="mb-4 sm:mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" />
@@ -245,8 +245,8 @@ export default function LeadDashboard() {
                 {evaluationTasks
                   .filter(task => task.status === 'pending')
                   .map((task) => (
-                    <div key={task.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
+                    <div key={task.id} className="border rounded-lg p-3 sm:p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-2 sm:space-y-0">
                         <div>
                           <h3 className="font-semibold">{task.evaluatee_name}</h3>
                           <p className="text-sm text-gray-600">{task.evaluatee_department}</p>
@@ -255,8 +255,8 @@ export default function LeadDashboard() {
                           待评分
                         </Badge>
                       </div>
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between">
+                      <div className="mt-2 sm:mt-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
                           <div>
                             <p className="text-sm font-medium">{task.assessment_title}</p>
                             <p className="text-xs text-gray-500">
@@ -266,6 +266,7 @@ export default function LeadDashboard() {
                           <Button
                             size="sm"
                             onClick={() => router.push(`/lead/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
+                            className="w-full sm:w-auto"
                           >
                             开始评分
                           </Button>
@@ -297,13 +298,13 @@ export default function LeadDashboard() {
             {teamMembers.length > 0 ? (
               <div className="space-y-4">
                 {teamMembers.map((member) => (
-                  <div key={member.user_id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
+                  <div key={member.user_id} className="border rounded-lg p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 space-y-2 sm:space-y-0">
                       <div>
                         <h3 className="font-semibold">{member.user_name}</h3>
                         <p className="text-sm text-gray-600">{member.department} · {member.position}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right sm:text-right text-center">
                         <p className="text-sm text-gray-600">当前得分</p>
                         <p className={`text-lg font-bold ${teamUtils.getScoreColor((member.evaluation_status?.final_score ?? member.evaluation_status?.current_employee_score) ?? 0)}`}>
                           {member.evaluation_status?.final_score ? 
@@ -318,7 +319,7 @@ export default function LeadDashboard() {
                     
                     {/* 考核信息 */}
                     <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-1 sm:space-y-0">
                         <span className="text-sm font-medium text-gray-700">
                           {member.current_assessment?.assessment_title || '暂无考核'}
                         </span>
@@ -326,7 +327,7 @@ export default function LeadDashboard() {
                           {teamUtils.formatEvaluationStatus(member)}
                         </Badge>
                       </div>
-                      <div className="flex items-center text-xs text-gray-500 gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center text-xs text-gray-500 gap-2 sm:gap-4">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {member.current_assessment?.period || 'N/A'}
@@ -341,7 +342,7 @@ export default function LeadDashboard() {
                     </div>
 
                     {/* 评分状态 */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 text-sm mb-3">
                       <div>
                         <span className="text-gray-600">自评状态：</span>
                         <span className={`font-semibold ${member.evaluation_status?.self_completed ? 'text-green-600' : 'text-gray-400'}`}>
@@ -380,7 +381,7 @@ export default function LeadDashboard() {
                     </div>
 
                     {/* 操作按钮 */}
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button
                         variant="outline"
                         size="sm"

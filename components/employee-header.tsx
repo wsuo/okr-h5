@@ -62,7 +62,7 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -91,9 +91,9 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
             )}
           </Button>
 
-          <div className="w-px h-6 bg-gray-200" />
+          <div className="w-px h-6 bg-gray-200 hidden sm:block" />
           
-          <div className="text-right">
+          <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-gray-900">{userInfo.name}</p>
             <p className="text-xs text-gray-500">员工</p>
           </div>
