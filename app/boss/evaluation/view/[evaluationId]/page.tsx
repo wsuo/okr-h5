@@ -241,7 +241,11 @@ export default function BossEvaluationViewPage() {
     )
   }
 
-  const bossScoreInfo = getScoreInfo(parseFloat(evaluation.score) || 0)
+  // 计算总分的评分信息
+  const totalScore = comparison?.evaluation_status?.current_score || 
+                     completeEvaluation?.evaluation_status?.current_score ||
+                     parseFloat(evaluation.score) || 0
+  const bossScoreInfo = getScoreInfo(totalScore)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -318,36 +322,19 @@ export default function BossEvaluationViewPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Crown className="w-5 h-5 text-yellow-600" />
-                您的评分
+                总分
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center">
                 <div className={`text-5xl font-bold mb-2 ${bossScoreInfo.color}`}>
-                  {parseFloat(evaluation.score)?.toFixed(1) || '--'}
+                  {(comparison?.evaluation_status?.current_score || 
+                    completeEvaluation?.evaluation_status?.current_score)?.toFixed(1) || 
+                   parseFloat(evaluation.score)?.toFixed(1) || '--'}
                 </div>
                 <Badge className={`${bossScoreInfo.bgColor} ${bossScoreInfo.color} border-current mb-4`}>
                   {bossScoreInfo.level}
                 </Badge>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600">提交时间</span>
-                  </div>
-                  <div className="text-right">
-                    {evaluation.submitted_at ? 
-                      evaluationUtils.formatDateTime(evaluation.submitted_at) : 
-                      '未提交'
-                    }
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-gray-600">更新时间</span>
-                  </div>
-                  <div className="text-right">
-                    {evaluationUtils.formatDateTime(evaluation.updated_at)}
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -440,9 +427,11 @@ export default function BossEvaluationViewPage() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">三方均值:</span>
+                      <span className="text-gray-600">总分:</span>
                       <span className="font-medium text-purple-600">
-                        {((parseFloat(comparison.self_evaluation.score) + parseFloat(comparison.leader_evaluation.score) + parseFloat(comparison.boss_evaluation.score)) / 3).toFixed(1)}
+                        {(comparison.evaluation_status?.current_score || 
+                          completeEvaluation?.evaluation_status?.current_score)?.toFixed(1) || 
+                         ((parseFloat(comparison.self_evaluation.score) + parseFloat(comparison.leader_evaluation.score) + parseFloat(comparison.boss_evaluation.score)) / 3).toFixed(1)}
                       </span>
                     </div>
                   </div>
@@ -494,45 +483,6 @@ export default function BossEvaluationViewPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* 评估信息总览 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-gray-600" />
-              评估信息
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">评估ID:</span>
-                <span className="ml-2 font-medium">#{evaluation.id}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">评估类型:</span>
-                <Badge variant="outline" className="ml-2">
-                  {evaluationUtils.getTypeText(evaluation.type)}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-gray-600">评估状态:</span>
-                <Badge className={`ml-2 ${evaluationUtils.getStatusStyle(evaluation.status)}`}>
-                  {evaluationUtils.getStatusText(evaluation.status)}
-                </Badge>
-              </div>
-              <div>
-                <span className="text-gray-600">截止时间:</span>
-                <span className="ml-2 font-medium">
-                  {evaluation.assessment?.deadline ? 
-                    evaluationUtils.formatDate(evaluation.assessment.deadline) : 
-                    '未设置'
-                  }
-                </span>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
