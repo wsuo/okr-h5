@@ -155,8 +155,8 @@ export default function BossEvaluationPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-lg">{task.evaluatee_name}</h3>
+                  <div className="flex items-center flex-wrap gap-2 sm:gap-3 mb-2">
+                    <h3 className="font-semibold text-lg mr-2">{task.evaluatee_name}</h3>
                     <Badge variant="outline" className="text-xs">
                       {task.evaluatee_department}
                     </Badge>
