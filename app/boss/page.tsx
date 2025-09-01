@@ -115,41 +115,56 @@ export default function BossDashboard() {
 
   // Helper functions for data processing
   const processScoreDistribution = () => {
-    // 分数区间到中文标签的映射
-    const getChineseLabel = (range: string) => {
-      if (range.includes('90') || range.includes('100')) return '优秀'
-      if (range.includes('80') || range.includes('89')) return '良好'
-      if (range.includes('70') || range.includes('79')) return '一般'
-      return '较差'
+    // 英文等级到中文标签的映射
+    const getChineseLabel = (englishKey: string) => {
+      const labelMap: Record<string, string> = {
+        'excellent': '优秀',
+        'good': '良好', 
+        'average': '一般',
+        'poor': '较差'
+      }
+      return labelMap[englishKey] || '较差'
+    }
+
+    // 英文等级到颜色的映射
+    const getColor = (englishKey: string) => {
+      const colorMap: Record<string, string> = {
+        'excellent': '#10b981',
+        'good': '#3b82f6',
+        'average': '#f59e0b', 
+        'poor': '#ef4444'
+      }
+      return colorMap[englishKey] || '#ef4444'
     }
 
     if (!dashboardData?.score_distribution) {
       // Return default score ranges if no data available
       return [
-        { range: '优秀', originalRange: '90-100', count: 0, percentage: 0, color: '#10b981' },
-        { range: '良好', originalRange: '80-89', count: 0, percentage: 0, color: '#3b82f6' },
-        { range: '一般', originalRange: '70-79', count: 0, percentage: 0, color: '#f59e0b' },
-        { range: '较差', originalRange: '60-69', count: 0, percentage: 0, color: '#ef4444' }
+        { range: '优秀', originalRange: 'excellent', count: 0, percentage: 0, color: '#10b981' },
+        { range: '良好', originalRange: 'good', count: 0, percentage: 0, color: '#3b82f6' },
+        { range: '一般', originalRange: 'average', count: 0, percentage: 0, color: '#f59e0b' },
+        { range: '较差', originalRange: 'poor', count: 0, percentage: 0, color: '#ef4444' }
       ]
     }
 
     // Handle both array and object formats from API
     const distribution = Array.isArray(dashboardData.score_distribution)
       ? dashboardData.score_distribution
-      : Object.entries(dashboardData.score_distribution).map(([range, count]) => ({
-          range,
+      : Object.entries(dashboardData.score_distribution).map(([englishKey, count]) => ({
+          range: englishKey,
           count: count as number,
           percentage: 0
         }))
 
-    return distribution.map(item => ({
-      ...item,
-      originalRange: item.range, // 保存原始区间用于颜色判断
-      range: getChineseLabel(item.range), // 使用中文标签
-      color: item.range.includes('90') || item.range.includes('100') ? '#10b981' :
-             item.range.includes('80') || item.range.includes('89') ? '#3b82f6' :
-             item.range.includes('70') || item.range.includes('79') ? '#f59e0b' : '#ef4444'
-    }))
+    return distribution.map(item => {
+      const originalRange = item.range // 保存原始英文key用于颜色判断
+      return {
+        ...item,
+        originalRange: originalRange, 
+        range: getChineseLabel(item.range), // 使用中文标签
+        color: getColor(originalRange) // 根据英文key获取颜色
+      }
+    })
   }
 
   const processDepartmentData = () => {
@@ -326,15 +341,15 @@ export default function BossDashboard() {
     <div className="min-h-screen bg-gray-50">
       <BossHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
 
-      <div className="container mx-auto p-4 max-w-7xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">全员绩效看板</h1>
-          <p className="text-gray-600">公司整体绩效数据分析</p>
+      <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">全员绩效看板</h1>
+          <p className="text-sm sm:text-base text-gray-600">公司整体绩效数据分析</p>
         </div>
 
         {/* Boss 待办任务卡片 */}
         {pendingTasksCount > 0 && (
-          <Card className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
+          <Card className="mb-4 sm:mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-yellow-800">
                 <Crown className="w-5 h-5" />
@@ -347,8 +362,8 @@ export default function BossDashboard() {
             <CardContent>
               <div className="space-y-3">
                 {bossTasks.filter(task => task.status === 'pending').slice(0, 3).map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-3 bg-white/60 rounded-lg border border-yellow-300">
-                    <div className="flex-1">
+                  <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white/60 rounded-lg border border-yellow-300 space-y-2 sm:space-y-0">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4 text-gray-600" />
                         <span className="font-medium text-gray-900">{task.evaluatee_name}</span>
@@ -360,7 +375,7 @@ export default function BossDashboard() {
                         {task.assessment_title} · 截止：{evaluationUtils.formatDate(task.deadline)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 ml-4">
+                    <div className="flex items-center gap-2 sm:ml-4 justify-end">
                       {task.is_overdue && (
                         <Badge variant="destructive" className="text-xs">
                           已逾期
@@ -395,154 +410,133 @@ export default function BossDashboard() {
         )}
 
         {/* 总体统计 - 重新设计以充分利用仪表板API数据 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           {/* 总用户数 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">总用户数</p>
-                  <p className="text-2xl font-bold text-blue-600">{dashboardData?.overview.total_users || 0}</p>
-                  <p className="text-xs text-gray-500 mt-1">系统注册用户</p>
+                  <p className="text-xs sm:text-sm text-gray-600">总用户数</p>
+                  <p className="text-lg sm:text-2xl font-bold text-blue-600">{dashboardData?.overview.total_users || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">系统注册用户</p>
                 </div>
-                <Users className="w-8 h-8 text-blue-600" />
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
 
           {/* 总评估数 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">总评估数</p>
-                  <p className="text-2xl font-bold text-indigo-600">{dashboardData?.overview.total_evaluations || 0}</p>
-                  <p className="text-xs text-gray-500 mt-1">累计评估次数</p>
+                  <p className="text-xs sm:text-sm text-gray-600">总评估数</p>
+                  <p className="text-lg sm:text-2xl font-bold text-indigo-600">{dashboardData?.overview.total_evaluations || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">累计评估次数</p>
                 </div>
-                <Activity className="w-8 h-8 text-indigo-600" />
+                <Activity className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
               </div>
             </CardContent>
           </Card>
 
           {/* 完成率 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">完成率</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-xs sm:text-sm text-gray-600">完成率</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-600">
                     {dashboardData?.overview.completion_rate?.toFixed(1) || '0.0'}%
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">评估完成比例</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">评估完成比例</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
 
           {/* 平均得分 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">平均得分</p>
-                  <p className="text-2xl font-bold text-emerald-600">
+                  <p className="text-xs sm:text-sm text-gray-600">平均得分</p>
+                  <p className="text-lg sm:text-2xl font-bold text-emerald-600">
                     {dashboardData?.overview.average_score?.toFixed(1) || '0.0'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">综合平均分</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">综合平均分</p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-emerald-600" />
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* 考核统计详情 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           {/* 活跃考核 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">活跃考核</p>
-                  <p className="text-2xl font-bold text-orange-600">{dashboardData?.overview.active_assessments || 0}</p>
-                  <p className="text-xs text-gray-500 mt-1">正在进行中</p>
+                  <p className="text-xs sm:text-sm text-gray-600">活跃考核</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-600">{dashboardData?.overview.active_assessments || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">正在进行中</p>
                 </div>
-                <Award className="w-8 h-8 text-orange-600" />
+                <Award className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
 
           {/* 已完成考核 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">已完成考核</p>
-                  <p className="text-2xl font-bold text-purple-600">{dashboardData?.overview.completed_assessments || 0}</p>
-                  <p className="text-xs text-gray-500 mt-1">已结束考核</p>
+                  <p className="text-xs sm:text-sm text-gray-600">已完成考核</p>
+                  <p className="text-lg sm:text-2xl font-bold text-purple-600">{dashboardData?.overview.completed_assessments || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">已结束考核</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-purple-600" />
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
 
           {/* 自评平均分 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">自评平均分</p>
-                  <p className="text-2xl font-bold text-cyan-600">
+                  <p className="text-xs sm:text-sm text-gray-600">自评平均分</p>
+                  <p className="text-lg sm:text-2xl font-bold text-cyan-600">
                     {dashboardData?.overview.self_average?.toFixed(1) || '0.0'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">员工自评得分</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">员工自评得分</p>
                 </div>
-                <Users className="w-8 h-8 text-cyan-600" />
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-600" />
               </div>
             </CardContent>
           </Card>
 
           {/* 领导评分平均分 */}
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-2 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">领导评分平均分</p>
-                  <p className="text-2xl font-bold text-rose-600">
+                  <p className="text-xs sm:text-sm text-gray-600">领导评分平均分</p>
+                  <p className="text-lg sm:text-2xl font-bold text-rose-600">
                     {dashboardData?.overview.leader_average?.toFixed(1) || '0.0'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">领导评估得分</p>
+                  <p className="text-xs text-gray-500 mt-1 hidden sm:block">领导评估得分</p>
                 </div>
-                <Building2 className="w-8 h-8 text-rose-600" />
+                <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-rose-600" />
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Boss评分统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
-          {/* Boss评分平均分 */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Boss评分平均分</p>
-                  <p className="text-2xl font-bold text-violet-600">
-                    {dashboardData?.overview.boss_average?.toFixed(1) || '0.0'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">老板评估得分</p>
-                </div>
-                <Award className="w-8 h-8 text-violet-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-
 
         {/* 数据图表区域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* 绩效分数分布图 */}
           <Card>
             <CardHeader>
@@ -550,7 +544,7 @@ export default function BossDashboard() {
               <CardDescription>员工绩效分数区间分布情况</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
                 <BarChart data={scoreDistribution}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="range" />
@@ -578,7 +572,7 @@ export default function BossDashboard() {
               <CardDescription>各部门三维度评分对比</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
                 <BarChart data={departmentAverage}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="department" />
@@ -601,7 +595,7 @@ export default function BossDashboard() {
         </div>
 
         {/* 用户统计详细分析图表 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* 员工完成率对比 */}
           <Card>
             <CardHeader>
@@ -621,7 +615,7 @@ export default function BossDashboard() {
                   </div>
                 </div>
               ) : (
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={300} className="sm:h-[350px]">
                   <BarChart
                     data={userStatsDetailProcessed.slice(0, 10)}
                     margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
@@ -699,7 +693,7 @@ export default function BossDashboard() {
               <CardDescription>各员工自评与领导评分平均分对比</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={300} className="sm:h-[350px]">
                 <BarChart data={userStatsDetailProcessed.slice(0, 10)}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
@@ -733,8 +727,8 @@ export default function BossDashboard() {
             <CardDescription>查看所有员工的详细绩效信息</CardDescription>
 
             {/* 搜索和筛选 */}
-            <div className="flex gap-4 mt-4">
-              <div className="flex-1 relative">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4">
+              <div className="flex-1 relative min-w-0">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
                   placeholder="搜索员工姓名或职位..."
@@ -744,7 +738,7 @@ export default function BossDashboard() {
                 />
               </div>
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-full sm:w-40">
                   <SelectValue placeholder="选择部门" />
                 </SelectTrigger>
                 <SelectContent>
@@ -757,23 +751,23 @@ export default function BossDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6">
               {filteredEmployees.map((employee) => (
-                <div key={employee.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div key={employee.id} className="border rounded-lg p-3 sm:p-6 hover:shadow-md transition-shadow">
                   {/* 员工基本信息 */}
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-blue-600" />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">{employee.name}</h3>
-                        <p className="text-sm text-gray-600">@{employee.username}</p>
-                        <p className="text-sm text-gray-600">{employee.position} · {employee.department}</p>
+                        <h3 className="font-semibold text-base sm:text-lg">{employee.name}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">@{employee.username}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">{employee.position} · {employee.department}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`text-2xl font-bold ${getScoreColor(employee.finalScore)}`}>
+                    <div className="text-right sm:text-right text-center">
+                      <div className={`text-xl sm:text-2xl font-bold ${getScoreColor(employee.finalScore)}`}>
                         {employee.finalScore?.toFixed(1) || '--'}
                       </div>
                       <div className="text-xs text-gray-500">最终得分</div>
@@ -781,9 +775,9 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 考核信息 */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-4">
                     <h4 className="font-medium text-gray-900 mb-2">考核信息</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">考核标题：</span>
                         <span className="font-medium">{employee.assessment?.title || '--'}</span>
@@ -815,27 +809,27 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 评分详情 */}
-                  <div className="grid grid-cols-4 gap-4 text-sm mb-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className={`text-xl font-bold ${getScoreColor(employee.selfScore)}`}>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm mb-4">
+                    <div className="text-center p-2 sm:p-3 bg-blue-50 rounded-lg">
+                      <div className={`text-lg sm:text-xl font-bold ${getScoreColor(employee.selfScore)}`}>
                         {employee.selfScore?.toFixed(1) || '--'}
                       </div>
                       <div className="text-xs text-gray-600">自评得分</div>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className={`text-xl font-bold ${getScoreColor(employee.leaderScore)}`}>
+                    <div className="text-center p-2 sm:p-3 bg-green-50 rounded-lg">
+                      <div className={`text-lg sm:text-xl font-bold ${getScoreColor(employee.leaderScore)}`}>
                         {employee.leaderScore?.toFixed(1) || '--'}
                       </div>
                       <div className="text-xs text-gray-600">领导评分</div>
                     </div>
-                    <div className="text-center p-3 bg-violet-50 rounded-lg">
-                      <div className={`text-xl font-bold ${getScoreColor(employee.bossScore || 0)}`}>
+                    <div className="text-center p-2 sm:p-3 bg-violet-50 rounded-lg">
+                      <div className={`text-lg sm:text-xl font-bold ${getScoreColor(employee.bossScore || 0)}`}>
                         {employee.bossScore?.toFixed(1) || '--'}
                       </div>
                       <div className="text-xs text-gray-600">Boss评分</div>
                     </div>
-                    <div className="text-center p-3 bg-purple-50 rounded-lg">
-                      <div className={`text-xl font-bold ${getScoreColor(employee.finalScore)}`}>
+                    <div className="text-center p-2 sm:p-3 bg-purple-50 rounded-lg">
+                      <div className={`text-lg sm:text-xl font-bold ${getScoreColor(employee.finalScore)}`}>
                         {employee.finalScore?.toFixed(1) || '--'}
                       </div>
                       <div className="text-xs text-gray-600">最终得分</div>
@@ -843,7 +837,7 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 完成状态 */}
-                  <div className="grid grid-cols-3 gap-4 text-sm mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-sm mb-4">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${employee.selfCompleted ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                       <span className="text-gray-600">自评完成：</span>
@@ -868,7 +862,7 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 提交时间 */}
-                  <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs text-gray-500 mb-4">
                     <div>
                       <span>自评提交：</span>
                       <span className="block">
@@ -899,7 +893,7 @@ export default function BossDashboard() {
                   </div>
 
                   {/* 操作按钮 */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
                     <div className="flex items-center gap-1">
                       <TrendingUp
                         className={`w-4 h-4 ${
@@ -919,6 +913,7 @@ export default function BossDashboard() {
                       variant="outline"
                       size="sm"
                       onClick={() => router.push(`/boss/employee/${employee.id}`)}
+                      className="w-full sm:w-auto"
                     >
                       查看详细绩效
                     </Button>
@@ -928,10 +923,10 @@ export default function BossDashboard() {
             </div>
 
             {filteredEmployees.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium mb-2">暂无员工数据</h3>
-                <p>没有找到符合条件的员工信息</p>
+              <div className="text-center py-6 sm:py-8 text-gray-500">
+                <Users className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-base sm:text-lg font-medium mb-2">暂无员工数据</h3>
+                <p className="text-sm sm:text-base">没有找到符合条件的员工信息</p>
               </div>
             )}
           </CardContent>
