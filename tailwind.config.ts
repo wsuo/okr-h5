@@ -12,6 +12,9 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		screens: {
+  			'xs': '320px', // iPhone 4/SE 等极小屏幕
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
