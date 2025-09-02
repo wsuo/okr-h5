@@ -429,37 +429,47 @@ export default function BossReportsPage() {
         </div>
 
         {/* 图表区域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 lg:gap-6 mb-4 sm:mb-6">
           {/* 绩效趋势图 */}
           <Card>
             <CardHeader>
-              <CardTitle>绩效趋势分析</CardTitle>
-              <CardDescription>各维度评分随时间的变化趋势</CardDescription>
+              <CardTitle className="text-base sm:text-lg">绩效趋势分析</CardTitle>
+              <CardDescription className="text-sm">各维度评分随时间的变化趋势</CardDescription>
             </CardHeader>
             <CardContent>
               {processTrendsData().length > 0 ? (
-                <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+                <ResponsiveContainer width="100%" height={200} className="sm:h-[250px] lg:h-[300px]">
                   <LineChart data={processTrendsData()}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis domain={[0, 100]} />
+                    <XAxis 
+                      dataKey="month" 
+                      fontSize={10}
+                      className="text-xs"
+                    />
+                    <YAxis 
+                      domain={[0, 100]} 
+                      fontSize={10}
+                      className="text-xs"
+                    />
                     <Tooltip 
                       formatter={(value, name) => [
                         name === '完成率' ? `${(value as number).toFixed(1)}%` : `${(value as number).toFixed(1)}分`, 
                         name
                       ]}
+                      labelStyle={{ fontSize: '12px' }}
+                      contentStyle={{ fontSize: '12px' }}
                     />
-                    <Legend />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Line type="monotone" dataKey="自评平均分" stroke="#3b82f6" strokeWidth={2} />
                     <Line type="monotone" dataKey="领导评分" stroke="#10b981" strokeWidth={2} />
                     <Line type="monotone" dataKey="综合得分" stroke="#8b5cf6" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-[300px] text-gray-500">
+                <div className="flex items-center justify-center h-[200px] sm:h-[300px] text-gray-500">
                   <div className="text-center">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm">暂无趋势数据</p>
+                    <BarChart3 className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+                    <p className="text-xs sm:text-sm">暂无趋势数据</p>
                     <p className="text-xs mt-1">数据将在有历史记录后显示</p>
                   </div>
                 </div>
@@ -470,15 +480,26 @@ export default function BossReportsPage() {
           {/* 部门绩效对比 */}
           <Card>
             <CardHeader>
-              <CardTitle>部门绩效对比</CardTitle>
-              <CardDescription>各部门评分和完成率对比</CardDescription>
+              <CardTitle className="text-base sm:text-lg">部门绩效对比</CardTitle>
+              <CardDescription className="text-sm">各部门评分和完成率对比</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+              <ResponsiveContainer width="100%" height={200} className="sm:h-[250px] lg:h-[300px]">
                 <BarChart data={processDepartmentData()}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="department" />
-                  <YAxis />
+                  <XAxis 
+                    dataKey="department" 
+                    fontSize={10}
+                    className="text-xs"
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    fontSize={10}
+                    className="text-xs"
+                  />
                   <Tooltip 
                     formatter={(value, name) => [
                       name === 'completionRate' ? `${(value as number).toFixed(1)}%` : `${(value as number).toFixed(1)}分`,
@@ -486,8 +507,10 @@ export default function BossReportsPage() {
                       name === 'leaderScore' ? '领导评分' :
                       name === 'bossScore' ? 'Boss评分' : '完成率'
                     ]}
+                    labelStyle={{ fontSize: '12px' }}
+                    contentStyle={{ fontSize: '12px' }}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
                   <Bar dataKey="selfScore" fill="#3b82f6" name="自评分" />
                   <Bar dataKey="leaderScore" fill="#10b981" name="领导评分" />
                   <Bar dataKey="bossScore" fill="#8b5cf6" name="Boss评分" />
@@ -502,49 +525,75 @@ export default function BossReportsPage() {
           {/* 分数分布饼图 */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>绩效分数分布</CardTitle>
-              <CardDescription>员工绩效等级分布情况</CardDescription>
+              <CardTitle className="text-base sm:text-lg">绩效分数分布</CardTitle>
+              <CardDescription className="text-sm">员工绩效等级分布情况</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300} className="sm:h-[380px]">
-                <PieChart>
-                  <Pie
-                    data={processScoreDistribution()}
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={45}
-                    outerRadius={90}
-                    dataKey="value"
-                    label={({value, percent}) => {
-                      // 只在扇形足够大时显示标签
-                      if (percent > 0.08) { // 大于8%才显示标签
-                        return `${value}人\n${(percent * 100).toFixed(1)}%`
-                      }
-                      return ''
-                    }}
-                    labelLine={false}
-                    fontSize={12}
-                  >
-                    {processScoreDistribution().map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value, name) => [`${value}人`, name]}
-                  />
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value, entry) => {
-                      const data = processScoreDistribution().find(item => item.name === value)
-                      return data ? `${value}: ${data.value}人` : value
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {/* 移动端优先显示数据卡片 */}
+              <div className="block sm:hidden mb-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                  {processScoreDistribution().map((item, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                        <span className="font-medium text-xs">{item.name.split('(')[0]}</span>
+                      </div>
+                      <span className="text-gray-600 font-semibold text-sm">{item.value}人</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 图表区域 - 在小屏幕上优化尺寸和标签 */}
+              <div className="hidden sm:block">
+                <ResponsiveContainer width="100%" height={300} className="sm:h-[380px]">
+                  <PieChart>
+                    <Pie
+                      data={processScoreDistribution()}
+                      cx="50%"
+                      cy="45%"
+                      innerRadius={40}
+                      outerRadius={85}
+                      dataKey="value"
+                      label={({value, percent}) => {
+                        // 在小屏幕上不显示标签，避免重叠
+                        if (typeof window !== 'undefined' && window.innerWidth < 640) {
+                          return ''
+                        }
+                        // 只在扇形足够大时显示标签
+                        if (percent > 0.1) { // 大于10%才显示标签
+                          return `${value}人`
+                        }
+                        return ''
+                      }}
+                      labelLine={false}
+                      fontSize={10}
+                    >
+                      {processScoreDistribution().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [`${value}人`, name]}
+                    />
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={40}
+                      wrapperStyle={{ fontSize: '12px' }}
+                      formatter={(value, entry) => {
+                        const data = processScoreDistribution().find(item => item.name === value)
+                        return data ? `${value.split('(')[0]}: ${data.value}人` : value
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               
-              {/* 数据详情卡片 */}
-              <div className="grid grid-cols-2 gap-2 mt-4">
+              {/* 桌面端数据详情卡片 */}
+              <div className="hidden sm:grid grid-cols-2 gap-2 mt-4">
                 {processScoreDistribution().map((item, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
                     <div className="flex items-center gap-2">
@@ -558,35 +607,59 @@ export default function BossReportsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* 极小屏幕显示简化的饼图 */}
+              <div className="block sm:hidden">
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={processScoreDistribution()}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={30}
+                      outerRadius={70}
+                      dataKey="value"
+                      label={false}
+                    >
+                      {processScoreDistribution().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [`${value}人`, name.split('(')[0]]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
 
           {/* 员工绩效列表 */}
           <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                 员工绩效排行
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 显示 {filteredPerformanceList.length} 个结果
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 max-h-80 overflow-y-auto">
+              <div className="space-y-2 sm:space-y-3 max-h-80 overflow-y-auto">
                 {filteredPerformanceList.slice(0, 10).map((item, index) => (
-                  <div key={item.employee.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-blue-600">#{index + 1}</span>
+                  <div key={item.employee.id} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs sm:text-sm font-bold text-blue-600">#{index + 1}</span>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{item.employee.name}</p>
-                        <p className="text-sm text-gray-600">{item.employee.position} · {item.employee.department}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{item.employee.name}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 truncate">{item.employee.position} · {item.employee.department}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`text-lg font-bold ${getScoreColor(item.scores.final_score)}`}>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`text-base sm:text-lg font-bold ${getScoreColor(item.scores.final_score)}`}>
                         {item.scores.final_score.toFixed(1)}
                       </div>
                       <div className="text-xs text-gray-500">最终得分</div>
@@ -596,8 +669,8 @@ export default function BossReportsPage() {
                 
                 {filteredPerformanceList.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                    <p>暂无匹配的员工数据</p>
+                    <Users className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm">暂无匹配的员工数据</p>
                   </div>
                 )}
               </div>
