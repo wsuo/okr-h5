@@ -8,8 +8,30 @@ import AssessmentManagement from "@/components/assessment-management"
 import TemplateManagement from "@/components/template-management"
 import UserManagement from "@/components/user-management"
 import { AdminGuard } from "@/components/auth-guard"
+import { useEffect, useState } from "react"
+import { statisticsService, DashboardStatistics } from "@/lib/statistics"
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStatistics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const res = await statisticsService.getDashboardStatistics()
+        if (res.code === 200) setStats(res.data)
+      } catch (e: any) {
+        console.error('加载统计失败', e)
+        setError(e.message || '加载统计失败')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
   return (
     <AdminGuard>
       <div className="min-h-screen bg-gray-50">
@@ -28,7 +50,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">进行中考核</p>
-                  <p className="text-xl sm:text-2xl font-bold">2</p>
+                  <p className="text-xl sm:text-2xl font-bold">{loading ? '-' : (stats?.overview.active_assessments ?? 0)}</p>
                 </div>
                 <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
@@ -39,7 +61,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">系统用户</p>
-                  <p className="text-xl sm:text-2xl font-bold">6</p>
+                  <p className="text-xl sm:text-2xl font-bold">{loading ? '-' : (stats?.overview.total_users ?? 0)}</p>
                 </div>
                 <Users className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
               </div>
@@ -50,7 +72,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">考核模板</p>
-                  <p className="text-xl sm:text-2xl font-bold">1</p>
+                  <p className="text-xl sm:text-2xl font-bold">{loading ? '-' : (stats?.overview.total_templates ?? 0)}</p>
                 </div>
                 <Settings className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
               </div>
@@ -61,7 +83,7 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">完成率</p>
-                  <p className="text-xl sm:text-2xl font-bold">85%</p>
+                  <p className="text-xl sm:text-2xl font-bold">{loading ? '-' : `${(stats?.overview.completion_rate ?? 0).toFixed(1)}%`}</p>
                 </div>
                 <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-orange-600" />
               </div>

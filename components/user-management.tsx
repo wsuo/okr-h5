@@ -162,7 +162,9 @@ export default function UserManagement() {
   const fetchDepartments = async () => {
     try {
       const response = await departmentService.getDepartments()
-      if (response.data) {
+      console.log('Departments API response:', response)
+      if (response.data && response.data.data) {
+        console.log('Departments data:', response.data.data)
         setDepartments(response.data.data)
       }
     } catch (error: any) {
@@ -222,10 +224,29 @@ export default function UserManagement() {
     try {
       setSubmitting(true)
       setError("")
-      await userService.createUser(formData)
+      
+      // 过滤掉空字符串字段，只传递有值的字段
+      const createData: any = {
+        username: formData.username.trim(),
+        password: formData.password.trim(),
+        name: formData.name.trim(),
+        role_ids: formData.role_ids,
+      }
+      
+      // 只有当字段有值时才添加到请求数据中
+      if (formData.email?.trim()) createData.email = formData.email.trim()
+      if (formData.phone?.trim()) createData.phone = formData.phone.trim()
+      if (formData.position?.trim()) createData.position = formData.position.trim()
+      if (formData.department_id) createData.department_id = formData.department_id
+      if (formData.leader_id) createData.leader_id = formData.leader_id
+      if (formData.join_date?.trim()) createData.join_date = formData.join_date.trim()
+      
+      await userService.createUser(createData as CreateUserDto)
       setIsCreateDialogOpen(false)
       resetForm()
+      // 创建成功后刷新用户和领导列表，保证下拉框有最新领导
       fetchUsers()
+      fetchLeaders()
       toast.success("创建成功", {
         description: `用户 "${formData.name}" 已成功创建`
       })
@@ -251,19 +272,26 @@ export default function UserManagement() {
     try {
       setSubmitting(true)
       setError("")
-      const updateData: UpdateUserDto = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        position: formData.position,
-        department_id: formData.department_id,
-        leader_id: formData.leader_id,
+      
+      // 过滤掉空字符串字段，只传递有值的字段
+      const updateData: any = {
+        name: formData.name.trim(),
         role_ids: formData.role_ids,
-        join_date: formData.join_date,
       }
-      await userService.updateUser(editingUser.id, updateData)
+      
+      // 只有当字段有值时才添加到请求数据中
+      if (formData.email?.trim()) updateData.email = formData.email.trim()
+      if (formData.phone?.trim()) updateData.phone = formData.phone.trim()
+      if (formData.position?.trim()) updateData.position = formData.position.trim()
+      if (formData.department_id) updateData.department_id = formData.department_id
+      if (formData.leader_id) updateData.leader_id = formData.leader_id
+      if (formData.join_date?.trim()) updateData.join_date = formData.join_date.trim()
+      
+      await userService.updateUser(editingUser.id, updateData as UpdateUserDto)
       setIsEditDialogOpen(false)
+      // 更新后刷新用户和领导列表（角色/部门变更会影响领导列表）
       fetchUsers()
+      fetchLeaders()
       toast.success("更新成功", {
         description: `用户 "${formData.name}" 信息已成功更新`
       })
@@ -300,6 +328,7 @@ export default function UserManagement() {
   const handleEdit = (user: User) => {
     console.log('Editing user:', user)
     setEditingUser(user)
+    setError("")  // 重置错误状态
     const editFormData = {
       username: user.username,
       password: "", // 编辑时不需要密码
@@ -368,7 +397,8 @@ export default function UserManagement() {
     if (!users || users.length === 0) return []
     return users.filter(user => 
       user.roles && user.roles.length > 0 &&
-      user.roles.some(role => role.code === 'lead') && 
+      // 角色代码修正为 'leader'
+      user.roles.some(role => role.code === 'leader') && 
       (!formData.department_id || user.department?.id === formData.department_id)
     )
   }
@@ -475,9 +505,18 @@ export default function UserManagement() {
                 </div>
                 
                 {/* 添加用户按钮 */}
-                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+                  setIsCreateDialogOpen(open)
+                  if (!open) {
+                    resetForm()
+                    setError("")  // 关闭时重置错误状态
+                  }
+                }}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => resetForm()} className="w-full lg:w-auto">
+                    <Button onClick={() => {
+                      resetForm()
+                      setError("")  // 打开时也重置错误状态
+                    }} className="w-full lg:w-auto">
                       <Plus className="w-4 h-4 mr-2" />
                       添加用户
                     </Button>
@@ -614,11 +653,6 @@ export default function UserManagement() {
                           />
                         </div>
                       </div>
-                      {error && (
-                        <Alert variant="destructive">
-                          <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                      )}
                       <div className="flex justify-end space-x-2">
                         <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                           取消
@@ -632,12 +666,6 @@ export default function UserManagement() {
                   </DialogContent>
                 </Dialog>
               </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
 
               {/* 用户列表 */}
               <div className="space-y-4">
@@ -779,8 +807,8 @@ export default function UserManagement() {
               <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
                 setIsEditDialogOpen(open)
                 if (!open) {
-                  // 只有在关闭对话框时才重置表单
                   resetForm()
+                  setError("")  // 关闭时重置错误状态
                 }
               }}>
                 <DialogContent className="max-w-2xl">
@@ -895,11 +923,6 @@ export default function UserManagement() {
                         />
                       </div>
                     </div>
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
                     <div className="flex justify-end space-x-2">
                       <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                         取消
@@ -916,7 +939,7 @@ export default function UserManagement() {
           </TabsContent>
 
           <TabsContent value="departments">
-            <DepartmentManagement />
+            <DepartmentManagement onDepartmentChange={fetchDepartments} />
           </TabsContent>
         </Tabs>
         </CardContent>

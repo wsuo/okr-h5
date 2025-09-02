@@ -36,7 +36,9 @@ export interface UpdateDepartmentDto {
 
 // 部门列表响应接口
 export interface DepartmentListResponse {
-  data: Department[]
+  data: {
+    data: Department[]
+  }
 }
 
 // 部门服务类

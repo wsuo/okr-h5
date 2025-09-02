@@ -13,7 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Edit, Trash2, Building, Users, Loader2 } from "lucide-react"
 import { Department, departmentService, departmentUtils, CreateDepartmentDto, UpdateDepartmentDto } from "@/lib/department"
 
-export default function DepartmentManagement() {
+interface DepartmentManagementProps {
+  onDepartmentChange?: () => void
+}
+
+export default function DepartmentManagement({ onDepartmentChange }: DepartmentManagementProps) {
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -74,6 +78,8 @@ export default function DepartmentManagement() {
       setIsCreateDialogOpen(false)
       resetForm()
       fetchDepartments()
+      // 通知父组件部门数据已变更
+      onDepartmentChange?.()
     } catch (error: any) {
       console.error('Create department error:', error)
       setError(error.message || "创建部门失败")
@@ -98,6 +104,8 @@ export default function DepartmentManagement() {
       setIsEditDialogOpen(false)
       resetForm()
       fetchDepartments()
+      // 通知父组件部门数据已变更
+      onDepartmentChange?.()
     } catch (error: any) {
       console.error('Update department error:', error)
       setError(error.message || "更新部门失败")
@@ -113,6 +121,8 @@ export default function DepartmentManagement() {
       console.log('Deleting department:', department.id)
       await departmentService.deleteDepartment(department.id)
       fetchDepartments()
+      // 通知父组件部门数据已变更
+      onDepartmentChange?.()
     } catch (error: any) {
       console.error('Delete department error:', error)
       setError(error.message || "删除部门失败")
