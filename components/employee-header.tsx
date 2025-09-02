@@ -3,10 +3,20 @@
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { LogOut, User, FileText, Home, Clock } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { LogOut, User, FileText, Home, Key } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { evaluationService } from "@/lib/evaluation"
+import { useAuth } from "@/contexts/auth-context"
+import ChangePasswordDialog from "@/components/change-password-dialog"
 
 interface EmployeeHeaderProps {
   userInfo: {
@@ -18,7 +28,11 @@ interface EmployeeHeaderProps {
 
 export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
   const router = useRouter()
+  const { logout, user } = useAuth()
   const [pendingTasksCount, setPendingTasksCount] = useState(0)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+
+  const currentUser = userInfo || user
 
   useEffect(() => {
     loadPendingTasksCount()
@@ -39,10 +53,14 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("userInfo")
-    router.push("/")
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/")
+    } catch (error) {
+      console.error('Logout failed:', error)
+      router.push("/")
+    }
   }
 
   const handleNavigation = (path: string) => {
@@ -50,6 +68,7 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
   }
 
   return (
+    <>
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -94,17 +113,51 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
           <div className="w-px h-6 bg-gray-200 hidden sm:block" />
           
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-medium text-gray-900">{userInfo.name}</p>
+            <p className="text-sm font-medium text-gray-900">{currentUser?.name}</p>
             <p className="text-xs text-gray-500">员工</p>
           </div>
-          <Avatar>
-            <AvatarFallback className="bg-green-100 text-green-600">{userInfo.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="w-4 h-4" />
-          </Button>
+          
+          {/* 用户菜单下拉 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-green-100 text-green-600">
+                    {currentUser?.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{currentUser?.name}</p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {currentUser?.username || userInfo.name}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowChangePassword(true)}>
+                <Key className="mr-2 h-4 w-4" />
+                修改密码
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                退出登录
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
+    
+    {/* 修改密码对话框 */}
+    <ChangePasswordDialog 
+      open={showChangePassword} 
+      onOpenChange={setShowChangePassword} 
+    />
+  </>
   )
 }
