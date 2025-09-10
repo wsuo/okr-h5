@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight } from "lucide-react"
+import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight, CalendarIcon } from "lucide-react"
 import BossHeader from "@/components/boss-header"
 import { useRouter } from "next/navigation"
 import { safeParseUserInfo, isBossUser } from "@/lib/utils"
@@ -29,7 +31,7 @@ export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [selectedMonth, setSelectedMonth] = useState<string>("all") // 改为默认"all"
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined) // 改为Date对象
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const router = useRouter()
@@ -61,12 +63,12 @@ export default function BossDashboard() {
     }
   }, [])
 
-  // 当选择月份改变时重新加载数据
+  // 当选择日期改变时重新加载数据
   useEffect(() => {
     if (userInfo) {
       loadAllStatistics()
     }
-  }, [selectedMonth])
+  }, [selectedDate])
 
   const loadAllStatistics = async () => {
     try {
@@ -74,7 +76,9 @@ export default function BossDashboard() {
       setError("")
 
       // 构建查询参数，包括月份过滤
-      const queryParams = selectedMonth !== "all" ? { month: selectedMonth } : undefined
+      const queryParams = selectedDate ? { 
+        month: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}` 
+      } : undefined
 
       // Load all statistics data and boss tasks in parallel
       const [
@@ -86,9 +90,9 @@ export default function BossDashboard() {
       ] = await Promise.all([
         statisticsService.getDashboardStatistics(queryParams),
         statisticsService.getDepartmentStatistics(queryParams),
-        statisticsService.getPerformanceList(selectedMonth !== "all" ? queryParams : dateRange),
+        statisticsService.getPerformanceList(selectedDate ? queryParams : dateRange),
         statisticsService.getUserStatisticsDetail({
-          ...(selectedMonth !== "all" ? queryParams : dateRange),
+          ...(selectedDate ? queryParams : dateRange),
           time_dimension: 'week',
           group_by: 'user'
         }),
@@ -128,21 +132,10 @@ export default function BossDashboard() {
     }
   }
 
-  // 生成月份选项 (最近12个月)
-  const generateMonthOptions = () => {
-    const options = [
-      { value: "all", label: "全部月份" }
-    ]
-    
-    const currentDate = new Date()
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
-      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      const label = `${date.getFullYear()}年${date.getMonth() + 1}月`
-      options.push({ value, label })
-    }
-    
-    return options
+  // 格式化选择的日期为月份显示
+  const formatSelectedMonth = (date: Date | undefined) => {
+    if (!date) return "全部月份"
+    return `${date.getFullYear()}年${date.getMonth() + 1}月`
   }
 
   // Helper functions for data processing
@@ -379,9 +372,9 @@ export default function BossDashboard() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">全员绩效看板</h1>
             <p className="text-sm sm:text-base text-gray-600">
               公司整体绩效数据分析
-              {selectedMonth !== "all" && (
+              {selectedDate && (
                 <span className="ml-2 text-blue-600 font-medium">
-                  · {generateMonthOptions().find(opt => opt.value === selectedMonth)?.label}
+                  · {formatSelectedMonth(selectedDate)}
                 </span>
               )}
             </p>
@@ -390,18 +383,40 @@ export default function BossDashboard() {
           {/* 月份选择器 */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 whitespace-nowrap">筛选月份:</span>
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="选择月份" />
-              </SelectTrigger>
-              <SelectContent>
-                {generateMonthOptions().map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-48 justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formatSelectedMonth(selectedDate)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <div className="p-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">选择月份</h4>
+                    {selectedDate && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setSelectedDate(undefined)}
+                      >
+                        清除
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
