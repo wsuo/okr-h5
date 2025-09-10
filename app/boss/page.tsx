@@ -29,7 +29,7 @@ export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [selectedMonth, setSelectedMonth] = useState<string>("") // 新增月份选择状态
+  const [selectedMonth, setSelectedMonth] = useState<string>("all") // 改为默认"all"
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const router = useRouter()
@@ -74,7 +74,7 @@ export default function BossDashboard() {
       setError("")
 
       // 构建查询参数，包括月份过滤
-      const queryParams = selectedMonth ? { month: selectedMonth } : undefined
+      const queryParams = selectedMonth !== "all" ? { month: selectedMonth } : undefined
 
       // Load all statistics data and boss tasks in parallel
       const [
@@ -86,9 +86,9 @@ export default function BossDashboard() {
       ] = await Promise.all([
         statisticsService.getDashboardStatistics(queryParams),
         statisticsService.getDepartmentStatistics(queryParams),
-        statisticsService.getPerformanceList(selectedMonth ? queryParams : dateRange),
+        statisticsService.getPerformanceList(selectedMonth !== "all" ? queryParams : dateRange),
         statisticsService.getUserStatisticsDetail({
-          ...(selectedMonth ? queryParams : dateRange),
+          ...(selectedMonth !== "all" ? queryParams : dateRange),
           time_dimension: 'week',
           group_by: 'user'
         }),
@@ -131,7 +131,7 @@ export default function BossDashboard() {
   // 生成月份选项 (最近12个月)
   const generateMonthOptions = () => {
     const options = [
-      { value: "", label: "全部月份" }
+      { value: "all", label: "全部月份" }
     ]
     
     const currentDate = new Date()
@@ -379,7 +379,7 @@ export default function BossDashboard() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">全员绩效看板</h1>
             <p className="text-sm sm:text-base text-gray-600">
               公司整体绩效数据分析
-              {selectedMonth && (
+              {selectedMonth !== "all" && (
                 <span className="ml-2 text-blue-600 font-medium">
                   · {generateMonthOptions().find(opt => opt.value === selectedMonth)?.label}
                 </span>
