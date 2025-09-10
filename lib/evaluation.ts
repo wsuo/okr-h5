@@ -96,12 +96,12 @@ export interface TwoTierScoringConfig {
 }
 
 export interface ScoringRules {
-  self_evaluation: {
+  self_evaluation?: {
     enabled: boolean
     description?: string
     weight_in_final: number
   }
-  leader_evaluation: {
+  leader_evaluation?: {
     enabled: boolean
     description?: string
     weight_in_final: number

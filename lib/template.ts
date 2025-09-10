@@ -25,6 +25,60 @@ export interface ScoringCriteria {
   }
 }
 
+// 老板评分配置接口
+export interface BossRatingConfig {
+  enabled: boolean
+  categories: BossRatingCategory[]
+  star_scale: number
+  rating_mode: string
+  total_weight: number
+  star_standards: StarStandards
+  validation_rules: ValidationRules
+}
+
+// 老板评分分类接口
+export interface BossRatingCategory {
+  id: string
+  name: string
+  weight: number
+  required: boolean
+  sort_order: number
+  description: string
+  star_to_score_mapping: StarToScoreMapping
+}
+
+// 星级到分数的映射
+export interface StarToScoreMapping {
+  "1": number
+  "2": number
+  "3": number
+  "4": number
+  "5": number
+}
+
+// 星级标准
+export interface StarStandards {
+  "1": StarStandard
+  "2": StarStandard
+  "3": StarStandard
+  "4": StarStandard
+  "5": StarStandard
+}
+
+// 单个星级标准
+export interface StarStandard {
+  color: string
+  title: string
+  description: string
+}
+
+// 验证规则
+export interface ValidationRules {
+  max_categories: number
+  min_categories: number
+  all_categories_required: boolean
+}
+
 // 评估项目接口
 export interface EvaluationItem {
   id: string
@@ -81,6 +135,8 @@ export interface TemplateConfig {
   usage_instructions: UsageInstructions
   // 公共评分标准配置
   scoring_criteria: ScoringCriteria
+  // 老板评分配置（可选）
+  boss_rating_config?: BossRatingConfig
 }
 
 // 模板创建者接口
