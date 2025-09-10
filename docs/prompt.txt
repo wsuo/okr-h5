@@ -1074,3 +1074,6 @@ ultrathink
 
   # 可以与其他参数组合使用
   GET /api/v1/users/{userId}/assessments-history?completion_stage=self_only&year=2025
+
+  http://localhost:3020/lead/evaluation/19/7 这个页面有问题，问题是用户已经完成了自评，但是系统还是提示‘该员工尚未开始自评，您仍可以进行评分，但建议等待自评完成后再进行评价以获得更全面的信息。’
+  只要领导能够评分，说明员工已经完成了自评，所以这个提示没有意义，可以去掉。

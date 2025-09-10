@@ -42,7 +42,11 @@ export default function BossEvaluationPage() {
       setLoading(true)
       const response = await evaluationService.getBossTasks()
       if (response.code === 200 && response.data) {
-        setTasks(response.data)
+        const mapped = response.data.map((t: BossTask) => ({
+          ...t,
+          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
+        }))
+        setTasks(mapped)
       }
     } catch (error: any) {
       console.error('加载Boss评估任务失败:', error)
@@ -205,13 +209,16 @@ export default function BossEvaluationPage() {
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      onClick={() => handleStartEvaluation(task)}
-                      className="bg-yellow-600 hover:bg-yellow-700"
-                    >
-                      <Crown className="w-4 h-4 mr-2" />
-                      开始评分
-                    </Button>
+                    // 逾期任务不显示评分按钮
+                    !task.is_overdue && (
+                      <Button
+                        onClick={() => handleStartEvaluation(task)}
+                        className="bg-yellow-600 hover:bg-yellow-700"
+                      >
+                        <Crown className="w-4 h-4 mr-2" />
+                        开始评分
+                      </Button>
+                    )
                   )}
                 </div>
               </div>

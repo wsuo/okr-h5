@@ -73,7 +73,11 @@ export default function EmployeeDashboard() {
         assessmentService.getAssessments({ status: 'completed' })
       ])
       if (tasksResponse.code === 200 && tasksResponse.data) {
-        setEvaluationTasks(tasksResponse.data)
+        const tasks = tasksResponse.data.map((t: EvaluationTask) => ({
+          ...t,
+          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
+        }))
+        setEvaluationTasks(tasks)
         
         // 计算待处理任务数量
         const pendingCount = tasksResponse.data.filter(task => 
@@ -350,14 +354,16 @@ export default function EmployeeDashboard() {
                         类型: {evaluationUtils.getTypeText(task.type)} • 
                         被评估人: {task.evaluatee_name}
                       </div>
-                      <Button 
-                        onClick={() => router.push(`/employee/evaluation/${task.assessment_id}`)} 
-                        size="sm"
-                        variant={task.is_overdue ? "destructive" : "default"}
-                        className="w-full sm:w-auto"
-                      >
-                        {task.status === 'in_progress' ? '继续评分' : '开始评分'}
-                      </Button>
+                      {/* 逾期则不允许进入评估，隐藏按钮 */}
+                      {!task.is_overdue && (
+                        <Button 
+                          onClick={() => router.push(`/employee/evaluation/${task.assessment_id}`)} 
+                          size="sm"
+                          className="w-full sm:w-auto"
+                        >
+                          {task.status === 'in_progress' ? '继续评分' : '开始评分'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -414,61 +414,23 @@ export default function LeaderEvaluationPage() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
-                  <span className="text-primary font-semibold text-lg">
-                    {evaluateeInfo.name.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-xl text-foreground">{evaluateeInfo.name}</h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    <span className="bg-secondary/20 px-2 py-1 rounded-md">
-                      {evaluateeInfo.department?.name || '未分配部门'}
-                    </span>
-                    <span>·</span>
-                    <span className="bg-secondary/20 px-2 py-1 rounded-md">
-                      {evaluateeInfo.position || '未设置职位'}
+                  <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-full flex items-center justify-center border-2 border-primary/20">
+                    <span className="text-primary font-semibold text-lg">
+                      {evaluateeInfo.name.charAt(0)}
                     </span>
                   </div>
-                </div>
-              </div>
-              
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground mb-2">自评状态</div>
-                {(() => {
-                  switch (selfEvaluationStatus.status) {
-                    case 'submitted':
-                    case 'completed':
-                      return (
-                        <div>
-                          <Badge className="bg-green-100 text-green-800 border-green-200 px-3 py-1">
-                            已提交
-                          </Badge>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {selfEvaluationStatus.completedAt && evaluationUtils.formatDateTime(selfEvaluationStatus.completedAt)}
-                          </div>
-                        </div>
-                      )
-                    case 'draft':
-                      return (
-                        <div>
-                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 px-3 py-1">
-                            草稿中
-                          </Badge>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {selfEvaluationStatus.completedAt && `保存于 ${evaluationUtils.formatDateTime(selfEvaluationStatus.completedAt)}`}
-                          </div>
-                        </div>
-                      )
-                    case 'none':
-                    default:
-                      return (
-                        <Badge className="bg-gray-100 text-gray-800 border-gray-200 px-3 py-1">
-                          未开始
-                        </Badge>
-                      )
-                  }
-                })()}
+                  <div>
+                    <h3 className="font-semibold text-xl text-foreground">{evaluateeInfo.name}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                      <span className="bg-secondary/20 px-2 py-1 rounded-md">
+                        {evaluateeInfo.department?.name || '未分配部门'}
+                      </span>
+                      <span>·</span>
+                      <span className="bg-secondary/20 px-2 py-1 rounded-md">
+                        {evaluateeInfo.position || '未设置职位'}
+                      </span>
+                    </div>
+                  </div>
               </div>
             </div>
           </CardContent>
@@ -484,41 +446,7 @@ export default function LeaderEvaluationPage() {
           </Alert>
         )}
 
-        {/* 自评状态提醒 */}
-        {!viewMode && (() => {
-          switch (selfEvaluationStatus.status) {
-            case 'none':
-              return (
-                <Alert className="mb-6 bg-gradient-to-r from-red-50 to-orange-50 border-red-200/50">
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800">
-                    该员工尚未开始自评，您仍可以进行评分，但建议等待自评完成后再进行评价以获得更全面的信息。
-                  </AlertDescription>
-                </Alert>
-              )
-            case 'draft':
-              return (
-                <Alert className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200/50">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <AlertDescription className="text-yellow-800">
-                    该员工的自评还在草稿阶段，尚未正式提交。您仍可以进行评分，但建议等待自评完成后再进行评价。
-                  </AlertDescription>
-                </Alert>
-              )
-            case 'submitted':
-            case 'completed':
-              return (
-                <Alert className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200/50">
-                  <AlertTriangle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    该员工已完成自评，您可以参考自评结果进行客观评价。
-                  </AlertDescription>
-                </Alert>
-              )
-            default:
-              return null
-          }
-        })()}
+        {/* 自评状态提醒已移除：领导可评分即视为无需提示 */}
 
         {/* 草稿恢复提醒 */}
         {existingDraft && existingDraft.detailed_scores && !viewMode && (

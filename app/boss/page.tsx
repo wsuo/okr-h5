@@ -98,7 +98,11 @@ export default function BossDashboard() {
         setUserStatsDetail(userStatsDetailResponse.data || [])
       }
       if (bossTasksResponse.code === 200) {
-        const tasks = bossTasksResponse.data || []
+        const tasksRaw = bossTasksResponse.data || []
+        const tasks = tasksRaw.map((t: any) => ({
+          ...t,
+          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
+        }))
         setBossTasks(tasks)
         const pendingTasks = tasks.filter(task => task.status === 'pending')
         setPendingTasksCount(pendingTasks.length)
@@ -381,13 +385,15 @@ export default function BossDashboard() {
                           已逾期
                         </Badge>
                       )}
-                      <Button
-                        size="sm"
-                        onClick={() => router.push(`/boss/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
-                        className="bg-yellow-600 hover:bg-yellow-700"
-                      >
-                        立即评分
-                      </Button>
+                      {!task.is_overdue && (
+                        <Button
+                          size="sm"
+                          onClick={() => router.push(`/boss/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
+                          className="bg-yellow-600 hover:bg-yellow-700"
+                        >
+                          立即评分
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

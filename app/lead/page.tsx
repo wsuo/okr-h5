@@ -75,7 +75,7 @@ export default function LeadDashboard() {
             evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
             status: evaluation.status === 'submitted' ? 'completed' as const : 'pending' as const,
             deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            is_overdue: false,
+            is_overdue: evaluation.assessment?.deadline ? evaluationUtils.isOverdue(evaluation.assessment.deadline) : false,
             evaluation_id: evaluation.id,
             last_updated: evaluation.updated_at
           }
@@ -263,13 +263,16 @@ export default function LeadDashboard() {
                               截止：{evaluationUtils.formatDate(task.deadline)} · {task.assessment_period}
                             </p>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={() => router.push(`/lead/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
-                            className="w-full sm:w-auto"
-                          >
-                            开始评分
-                          </Button>
+                          {/* 过期则不允许评分，隐藏按钮 */}
+                          {!task.is_overdue && (
+                            <Button
+                              size="sm"
+                              onClick={() => router.push(`/lead/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
+                              className="w-full sm:w-auto"
+                            >
+                              开始评分
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -390,15 +393,15 @@ export default function LeadDashboard() {
                       >
                         查看详情
                       </Button>
-                      {member.has_active_assessment && !member.evaluation_status?.leader_completed && (
-                        <Button
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => router.push(`/lead/evaluation/${member.current_assessment.assessment_id}/${member.user_id}`)}
-                        >
-                          开始评分
-                        </Button>
-                      )}
+                        {member.has_active_assessment && !member.evaluation_status?.leader_completed && (!member.current_assessment || !teamUtils.isAssessmentOverdue(member.current_assessment)) && (
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => router.push(`/lead/evaluation/${member.current_assessment.assessment_id}/${member.user_id}`)}
+                          >
+                            开始评分
+                          </Button>
+                        )}
                     </div>
                   </div>
                 ))}

@@ -89,7 +89,7 @@ export default function LeadEvaluationCenter() {
             evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
             status: taskStatus,
             deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            is_overdue: false,
+            is_overdue: evaluation.assessment?.deadline ? evaluationUtils.isOverdue(evaluation.assessment.deadline) : false,
             evaluation_id: evaluation.id,
             last_updated: evaluation.updated_at,
             score: evaluation.score, // Include score information
@@ -135,7 +135,7 @@ export default function LeadEvaluationCenter() {
               evaluatee_department: evaluation.evaluatee?.department?.name || '未知部门',
               status: 'completed' as TaskStatus, // Mark as completed for the completed tab
               deadline: evaluation.assessment?.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-              is_overdue: false,
+              is_overdue: evaluation.assessment?.deadline ? evaluationUtils.isOverdue(evaluation.assessment.deadline) : false,
               evaluation_id: evaluation.id,
               last_updated: evaluation.updated_at || evaluation.submitted_at,
               score: evaluation.score, // Include score information
@@ -460,13 +460,15 @@ export default function LeadEvaluationCenter() {
                               <span>最后更新：{evaluationUtils.formatDateTime(task.last_updated)}</span>
                             )}
                           </div>
-                          <Button
-                            onClick={() => router.push(`/lead/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
-                            variant={task.is_overdue ? "destructive" : "default"}
-                            size="sm"
-                          >
-                            {task.status === 'in_progress' ? '继续评分' : '开始评分'}
-                          </Button>
+                          {/* 已逾期则不允许评分，隐藏按钮 */}
+                          {!task.is_overdue && (
+                            <Button
+                              onClick={() => router.push(`/lead/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
+                              size="sm"
+                            >
+                              {task.status === 'in_progress' ? '继续评分' : '开始评分'}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -605,13 +607,7 @@ export default function LeadEvaluationCenter() {
                           <div className="text-sm text-red-600">
                             逾期时间：{evaluationUtils.formatDate(task.deadline)}
                           </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => router.push(`/lead/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
-                          >
-                            立即评分
-                          </Button>
+                          {/* 逾期任务不显示评分按钮 */}
                         </div>
                       </div>
                     ))}

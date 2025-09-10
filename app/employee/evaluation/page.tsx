@@ -72,7 +72,11 @@ export default function EmployeeEvaluationCenter() {
 
       // 处理评估任务
       if (tasksResponse.code === 200 && tasksResponse.data) {
-        setEvaluationTasks(tasksResponse.data)
+        const tasks = tasksResponse.data.map((t: EvaluationTask) => ({
+          ...t,
+          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
+        }))
+        setEvaluationTasks(tasks)
       }
 
       // 处理评估历史
@@ -326,13 +330,15 @@ export default function EmployeeEvaluationCenter() {
                               <span>最后更新：{evaluationUtils.formatDateTime(task.last_updated)}</span>
                             )}
                           </div>
-                          <Button
-                            onClick={() => router.push(`/employee/evaluation/${task.assessment_id}`)}
-                            variant={task.is_overdue ? "destructive" : "default"}
-                            size="sm"
-                          >
-                            {task.status === 'in_progress' ? '继续评估' : '开始评估'}
-                          </Button>
+                          {/* 逾期则不允许进入评估，隐藏按钮 */}
+                          {!task.is_overdue && (
+                            <Button
+                              onClick={() => router.push(`/employee/evaluation/${task.assessment_id}`)}
+                              size="sm"
+                            >
+                              {task.status === 'in_progress' ? '继续评估' : '开始评估'}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}

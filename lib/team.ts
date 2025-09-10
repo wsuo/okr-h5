@@ -8,6 +8,8 @@ export interface TeamMemberAssessment {
   start_date: string
   end_date: string
   period: string
+  // 新增：后端返回的截止日期字段
+  deadline?: string
 }
 
 export interface TeamMemberEvaluationStatus {
@@ -240,9 +242,11 @@ export const teamUtils = {
    */
   isAssessmentOverdue(assessment: TeamMemberAssessment): boolean {
     if (assessment.status === 'completed') return false
-    const endDate = new Date(assessment.end_date)
+    const deadlineStr = assessment.deadline || assessment.end_date
+    if (!deadlineStr) return false
+    const deadline = new Date(deadlineStr)
     const now = new Date()
-    return now > endDate
+    return now > deadline
   },
 
   /**
