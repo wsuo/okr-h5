@@ -9,14 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -33,6 +25,11 @@ import { Template, templateService, templateUtils, TemplateListQuery, CreateTemp
 import { ScoringMode, TwoTierScoringConfig } from "@/lib/evaluation"
 import { User, userService } from "@/lib/user"
 import { toast } from "sonner"
+import Filters from "@/components/template-management/Filters"
+import CreateDialog from "@/components/template-management/CreateDialog"
+import ConfigEditor from "@/components/template-management/ConfigEditor"
+import ScoringRulesEditor from "@/components/template-management/ScoringRulesEditor"
+import { validateWeights } from "@/components/template-management/utils"
 
 export default function TemplateManagement() {
   const [templates, setTemplates] = useState<Template[]>([])
@@ -103,6 +100,46 @@ export default function TemplateManagement() {
         poor: {
           min: 0,
           description: "较差：未完成目标，表现不佳"
+        }
+      },
+      // 老板评分配置
+      boss_rating_config: {
+        enabled: false,
+        categories: [],
+        star_scale: 5,
+        rating_mode: "star_category",
+        total_weight: 100,
+        star_standards: {
+          "1": {
+            color: "#ff4d4f",
+            title: "待改进",
+            description: "明显低于期望，急需提升"
+          },
+          "2": {
+            color: "#ff7a45",
+            title: "基本达标",
+            description: "略低于期望，需要改进"
+          },
+          "3": {
+            color: "#faad14",
+            title: "符合期望",
+            description: "符合期望，标准表现"
+          },
+          "4": {
+            color: "#52c41a",
+            title: "超出期望",
+            description: "超出期望，值得肯定"
+          },
+          "5": {
+            color: "#1890ff",
+            title: "卓越表现",
+            description: "显著超出期望，业内标杆"
+          }
+        },
+        validation_rules: {
+          max_categories: 8,
+          min_categories: 3,
+          all_categories_required: true
         }
       }
     },
@@ -683,23 +720,6 @@ export default function TemplateManagement() {
                 <Plus className="w-3 h-3 mr-1" />
                 添加大项
               </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={handleCancelEdit}
-                className="text-xs"
-              >
-                取消
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={() => handleSaveTemplate(template)}
-                disabled={submitting || !validation.isValid}
-                className="text-xs"
-              >
-                {submitting && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
-                保存
-              </Button>
             </div>
           ) : null}
         </div>
@@ -875,167 +895,42 @@ export default function TemplateManagement() {
             </CardTitle>
             <CardDescription>管理绩效考核模板配置</CardDescription>
           </div>
-          {/* 新建模板按钮 - 仅管理员可见 */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => resetForm()}>
-                <Plus className="w-4 h-4 mr-2" />
-                新建模板
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>新建模板</DialogTitle>
-                <DialogDescription>创建一个新的绩效评估模板</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateTemplate} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="name">模板名称 *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="请输入模板名称"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="type">模板类型 *</Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) => setFormData({ ...formData, type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择模板类型" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="okr">OKR模板</SelectItem>
-                        <SelectItem value="assessment">考核模板</SelectItem>
-                        <SelectItem value="evaluation">评估模板</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="description">模板描述</Label>
-                  <Input
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="请输入模板描述"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_default"
-                    checked={formData.is_default === 1}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_default: checked ? 1 : 0 })}
-                  />
-                  <Label htmlFor="is_default">设为默认模板</Label>
-                </div>
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    取消
-                  </Button>
-                  <Button type="submit" disabled={submitting}>
-                    {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    创建模板
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {/* 新建模板按钮 */}
+          <div>
+            <Button onClick={() => { resetForm(); setIsCreateDialogOpen(true) }}>
+              <Plus className="w-4 h-4 mr-2" />
+              新建模板
+            </Button>
+            <CreateDialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+              formData={formData}
+              setFormData={(data) => setFormData(data)}
+              error={error}
+              submitting={submitting}
+              onSubmit={handleCreateTemplate}
+              onCancel={() => setIsCreateDialogOpen(false)}
+            />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        {/* 搜索和筛选区域 */}
-        <div className="space-y-4 mb-6">
-          {/* 第一行：搜索框和操作按钮 */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-            <Input
-              placeholder="搜索模板..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1"
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            />
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={handleSearch}
-                disabled={loading}
-                className="flex-1 sm:flex-none"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "搜索"}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleReset}
-                disabled={loading}
-                className="flex-1 sm:flex-none"
-              >
-                重置
-              </Button>
-            </div>
-          </div>
-          
-          {/* 第二行：筛选条件 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="筛选类型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部类型</SelectItem>
-                <SelectItem value="okr">OKR模板</SelectItem>
-                <SelectItem value="assessment">考核模板</SelectItem>
-                <SelectItem value="evaluation">评估模板</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="筛选状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="1">启用</SelectItem>
-                <SelectItem value="0">禁用</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedIsDefault} onValueChange={setSelectedIsDefault}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="是否默认" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部模板</SelectItem>
-                <SelectItem value="1">默认模板</SelectItem>
-                <SelectItem value="0">非默认模板</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedCreatedBy} onValueChange={setSelectedCreatedBy}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="创建者（管理员）" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部管理员</SelectItem>
-                {users && users.map((user) => (
-                  <SelectItem key={user.id} value={user.id.toString()}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <Filters
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedType={selectedType}
+          setSelectedType={setSelectedType}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+          selectedIsDefault={selectedIsDefault}
+          setSelectedIsDefault={setSelectedIsDefault}
+          selectedCreatedBy={selectedCreatedBy}
+          setSelectedCreatedBy={setSelectedCreatedBy}
+          users={users}
+          loading={loading}
+          onSearch={handleSearch}
+          onReset={handleReset}
+        />
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -2307,7 +2202,283 @@ export default function TemplateManagement() {
                     </>
                   )}
                   
-                  {renderEditableTemplateConfig(template)}
+                  <ConfigEditor
+                    template={template}
+                    isEditing={editingTemplateId === template.id}
+                    submitting={submitting}
+                    onAddCategory={handleAddCategory}
+                    onDeleteCategory={handleDeleteCategory}
+                    onAddItem={handleAddItem}
+                    onDeleteItem={handleDeleteItem}
+                    onUpdateCategory={handleUpdateCategory}
+                    onUpdateItem={handleUpdateItem}
+                    onCancelEdit={handleCancelEdit}
+                    onSave={handleSaveTemplate}
+                  />
+                  
+                  {/* Boss评分配置 - 独立区域 */}
+                  {template.config.boss_rating_config && (
+                    <div className="mt-4 pl-4 border-l-2 border-orange-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">★</div>
+                        <span className="text-sm font-medium text-orange-700">Boss星级评分配置</span>
+                        <Switch
+                          checked={template.config.boss_rating_config.enabled}
+                          onCheckedChange={(checked) => {
+                            const updatedTemplate = {
+                              ...template,
+                              config: {
+                                ...template.config,
+                                boss_rating_config: {
+                                  ...template.config.boss_rating_config!,
+                                  enabled: checked
+                                }
+                              }
+                            }
+                            updateTemplateInState(updatedTemplate)
+                          }}
+                          disabled={editingTemplateId !== template.id}
+                        />
+                        <span className={`text-xs px-2 py-1 rounded ${template.config.boss_rating_config.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {template.config.boss_rating_config.enabled ? '启用' : '禁用'}
+                        </span>
+                      </div>
+
+                      {template.config.boss_rating_config.enabled && (
+                        <div className="space-y-4 pl-4 border-l-2 border-orange-200">
+                          {editingTemplateId === template.id ? (
+                            <>
+                              {/* 编辑模式 - Boss评分分类配置 */}
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-medium text-gray-700">评分分类</span>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      const newCategory = {
+                                        id: `boss_cat_${Date.now()}`,
+                                        name: "新分类",
+                                        weight: 20,
+                                        required: true,
+                                        sort_order: (template.config.boss_rating_config?.categories.length || 0) + 1,
+                                        description: "请添加描述",
+                                        star_to_score_mapping: {
+                                          "1": 4,
+                                          "2": 8,
+                                          "3": 12,
+                                          "4": 16,
+                                          "5": 20
+                                        }
+                                      }
+                                      const updatedTemplate = {
+                                        ...template,
+                                        config: {
+                                          ...template.config,
+                                          boss_rating_config: {
+                                            ...template.config.boss_rating_config!,
+                                            categories: [...(template.config.boss_rating_config?.categories || []), newCategory]
+                                          }
+                                        }
+                                      }
+                                      updateTemplateInState(updatedTemplate)
+                                    }}
+                                  >
+                                    <Plus className="w-3 h-3 mr-1" />
+                                    添加分类
+                                  </Button>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {template.config.boss_rating_config.categories.map((category, index) => (
+                                    <div key={category.id} className="p-3 bg-gray-50 rounded border">
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div>
+                                          <Label htmlFor={`boss-cat-name-${category.id}`} className="text-xs">分类名称</Label>
+                                          <Input
+                                            id={`boss-cat-name-${category.id}`}
+                                            value={category.name}
+                                            onChange={(e) => {
+                                              const updatedCategories = [...(template.config.boss_rating_config?.categories || [])]
+                                              updatedCategories[index] = { ...category, name: e.target.value }
+                                              const updatedTemplate = {
+                                                ...template,
+                                                config: {
+                                                  ...template.config,
+                                                  boss_rating_config: {
+                                                    ...template.config.boss_rating_config!,
+                                                    categories: updatedCategories
+                                                  }
+                                                }
+                                              }
+                                              updateTemplateInState(updatedTemplate)
+                                            }}
+                                            className="text-sm h-8"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor={`boss-cat-weight-${category.id}`} className="text-xs">权重 (%)</Label>
+                                          <Input
+                                            id={`boss-cat-weight-${category.id}`}
+                                            type="number"
+                                            min="1"
+                                            max="100"
+                                            value={category.weight}
+                                            onChange={(e) => {
+                                              const weight = parseInt(e.target.value) || 0
+                                              const updatedCategories = [...(template.config.boss_rating_config?.categories || [])]
+                                              updatedCategories[index] = { 
+                                                ...category, 
+                                                weight,
+                                                star_to_score_mapping: {
+                                                  "1": Math.round(weight * 0.2),
+                                                  "2": Math.round(weight * 0.4),
+                                                  "3": Math.round(weight * 0.6),
+                                                  "4": Math.round(weight * 0.8),
+                                                  "5": weight
+                                                }
+                                              }
+                                              const updatedTemplate = {
+                                                ...template,
+                                                config: {
+                                                  ...template.config,
+                                                  boss_rating_config: {
+                                                    ...template.config.boss_rating_config!,
+                                                    categories: updatedCategories
+                                                  }
+                                                }
+                                              }
+                                              updateTemplateInState(updatedTemplate)
+                                            }}
+                                            className="text-sm h-8"
+                                          />
+                                        </div>
+                                        <div className="flex items-end gap-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                              const updatedCategories = template.config.boss_rating_config?.categories.filter((_, i) => i !== index) || []
+                                              const updatedTemplate = {
+                                                ...template,
+                                                config: {
+                                                  ...template.config,
+                                                  boss_rating_config: {
+                                                    ...template.config.boss_rating_config!,
+                                                    categories: updatedCategories
+                                                  }
+                                                }
+                                              }
+                                              updateTemplateInState(updatedTemplate)
+                                            }}
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      <div className="mt-2">
+                                        <Label htmlFor={`boss-cat-desc-${category.id}`} className="text-xs">描述</Label>
+                                        <Input
+                                          id={`boss-cat-desc-${category.id}`}
+                                          value={category.description}
+                                          onChange={(e) => {
+                                            const updatedCategories = [...(template.config.boss_rating_config?.categories || [])]
+                                            updatedCategories[index] = { ...category, description: e.target.value }
+                                            const updatedTemplate = {
+                                              ...template,
+                                              config: {
+                                                ...template.config,
+                                                boss_rating_config: {
+                                                  ...template.config.boss_rating_config!,
+                                                  categories: updatedCategories
+                                                }
+                                              }
+                                            }
+                                            updateTemplateInState(updatedTemplate)
+                                          }}
+                                          placeholder="请描述此分类的评分标准"
+                                          className="text-sm h-8"
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+
+                                  {/* Boss评分权重验证 */}
+                                  {(() => {
+                                    const totalWeight = (template.config.boss_rating_config?.categories || [])
+                                      .reduce((sum, cat) => sum + cat.weight, 0)
+                                    const isValid = totalWeight === 100
+                                    
+                                    return (
+                                      <div className={`text-xs px-2 py-1 rounded ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        Boss评分权重总计: {totalWeight}% {isValid ? '✓' : '⚠️ 应为100%'}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* 查看模式 - Boss评分分类显示 */}
+                              <div>
+                                <div className="text-sm font-medium text-gray-700 mb-2">评分分类</div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {template.config.boss_rating_config.categories.map((category) => (
+                                    <div key={category.id} className="p-2 bg-white rounded border">
+                                      <div className="text-xs text-gray-600">{category.name}</div>
+                                      <div className="text-sm font-bold text-orange-600">
+                                        {category.weight}%
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {category.description}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Boss评分配置状态 */}
+                                {(() => {
+                                  const totalWeight = (template.config.boss_rating_config?.categories || [])
+                                    .reduce((sum, cat) => sum + cat.weight, 0)
+                                  const isValid = totalWeight === 100
+                                  
+                                  return (
+                                    <div className={`text-xs px-2 py-1 rounded mt-2 ${isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      配置状态: {isValid ? '✅ Boss评分配置正确' : '⚠️ Boss评分配置有误'}
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* 编辑模式的底部按钮 */}
+                  {editingTemplateId === template.id && (
+                    <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleCancelEdit}
+                        className="text-sm"
+                      >
+                        取消
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleSaveTemplate(template)}
+                        disabled={submitting || !validateWeights(template).isValid}
+                        className="text-sm"
+                      >
+                        {submitting && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+                        保存配置
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
