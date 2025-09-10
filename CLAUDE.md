@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+不要每次修改完代码都执行 npm run build
+
 ## 项目概述
 
 这是一个企业级 OKR 绩效考核系统，基于 Next.js 15.2.4 + TypeScript + Tailwind CSS + shadcn/ui 构建。系统支持多角色管理（管理员、老板、部门领导、员工），提供完整的绩效评估和目标管理功能。
