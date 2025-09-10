@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, UserCheck, Clock, CheckCircle, AlertTriangle, Crown } from "lucide-react"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import BossHeader from "@/components/boss-header"
 import { safeParseUserInfo, isBossUser } from "@/lib/utils"
 import { 
@@ -20,6 +20,7 @@ import {
 
 export default function BossEvaluationPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [userInfo, setUserInfo] = useState<any>(null)
   const [tasks, setTasks] = useState<BossTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,11 +31,17 @@ export default function BossEvaluationPage() {
     if (user) {
       setUserInfo(user)
       loadTasks()
+      
+      // 检查URL参数中是否有tab参数
+      const tabParam = searchParams.get('tab')
+      if (tabParam && ['pending', 'in_progress', 'completed', 'overdue'].includes(tabParam)) {
+        setActiveTab(tabParam)
+      }
     } else {
       router.push('/')
       return
     }
-  }, [])
+  }, [searchParams])
 
   // 加载Boss评估任务
   const loadTasks = async () => {

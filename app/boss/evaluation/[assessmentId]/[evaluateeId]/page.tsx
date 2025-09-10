@@ -4,13 +4,11 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, AlertTriangle, Crown, Save, Send, User, Award } from "lucide-react"
+import { ArrowLeft, Loader2, AlertTriangle, Crown, Send, User, Award } from "lucide-react"
+import { StarRating, starToScore, scoreToStars } from "@/components/ui/star-rating"
 import { toast } from "sonner"
 import BossHeader from "@/components/boss-header"
 import { safeParseUserInfo } from "@/lib/utils"
@@ -35,8 +33,8 @@ export default function BossEvaluationFormPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 表单数据
-  const [score, setScore] = useState<number>(85)
+  // 表单数据 - 使用星级评分
+  const [starRating, setStarRating] = useState<number>(4) // 默认4星(良好)
   const [feedback, setFeedback] = useState<string>('')
   const [strengths, setStrengths] = useState<string>('')
   const [improvements, setImprovements] = useState<string>('')
@@ -98,7 +96,7 @@ export default function BossEvaluationFormPage() {
           type: 'boss'
         })
         
-        if (evaluationsResponse.code === 200 && evaluationsResponse.data?.items?.length > 0) {
+        if (evaluationsResponse.code === 200 && evaluationsResponse.data?.items && evaluationsResponse.data.items.length > 0) {
           const evaluation = evaluationsResponse.data.items[0]
           if (evaluation.status === 'submitted' || evaluation.status === 'completed') {
             toast.info('您已完成对该员工的Boss评分')
@@ -123,8 +121,10 @@ export default function BossEvaluationFormPage() {
   const handleSubmit = async () => {
     try {
       // 验证表单数据
-      if (score < 0 || score > 100) {
-        toast.error('评分必须在0-100之间')
+      const score = starToScore(starRating) // 将星级转换为分数
+      
+      if (starRating < 1 || starRating > 5) {
+        toast.error('请选择评分星级')
         return
       }
 
@@ -138,7 +138,7 @@ export default function BossEvaluationFormPage() {
       const submitData: SubmitBossEvaluationRequest = {
         assessment_id: assessmentId,
         evaluatee_id: evaluateeId,
-        score: score,
+        score: score, // 使用转换后的分数
         feedback: feedback.trim(),
         strengths: strengths.trim() || undefined,
         improvements: improvements.trim() || undefined
@@ -150,7 +150,8 @@ export default function BossEvaluationFormPage() {
         toast.success('Boss评分提交成功！', {
           description: '系统将自动计算最终加权得分'
         })
-        router.push('/boss/evaluation')
+        // 跳转到已完成tab
+        router.push('/boss/evaluation?tab=completed')
       } else {
         throw new Error(response.message || '提交失败')
       }
@@ -170,15 +171,8 @@ export default function BossEvaluationFormPage() {
     router.push('/boss/evaluation')
   }
 
-  // 获取评分等级
-  const getScoreLevel = (score: number) => {
-    if (score >= 90) return { text: '优秀', color: 'text-green-600' }
-    if (score >= 80) return { text: '良好', color: 'text-blue-600' }
-    if (score >= 70) return { text: '合格', color: 'text-yellow-600' }
-    return { text: '待改进', color: 'text-red-600' }
-  }
-
-  const scoreLevel = getScoreLevel(score)
+  // 获取当前分数 (从星级转换)
+  const getCurrentScore = () => starToScore(starRating)
 
   if (!userInfo) {
     return (
@@ -271,7 +265,7 @@ export default function BossEvaluationFormPage() {
               Boss 简化评分
             </h1>
             <p className="text-gray-600 text-lg">
-              {template.assessment_title} · {template.assessment_period}
+              {template.assessment_title} · 考核周期
             </p>
             <div className="mt-4 flex items-center justify-center gap-4 text-sm">
               <div className="bg-white/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-yellow-300">
@@ -336,51 +330,33 @@ export default function BossEvaluationFormPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* 评分滑块 */}
+            {/* 五角星评分 */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">总体评分 (0-100分)</Label>
+                <Label className="text-base font-medium">Boss 评分</Label>
                 <div className="text-right">
-                  <span className={`text-3xl font-bold ${scoreLevel.color}`}>
-                    {score}
+                  <span className="text-lg text-gray-500">当前分数: </span>
+                  <span className="text-2xl font-bold text-blue-600">
+                    {getCurrentScore()}
                   </span>
-                  <span className="text-lg text-gray-500 ml-1">/ 100</span>
+                  <span className="text-lg text-gray-500 ml-1">分</span>
                 </div>
               </div>
               
-              <div className="px-3 py-2">
-                <Slider
-                  value={[score]}
-                  onValueChange={(values) => setScore(values[0])}
-                  max={100}
-                  min={0}
-                  step={1}
-                  className="w-full"
+              <div className="flex flex-col items-center space-y-4 py-6 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-600 mb-2">
+                  请选择您对该员工的总体评价
+                </div>
+                <StarRating
+                  value={starRating}
+                  onChange={setStarRating}
+                  disabled={submitting}
+                  showLabel={true}
+                  className="justify-center"
                 />
-                <div className="flex justify-between text-sm text-gray-600 mt-2 px-1">
-                  <span>0</span>
-                  <span>25</span>
-                  <span>50</span>
-                  <span>75</span>
-                  <span>100</span>
+                <div className="text-xs text-gray-500 text-center max-w-md">
+                  五星评分制：优秀(95分) · 良好(85分) · 中等(75分) · 需改进(65分) · 不合格(50分)
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm font-medium text-gray-700">精确输入：</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={score}
-                    onChange={(e) => setScore(Number(e.target.value) || 0)}
-                    className="w-20 text-center font-bold"
-                  />
-                </div>
-                <Badge className={`${scoreLevel.color.replace('text-', 'bg-').replace('-600', '-100')} ${scoreLevel.color} border-current`}>
-                  {scoreLevel.text}
-                </Badge>
               </div>
             </div>
 
@@ -455,7 +431,7 @@ export default function BossEvaluationFormPage() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={submitting || !feedback.trim()}
+                  disabled={submitting || !feedback.trim() || starRating === 0}
                   className="bg-yellow-600 hover:bg-yellow-700"
                 >
                   {submitting ? (
