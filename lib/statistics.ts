@@ -206,6 +206,7 @@ export interface StatisticsQueryParams {
   assessment_id?: number
   time_dimension?: string
   group_by?: string
+  month?: string       // 新增月份参数，格式：YYYY-MM
 }
 
 // 统计服务类
@@ -213,8 +214,8 @@ export class StatisticsService {
   /**
    * 获取仪表板统计数据
    */
-  async getDashboardStatistics(): Promise<ApiResponse<DashboardStatistics>> {
-    return apiClient.get<DashboardStatistics>('/statistics/dashboard')
+  async getDashboardStatistics(params?: StatisticsQueryParams): Promise<ApiResponse<DashboardStatistics>> {
+    return apiClient.get<DashboardStatistics>('/statistics/dashboard', params)
   }
 
   /**
@@ -234,8 +235,8 @@ export class StatisticsService {
   /**
    * 获取部门统计数据
    */
-  async getDepartmentStatistics(): Promise<ApiResponse<DepartmentStat[]>> {
-    return apiClient.get<DepartmentStat[]>('/statistics/departments')
+  async getDepartmentStatistics(params?: StatisticsQueryParams): Promise<ApiResponse<DepartmentStat[]>> {
+    return apiClient.get<DepartmentStat[]>('/statistics/departments', params)
   }
 
   /**

@@ -29,6 +29,7 @@ export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [selectedMonth, setSelectedMonth] = useState<string>("") // 新增月份选择状态
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const router = useRouter()
@@ -60,10 +61,20 @@ export default function BossDashboard() {
     }
   }, [])
 
+  // 当选择月份改变时重新加载数据
+  useEffect(() => {
+    if (userInfo) {
+      loadAllStatistics()
+    }
+  }, [selectedMonth])
+
   const loadAllStatistics = async () => {
     try {
       setLoading(true)
       setError("")
+
+      // 构建查询参数，包括月份过滤
+      const queryParams = selectedMonth ? { month: selectedMonth } : undefined
 
       // Load all statistics data and boss tasks in parallel
       const [
@@ -73,11 +84,11 @@ export default function BossDashboard() {
         userStatsDetailResponse,
         bossTasksResponse
       ] = await Promise.all([
-        statisticsService.getDashboardStatistics(),
-        statisticsService.getDepartmentStatistics(),
-        statisticsService.getPerformanceList(dateRange),
+        statisticsService.getDashboardStatistics(queryParams),
+        statisticsService.getDepartmentStatistics(queryParams),
+        statisticsService.getPerformanceList(selectedMonth ? queryParams : dateRange),
         statisticsService.getUserStatisticsDetail({
-          ...dateRange,
+          ...(selectedMonth ? queryParams : dateRange),
           time_dimension: 'week',
           group_by: 'user'
         }),
@@ -115,6 +126,23 @@ export default function BossDashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 生成月份选项 (最近12个月)
+  const generateMonthOptions = () => {
+    const options = [
+      { value: "", label: "全部月份" }
+    ]
+    
+    const currentDate = new Date()
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const label = `${date.getFullYear()}年${date.getMonth() + 1}月`
+      options.push({ value, label })
+    }
+    
+    return options
   }
 
   // Helper functions for data processing
@@ -346,9 +374,35 @@ export default function BossDashboard() {
       <BossHeader userInfo={userInfo} pendingTasksCount={pendingTasksCount} />
 
       <div className="container mx-auto p-2 sm:p-4 max-w-7xl">
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">全员绩效看板</h1>
-          <p className="text-sm sm:text-base text-gray-600">公司整体绩效数据分析</p>
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">全员绩效看板</h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              公司整体绩效数据分析
+              {selectedMonth && (
+                <span className="ml-2 text-blue-600 font-medium">
+                  · {generateMonthOptions().find(opt => opt.value === selectedMonth)?.label}
+                </span>
+              )}
+            </p>
+          </div>
+          
+          {/* 月份选择器 */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 whitespace-nowrap">筛选月份:</span>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="选择月份" />
+              </SelectTrigger>
+              <SelectContent>
+                {generateMonthOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Boss 待办任务卡片 */}
