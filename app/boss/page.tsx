@@ -135,7 +135,20 @@ export default function BossDashboard() {
   // 格式化选择的日期为月份显示
   const formatSelectedMonth = (date: Date | undefined) => {
     if (!date) return "全部月份"
-    return `${date.getFullYear()}年${date.getMonth() + 1}月`
+    // 创建新的Date对象确保正确的月份显示
+    const displayDate = new Date(date.getTime())
+    return `${displayDate.getFullYear()}年${displayDate.getMonth() + 1}月`
+  }
+
+  // 处理日期选择
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      // 确保日期是当前时区的正确日期
+      const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+      setSelectedDate(localDate)
+    } else {
+      setSelectedDate(undefined)
+    }
   }
 
   // Helper functions for data processing
@@ -394,27 +407,31 @@ export default function BossDashboard() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
-                <div className="p-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">选择月份</h4>
-                    {selectedDate && (
+                <div className="p-4">
+                  <h4 className="font-medium mb-3">选择年月</h4>
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    disabled={(date) => date > new Date()}
+                    defaultMonth={selectedDate || new Date()}
+                    captionLayout="dropdown-buttons"
+                    fromYear={2020}
+                    toYear={new Date().getFullYear()}
+                  />
+                  {selectedDate && (
+                    <div className="mt-3 pt-3 border-t">
                       <Button 
                         variant="ghost" 
                         size="sm"
                         onClick={() => setSelectedDate(undefined)}
+                        className="w-full"
                       >
-                        清除
+                        清除选择
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date > new Date()}
-                  initialFocus
-                />
               </PopoverContent>
             </Popover>
           </div>
