@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-不要每次修改完代码都执行 npm run build
+不要每次修改完代码都执行 npm run build 编译项目验证修改是否正确。
 
 ## 项目概述
 
