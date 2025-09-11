@@ -94,10 +94,10 @@ export default function BossEvaluationPage() {
 
   // 按状态分类任务
   const categorizedTasks = {
-    pending: tasks.filter(task => task.status === 'pending'),
-    in_progress: tasks.filter(task => task.status === 'in_progress'),
-    completed: tasks.filter(task => task.status === 'completed'),
-    overdue: tasks.filter(task => task.is_overdue),
+    pending: tasks.filter(task => task.status === 'pending' && !task.is_overdue), // 待评分且未逾期
+    in_progress: tasks.filter(task => task.status === 'in_progress' && !task.is_overdue), // 进行中且未逾期
+    completed: tasks.filter(task => task.status === 'completed'), // 已完成（不论是否逾期）
+    overdue: tasks.filter(task => task.is_overdue && task.status !== 'completed'), // 已逾期但未完成
   }
 
   // 处理开始评分
@@ -179,14 +179,9 @@ export default function BossEvaluationPage() {
                       }
                       className="flex items-center gap-1"
                     >
-                      {getStatusIcon(task.status)}
-                      {getStatusText(task.status)}
+                      {getStatusIcon(task.status === 'completed' ? 'completed' : task.is_overdue ? 'overdue' : task.status)}
+                      {getStatusText(task.status === 'completed' ? 'completed' : task.is_overdue ? 'overdue' : task.status)}
                     </Badge>
-                    {task.is_overdue && (
-                      <Badge variant="destructive" className="text-xs">
-                        已逾期
-                      </Badge>
-                    )}
                   </div>
                   
                   <div className="text-sm text-muted-foreground space-y-1">
@@ -270,9 +265,6 @@ export default function BossEvaluationPage() {
               <Crown className="w-7 h-7 text-yellow-600" />
               Boss 评分中心
             </h1>
-            <p className="text-muted-foreground mt-1">
-              采用简化评分模式，只需提供总分和评语即可完成评分
-            </p>
           </div>
           <Button
             variant="outline"
@@ -357,16 +349,6 @@ export default function BossEvaluationPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Boss评分说明 */}
-        <Alert className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
-          <Crown className="h-4 w-4 text-yellow-600" />
-          <AlertDescription className="text-yellow-800">
-            <strong>Boss 简化评分模式：</strong>
-            作为公司高级管理者，您只需为每位员工提供总体评分（0-100分）和简要评语即可。
-            系统将自动计算最终加权得分，您的评分在最终结果中占 10% 权重。
-          </AlertDescription>
-        </Alert>
 
         {/* 任务列表 */}
         <Card>
