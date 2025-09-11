@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,8 +22,12 @@ import { userService } from "@/lib/user"
 export default function BossEvaluationViewPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   const evaluationId = parseInt(params.evaluationId as string)
+  // 从查询参数获取 assessmentId 和 employeeId
+  const assessmentIdParam = searchParams.get('assessmentId')
+  const employeeIdParam = searchParams.get('employeeId')
   
   const [userInfo, setUserInfo] = useState<any>(null)
   const [evaluation, setEvaluation] = useState<DetailedEvaluation | null>(null)
@@ -50,87 +54,98 @@ export default function BossEvaluationViewPage() {
       setLoading(true)
       setError(null)
 
-      // 检查参数有效性
-      if (!evaluationId) {
-        throw new Error('评估ID无效')
-      }
-
-      // 获取评估详情
-      const evaluationResponse = await evaluationService.getDetailedEvaluation(evaluationId)
-      
-      if (evaluationResponse.code === 200 && evaluationResponse.data) {
-        const evaluationData = evaluationResponse.data
-        console.log('✅ 获取评估数据成功:', evaluationData)
-        console.log('🔍 检查关键字段:')
-        console.log('   - assessment_id:', evaluationData.assessment_id)
-        console.log('   - evaluatee_id:', evaluationData.evaluatee_id)
-        console.log('   - evaluatee对象:', evaluationData.evaluatee)
+      // 判断使用哪种加载模式
+      if (assessmentIdParam && employeeIdParam) {
+        // 模式1：通过查询参数获取 assessmentId 和 employeeId
+        const assessmentId = parseInt(assessmentIdParam)
+        const employeeId = parseInt(employeeIdParam)
         
-        setEvaluation(evaluationData)
-
-        // 获取被评估人信息
-        if (evaluationData.evaluatee_id) {
-          const evaluateeResponse = await userService.getUser(evaluationData.evaluatee_id)
+        console.log('🔍 使用查询参数模式加载评估详情:', { assessmentId, employeeId })
+        
+        // 直接使用完整评估接口
+        const completeResponse = await evaluationService.getCompleteEvaluationDetails(
+          assessmentId,
+          employeeId,
+          { include_details: true, include_comments: true, include_comparison: true }
+        )
+        
+        if (completeResponse.code === 200 && completeResponse.data) {
+          setCompleteEvaluation(completeResponse.data)
+          console.log('✅ 通过查询参数获取完整评估数据成功')
+          
+          // 获取被评估人信息
+          const evaluateeResponse = await userService.getUser(employeeId)
           if (evaluateeResponse.code === 200 && evaluateeResponse.data) {
             setEvaluateeInfo(evaluateeResponse.data)
           }
-        } else if (evaluationData.evaluatee) {
-          setEvaluateeInfo(evaluationData.evaluatee)
-        }
-
-        // 获取对比数据（如果有的话）
-        const assessmentId = evaluationData.assessment_id || evaluationData.assessment?.id
-        const evaluateeId = evaluationData.evaluatee_id || evaluationData.evaluatee?.id
-        
-        console.log('🔍 修正后的ID:')
-        console.log('   - assessmentId:', assessmentId)
-        console.log('   - evaluateeId:', evaluateeId)
-        
-        if (assessmentId && evaluateeId) {
+          
+          // 获取对比数据
           try {
-            console.log('📊 开始获取对比数据...', {
-              assessment_id: assessmentId, 
-              evaluatee_id: evaluateeId
-            })
-            
             const comparisonResponse = await evaluationService.getEvaluationComparison(
               assessmentId,
-              evaluateeId
+              employeeId
             )
-            console.log('📊 对比数据响应:', comparisonResponse)
             if (comparisonResponse.code === 200 && comparisonResponse.data) {
               setComparison(comparisonResponse.data)
-              console.log('✅ 设置对比数据成功')
-            }
-
-            console.log('🔍 开始调用完整评估接口...')
-            // 获取完整评估数据
-            const completeResponse = await evaluationService.getCompleteEvaluationDetails(
-              assessmentId,
-              evaluateeId,
-              { include_details: true, include_comments: true, include_comparison: true }
-            )
-            console.log('🔍 完整评估数据响应:', completeResponse)
-            if (completeResponse.code === 200 && completeResponse.data) {
-              console.log('✅ 设置完整评估数据前:', completeResponse.data)
-              setCompleteEvaluation(completeResponse.data)
-              console.log('✅ 设置完整评估数据成功')
-            } else {
-              console.error('❌ 完整评估接口调用失败:', completeResponse)
             }
           } catch (comparisonError) {
-            console.error('💢 获取对比数据失败:', comparisonError)
-            console.error('💢 错误详情:', comparisonError.message, comparisonError.stack)
-            // 对比数据获取失败不影响主流程
+            console.error('获取对比数据失败:', comparisonError)
           }
         } else {
-          console.warn('⚠️ 缺少assessmentId或evaluateeId，无法获取详细数据')
-          console.warn('   - assessmentId:', assessmentId)
-          console.warn('   - evaluateeId:', evaluateeId)
+          throw new Error(completeResponse.message || '获取评估详情失败')
         }
+        
+      } else if (evaluationId && evaluationId !== 0) {
+        // 模式2：通过原有的 evaluationId 获取
+        console.log('🔍 使用传统evaluationId模式加载评估详情:', evaluationId)
+        
+        const evaluationResponse = await evaluationService.getDetailedEvaluation(evaluationId)
+        
+        if (evaluationResponse.code === 200 && evaluationResponse.data) {
+          const evaluationData = evaluationResponse.data
+          setEvaluation(evaluationData)
 
+          // 获取被评估人信息
+          if (evaluationData.evaluatee_id) {
+            const evaluateeResponse = await userService.getUser(evaluationData.evaluatee_id)
+            if (evaluateeResponse.code === 200 && evaluateeResponse.data) {
+              setEvaluateeInfo(evaluateeResponse.data)
+            }
+          } else if (evaluationData.evaluatee) {
+            setEvaluateeInfo(evaluationData.evaluatee)
+          }
+
+          // 获取对比数据和完整评估数据
+          const assessmentId = evaluationData.assessment_id || evaluationData.assessment?.id
+          const evaluateeId = evaluationData.evaluatee_id || evaluationData.evaluatee?.id
+          
+          if (assessmentId && evaluateeId) {
+            try {
+              const [comparisonResponse, completeResponse] = await Promise.all([
+                evaluationService.getEvaluationComparison(assessmentId, evaluateeId),
+                evaluationService.getCompleteEvaluationDetails(
+                  assessmentId,
+                  evaluateeId,
+                  { include_details: true, include_comments: true, include_comparison: true }
+                )
+              ])
+              
+              if (comparisonResponse.code === 200 && comparisonResponse.data) {
+                setComparison(comparisonResponse.data)
+              }
+              
+              if (completeResponse.code === 200 && completeResponse.data) {
+                setCompleteEvaluation(completeResponse.data)
+              }
+            } catch (error) {
+              console.error('获取补充数据失败:', error)
+            }
+          }
+        } else {
+          throw new Error(evaluationResponse.message || '获取评估详情失败')
+        }
       } else {
-        throw new Error(evaluationResponse.message || '获取评估详情失败')
+        throw new Error('缺少必要的参数：需要evaluationId或(assessmentId + employeeId)')
       }
 
     } catch (error: any) {
@@ -218,7 +233,7 @@ export default function BossEvaluationViewPage() {
     )
   }
 
-  if (!evaluation || !evaluateeInfo) {
+  if ((!evaluation && !completeEvaluation) || !evaluateeInfo) {
     return (
       <div className="min-h-screen bg-gray-50">
         <BossHeader userInfo={userInfo} />
@@ -244,7 +259,7 @@ export default function BossEvaluationViewPage() {
   // 计算总分的评分信息
   const totalScore = comparison?.evaluation_status?.current_score || 
                      completeEvaluation?.evaluation_status?.current_score ||
-                     parseFloat(evaluation.score) || 0
+                     (evaluation ? parseFloat(evaluation.score) : 0) || 0
   const bossScoreInfo = getScoreInfo(totalScore)
 
   return (
@@ -265,7 +280,8 @@ export default function BossEvaluationViewPage() {
               Boss 评分详情
             </h1>
             <p className="text-gray-600 text-lg">
-              {evaluation.assessment?.title} · {evaluation.assessment?.period}
+              {evaluation?.assessment?.title || completeEvaluation?.assessment?.title || '考核评估'} · 
+              {evaluation?.assessment?.period || completeEvaluation?.assessment?.period || '当前周期'}
             </p>
           </div>
         </div>
@@ -330,7 +346,7 @@ export default function BossEvaluationViewPage() {
                 <div className={`text-5xl font-bold mb-2 ${bossScoreInfo.color}`}>
                   {(comparison?.evaluation_status?.current_score || 
                     completeEvaluation?.evaluation_status?.current_score)?.toFixed(1) || 
-                   parseFloat(evaluation.score)?.toFixed(1) || '--'}
+                   (evaluation ? parseFloat(evaluation.score)?.toFixed(1) : '--') || '--'}
                 </div>
                 <Badge className={`${bossScoreInfo.bgColor} ${bossScoreInfo.color} border-current mb-4`}>
                   {bossScoreInfo.level}
@@ -455,30 +471,31 @@ export default function BossEvaluationViewPage() {
               <h4 className="font-medium text-gray-900 mb-3">总体评价</h4>
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-gray-700 leading-relaxed">
-                  {evaluation.feedback || evaluation.boss_review || '未填写评价'}
+                  {evaluation?.feedback || evaluation?.boss_review || 
+                   completeEvaluation?.boss_evaluation?.review || '未填写评价'}
                 </p>
               </div>
             </div>
 
             {/* 优势亮点 */}
-            {evaluation.strengths && (
+            {(evaluation?.strengths || completeEvaluation?.boss_evaluation?.strengths) && (
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">优势亮点</h4>
                 <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                   <p className="text-green-800 leading-relaxed">
-                    {evaluation.strengths}
+                    {evaluation?.strengths || completeEvaluation?.boss_evaluation?.strengths}
                   </p>
                 </div>
               </div>
             )}
 
             {/* 改进建议 */}
-            {evaluation.improvements && (
+            {(evaluation?.improvements || completeEvaluation?.boss_evaluation?.improvements) && (
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">改进建议</h4>
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <p className="text-blue-800 leading-relaxed">
-                    {evaluation.improvements}
+                    {evaluation?.improvements || completeEvaluation?.boss_evaluation?.improvements}
                   </p>
                 </div>
               </div>
@@ -493,8 +510,10 @@ export default function BossEvaluationViewPage() {
           </Button>
           
           {(() => {
-            const assessmentIdForLink = (evaluation as any)?.assessment_id || (evaluation as any)?.assessment?.id
-            const evaluateeIdForLink = (evaluation as any)?.evaluatee_id || (evaluation as any)?.evaluatee?.id
+            const assessmentIdForLink = evaluation?.assessment_id || evaluation?.assessment?.id || 
+                                      completeEvaluation?.assessment?.id || assessmentIdParam
+            const evaluateeIdForLink = evaluation?.evaluatee_id || evaluation?.evaluatee?.id || 
+                                     completeEvaluation?.evaluatee?.id || employeeIdParam
             return comparison && assessmentIdForLink && evaluateeIdForLink ? (
               <Button
                 variant="outline"

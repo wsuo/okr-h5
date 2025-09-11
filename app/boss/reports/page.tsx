@@ -247,6 +247,14 @@ export default function BossReportsPage() {
     return "text-red-600"
   }
 
+  // 处理绩效排行项点击事件
+  const handlePerformanceItemClick = (item: PerformanceListItem) => {
+    // 使用 assessmentId 和 employeeId 作为查询参数跳转到评估详情页面
+    const assessmentId = item.assessment.id
+    const employeeId = item.employee.id
+    router.push(`/boss/evaluation/view/0?assessmentId=${assessmentId}&employeeId=${employeeId}`)
+  }
+
   if (!userInfo) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -648,7 +656,11 @@ export default function BossReportsPage() {
             <CardContent>
               <div className="space-y-2 sm:space-y-3 max-h-80 overflow-y-auto">
                 {filteredPerformanceList.slice(0, 10).map((item, index) => (
-                  <div key={item.employee.id} className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <div 
+                    key={item.employee.id} 
+                    className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => handlePerformanceItemClick(item)}
+                  >
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                       <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-xs sm:text-sm font-bold text-blue-600">#{index + 1}</span>
