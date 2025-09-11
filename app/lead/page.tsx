@@ -24,11 +24,13 @@ import { safeParseUserInfo } from "@/lib/utils"
 export default function LeadDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [evaluationTasks, setEvaluationTasks] = useState<EvaluationTask[]>([])
+  const [selfEvaluationTasks, setSelfEvaluationTasks] = useState<any[]>([]) // 领导自评任务
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [overallStats, setOverallStats] = useState({
     totalMembers: 0,
     pendingEvaluations: 0,
+    pendingSelfEvaluations: 0, // 待自评数量
     teamAverageScore: 0,
     completionRate: 0
   })
@@ -52,9 +54,10 @@ export default function LeadDashboard() {
       setLoading(true)
 
       // 并行加载数据
-      const [tasksResponse, teamResponse] = await Promise.all([
+      const [tasksResponse, teamResponse, selfEvaluationResponse] = await Promise.all([
         evaluationService.getEvaluationsToGive(),
-        teamService.getTeamMembers()
+        teamService.getTeamMembers(),
+        evaluationService.getLeaderSelfEvaluations() // 获取领导自评任务
       ])
 
       // 处理评估任务数据
@@ -84,6 +87,14 @@ export default function LeadDashboard() {
         pendingTasksCount = tasks.filter(task => task.status === 'pending').length
       }
 
+      // 处理领导自评任务数据
+      let pendingSelfEvaluationsCount = 0
+      if (selfEvaluationResponse.code === 200 && selfEvaluationResponse.data) {
+        const selfTasks = selfEvaluationResponse.data.filter(evaluation => evaluation.status === 'draft')
+        setSelfEvaluationTasks(selfTasks)
+        pendingSelfEvaluationsCount = selfTasks.length
+      }
+
       // 处理团队成员数据
       if (teamResponse.code === 200 && teamResponse.data) {
         setTeamMembers(teamResponse.data.members)
@@ -107,7 +118,8 @@ export default function LeadDashboard() {
         
         setOverallStats({
           totalMembers: total_members,
-          pendingEvaluations: pendingTasksCount,
+          pendingEvaluations: pendingTasksCount, // 使用API返回的待评分数量
+          pendingSelfEvaluations: pendingSelfEvaluationsCount, // 待自评数量
           teamAverageScore,
           completionRate
         })
@@ -177,7 +189,7 @@ export default function LeadDashboard() {
         </div>
 
         {/* 团队统计 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <Card>
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
@@ -206,6 +218,19 @@ export default function LeadDashboard() {
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
+                  <p className="text-xs sm:text-sm text-gray-600">待自评</p>
+                  <p className="text-lg sm:text-2xl font-bold text-purple-600">
+                    {overallStats.pendingSelfEvaluations}
+                  </p>
+                </div>
+                <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div>
                   <p className="text-xs sm:text-sm text-gray-600">团队平均分</p>
                   <p className="text-lg sm:text-2xl font-bold text-green-600">
                     {overallStats.teamAverageScore > 0 ? overallStats.teamAverageScore.toFixed(1) : '--'}
@@ -220,11 +245,11 @@ export default function LeadDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs sm:text-sm text-gray-600">完成率</p>
-                  <p className="text-lg sm:text-2xl font-bold text-purple-600">
+                  <p className="text-lg sm:text-2xl font-bold text-blue-600">
                     {overallStats.completionRate.toFixed(0)}%
                   </p>
                 </div>
-                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
+                <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
@@ -283,6 +308,59 @@ export default function LeadDashboard() {
                 <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
                 <p>暂无待评分项目</p>
                 <p className="text-xs mt-1">所有评分任务均已完成</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 待自评 */}
+        <Card className="mb-4 sm:mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              待自评
+            </CardTitle>
+            <CardDescription>需要您完成的自我评估</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {selfEvaluationTasks.length > 0 ? (
+              <div className="space-y-4">
+                {selfEvaluationTasks.map((evaluation) => (
+                  <div key={evaluation.id} className="border rounded-lg p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 space-y-2 sm:space-y-0">
+                      <div>
+                        <h3 className="font-semibold">{evaluation.assessment?.title || '自我评估'}</h3>
+                        <p className="text-sm text-gray-600">{evaluation.assessment?.period || '当前周期'}</p>
+                      </div>
+                      <Badge variant="outline" className="text-purple-600 border-purple-600">
+                        待自评
+                      </Badge>
+                    </div>
+                    <div className="mt-2 sm:mt-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+                        <div>
+                          <p className="text-sm font-medium">自我评估任务</p>
+                          <p className="text-xs text-gray-500">
+                            截止：{evaluation.assessment?.deadline ? evaluationUtils.formatDate(evaluation.assessment.deadline) : '待定'}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => router.push(`/employee/evaluation/${evaluation.assessment?.id}`)}
+                          className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700"
+                        >
+                          开始自评
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                <p>暂无待自评项目</p>
+                <p className="text-xs mt-1">所有自评任务均已完成</p>
               </div>
             )}
           </CardContent>
@@ -385,23 +463,36 @@ export default function LeadDashboard() {
 
                     {/* 操作按钮 */}
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => router.push(`/lead/member/${member.user_id}`)}
-                      >
-                        查看详情
-                      </Button>
-                        {member.has_active_assessment && !member.evaluation_status?.leader_completed && (!member.current_assessment || !teamUtils.isAssessmentOverdue(member.current_assessment)) && (
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => router.push(`/lead/evaluation/${member.current_assessment.assessment_id}/${member.user_id}`)}
-                          >
-                            开始评分
-                          </Button>
-                        )}
+                      {/* 查看详情按钮 - 只有在员工有自评结果时才显示 */}
+                      {member.evaluation_status?.self_completed && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/lead/member/${member.user_id}`)}
+                        >
+                          查看详情
+                        </Button>
+                      )}
+                      {/* 开始评分按钮 - 必须员工自评完成且领导未评分且考核未过期 */}
+                      {member.has_active_assessment && 
+                       member.evaluation_status?.self_completed && 
+                       !member.evaluation_status?.leader_completed && 
+                       (!member.current_assessment || !teamUtils.isAssessmentOverdue(member.current_assessment)) && (
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/lead/evaluation/${member.current_assessment.assessment_id}/${member.user_id}`)}
+                        >
+                          开始评分
+                        </Button>
+                      )}
+                      {/* 如果员工自评未完成，显示提示信息 */}
+                      {member.has_active_assessment && !member.evaluation_status?.self_completed && (
+                        <div className="flex-1 p-2 bg-yellow-50 border border-yellow-200 rounded text-center">
+                          <span className="text-sm text-yellow-700">等待员工完成自评</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

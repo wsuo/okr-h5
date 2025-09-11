@@ -25,6 +25,7 @@ import { safeParseUserInfo } from "@/lib/utils"
 export default function LeadEvaluationCenter() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [evaluationTasks, setEvaluationTasks] = useState<EvaluationTask[]>([])
+  const [selfEvaluationTasks, setSelfEvaluationTasks] = useState<any[]>([])
   const [evaluationHistory, setEvaluationHistory] = useState<Evaluation[]>([])
   const [activeAssessments, setActiveAssessments] = useState<AssessmentListItem[]>([])
   const [assessmentProgress, setAssessmentProgress] = useState<Record<number, EvaluationProgress>>({})
@@ -54,11 +55,13 @@ export default function LeadEvaluationCenter() {
       const [
         tasksResponse,
         historyResponse,
-        assessmentsResponse
+        assessmentsResponse,
+        selfEvaluationResponse
       ] = await Promise.all([
         evaluationService.getEvaluationsToGive(),
         evaluationService.getEvaluations({ type: 'leader' }),
-        assessmentService.getAssessments({ status: 'active' })
+        assessmentService.getAssessments({ status: 'active' }),
+        evaluationService.getLeaderSelfEvaluations() // 获取领导自评任务
       ])
 
       // Combine both pending tasks and completed evaluations
@@ -154,6 +157,12 @@ export default function LeadEvaluationCenter() {
       }
 
       setEvaluationTasks(allTasks)
+
+      // 处理领导自评任务数据
+      if (selfEvaluationResponse.code === 200 && selfEvaluationResponse.data) {
+        const selfTasks = selfEvaluationResponse.data.filter(evaluation => evaluation.status === 'draft')
+        setSelfEvaluationTasks(selfTasks)
+      }
 
       // 处理评估历史 (for history tab display)
       if (historyResponse.code === 200 && historyResponse.data) {
@@ -275,6 +284,19 @@ export default function LeadEvaluationCenter() {
     return matchesSearch && matchesAssessment
   })
 
+  const filteredSelfEvaluationTasks = selfEvaluationTasks.filter(evaluation => {
+    // Enhanced search functionality for self-evaluation tasks
+    const searchLower = searchQuery.toLowerCase()
+    const matchesSearch = searchQuery === "" ||
+                         (evaluation.assessment?.title && evaluation.assessment.title.toLowerCase().includes(searchLower)) ||
+                         (evaluation.assessment?.period && evaluation.assessment.period.toLowerCase().includes(searchLower))
+
+    const assessmentId = evaluation.assessment?.id
+    const matchesAssessment = selectedAssessment === "all" || (assessmentId?.toString() || '') === selectedAssessment
+
+    return matchesSearch && matchesAssessment
+  })
+
   const getTabCount = (tab: string) => {
     switch (tab) {
       case 'pending':
@@ -283,6 +305,8 @@ export default function LeadEvaluationCenter() {
         return evaluationTasks.filter(task => task.status === 'completed').length
       case 'overdue':
         return evaluationTasks.filter(task => task.is_overdue).length
+      case 'self_evaluation':
+        return selfEvaluationTasks.length
       default:
         return 0
     }
@@ -369,13 +393,22 @@ export default function LeadEvaluationCenter() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="pending" className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
               待评分
               {getTabCount('pending') > 0 && (
                 <Badge variant="secondary" className="ml-1 text-xs">
                   {getTabCount('pending')}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="self_evaluation" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              待自评
+              {getTabCount('self_evaluation') > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  {getTabCount('self_evaluation')}
                 </Badge>
               )}
             </TabsTrigger>
@@ -484,6 +517,71 @@ export default function LeadEvaluationCenter() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="self_evaluation" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  待自评任务
+                </CardTitle>
+                <CardDescription>
+                  需要您完成的自我评估任务
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {filteredSelfEvaluationTasks.length > 0 ? (
+                  <div className="space-y-4">
+                    {filteredSelfEvaluationTasks.map((evaluation) => (
+                      <div key={evaluation.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h3 className="font-semibold text-lg">{evaluation.assessment?.title || '自我评估'}</h3>
+                            <p className="text-sm text-gray-600">{evaluation.assessment?.period || '当前周期'}</p>
+                          </div>
+                          <Badge variant="outline" className="text-purple-600 border-purple-600">
+                            待自评
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>考核：{evaluation.assessment?.title || '自我评估'}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>截止：{evaluation.assessment?.deadline ? evaluationUtils.formatDate(evaluation.assessment.deadline) : '待定'}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-gray-500">
+                            {evaluation.updated_at && (
+                              <span>最后更新：{evaluationUtils.formatDateTime(evaluation.updated_at)}</span>
+                            )}
+                          </div>
+                          <Button
+                            onClick={() => router.push(`/employee/evaluation/${evaluation.assessment?.id}`)}
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            开始自评
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-300" />
+                    <h3 className="text-lg font-medium mb-2">暂无待自评任务</h3>
+                    <p>所有自评任务均已完成</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="completed" className="space-y-4">
             <Card>
               <CardHeader>
@@ -532,14 +630,10 @@ export default function LeadEvaluationCenter() {
                               </div>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm text-blue-600">
+                          <div className="grid grid-cols-1 gap-2 text-sm text-blue-600">
                             <div>
                               <span>完成时间：</span>
                               <span className="font-medium">{task.last_updated && evaluationUtils.formatDateTime(task.last_updated)}</span>
-                            </div>
-                            <div>
-                              <span>评估ID：</span>
-                              <span className="font-medium">{task.evaluation_id || '未知'}</span>
                             </div>
                           </div>
                         </div>
@@ -602,10 +696,40 @@ export default function LeadEvaluationCenter() {
                           </div>
                           {getTaskStatusBadge(task)}
                         </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
+                          <div className="flex items-center gap-1">
+                            <FileText className="w-4 h-4" />
+                            <span>考核：{task.assessment_title}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>周期：{task.assessment_period}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-red-100 rounded-lg p-3 mb-3 border border-red-200">
+                          <div className="flex items-center gap-2 text-red-700 mb-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="font-medium">逾期信息</span>
+                          </div>
+                          <div className="text-sm text-red-600">
+                            <div className="mb-1">
+                              <span className="font-medium">截止时间：</span>
+                              <span>{evaluationUtils.formatDateTime(task.deadline)}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium">状态说明：</span>
+                              <span>评分已逾期，系统已禁止评分操作</span>
+                            </div>
+                          </div>
+                        </div>
                         
                         <div className="flex items-center justify-between">
-                          <div className="text-sm text-red-600">
-                            逾期时间：{evaluationUtils.formatDate(task.deadline)}
+                          <div className="text-sm text-gray-500">
+                            {task.last_updated && (
+                              <span>最后更新：{evaluationUtils.formatDateTime(task.last_updated)}</span>
+                            )}
                           </div>
                           {/* 逾期任务不显示评分按钮 */}
                         </div>
