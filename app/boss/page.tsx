@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight, CalendarIcon } from "lucide-react"
@@ -119,7 +118,7 @@ export default function BossDashboard() {
           is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
         }))
         setBossTasks(tasks)
-        const pendingTasks = tasks.filter(task => task.status === 'pending')
+        const pendingTasks = tasks.filter(task => task.status === 'pending' && !task.is_overdue)
         setPendingTasksCount(pendingTasks.length)
       }
 
@@ -138,17 +137,6 @@ export default function BossDashboard() {
     // 创建新的Date对象确保正确的月份显示
     const displayDate = new Date(date.getTime())
     return `${displayDate.getFullYear()}年${displayDate.getMonth() + 1}月`
-  }
-
-  // 处理日期选择
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      // 确保日期是当前时区的正确日期
-      const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-      setSelectedDate(localDate)
-    } else {
-      setSelectedDate(undefined)
-    }
   }
 
   // Helper functions for data processing
@@ -409,18 +397,52 @@ export default function BossDashboard() {
               <PopoverContent className="w-auto p-0" align="end">
                 <div className="p-4">
                   <h4 className="font-medium mb-3">选择年月</h4>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={(date) => date > new Date()}
-                    defaultMonth={selectedDate || new Date()}
-                    captionLayout="dropdown-buttons"
-                    fromYear={2020}
-                    toYear={new Date().getFullYear()}
-                  />
+                  <div className="space-y-4">
+                    {/* 年份选择 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 min-w-0">年份:</span>
+                      <Select 
+                        value={selectedDate ? selectedDate.getFullYear().toString() : new Date().getFullYear().toString()} 
+                        onValueChange={(year) => {
+                          const currentMonth = selectedDate ? selectedDate.getMonth() : new Date().getMonth()
+                          setSelectedDate(new Date(parseInt(year), currentMonth))
+                        }}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: new Date().getFullYear() - 2020 + 1 }, (_, i) => 2020 + i).map(year => (
+                            <SelectItem key={year} value={year.toString()}>{year}年</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* 月份选择 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 min-w-0">月份:</span>
+                      <Select 
+                        value={selectedDate ? (selectedDate.getMonth() + 1).toString() : (new Date().getMonth() + 1).toString()} 
+                        onValueChange={(month) => {
+                          const currentYear = selectedDate ? selectedDate.getFullYear() : new Date().getFullYear()
+                          setSelectedDate(new Date(currentYear, parseInt(month) - 1))
+                        }}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                            <SelectItem key={month} value={month.toString()}>{month}月</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
                   {selectedDate && (
-                    <div className="mt-3 pt-3 border-t">
+                    <div className="mt-4 pt-3 border-t">
                       <Button 
                         variant="ghost" 
                         size="sm"
@@ -451,7 +473,7 @@ export default function BossDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {bossTasks.filter(task => task.status === 'pending').slice(0, 3).map((task) => (
+                {bossTasks.filter(task => task.status === 'pending' && !task.is_overdue).slice(0, 3).map((task) => (
                   <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white/60 rounded-lg border border-yellow-300 space-y-2 sm:space-y-0">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
