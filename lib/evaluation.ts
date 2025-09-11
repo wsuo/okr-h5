@@ -348,6 +348,43 @@ export interface SubordinateInfo {
   last_updated?: string
 }
 
+// Boss星级评分配置
+export interface BossRatingConfig {
+  enabled: boolean
+  categories: BossRatingCategory[]
+  star_scale: number
+  rating_mode: string
+  total_weight: number
+  star_standards: StarStandards
+  validation_rules: ValidationRules
+}
+
+export interface BossRatingCategory {
+  id: string
+  name: string
+  weight: number
+  required: boolean
+  sort_order: number
+  description: string
+  star_to_score_mapping: {
+    [star: string]: number
+  }
+}
+
+export interface StarStandards {
+  [star: string]: {
+    color: string
+    title: string
+    description: string
+  }
+}
+
+export interface ValidationRules {
+  max_categories: number
+  min_categories: number
+  all_categories_required: boolean
+}
+
 // 老板简化评分模板接口
 export interface BossEvaluationTemplate {
   assessment_id: number
@@ -377,14 +414,21 @@ export interface BossEvaluationTemplate {
   current_status: string
   is_boss_simplified: boolean
   boss_evaluation_note: string
+  boss_rating_config?: BossRatingConfig
 }
 
-// 提交简单Boss评分请求
+// 提交Boss评分请求
 export interface SubmitBossEvaluationRequest {
   assessment_id: number
   evaluatee_id: number
-  score: number
-  feedback: string
+  // 传统评分模式
+  score?: number
+  // 星级评分模式
+  star_ratings?: {
+    [category_id: string]: number
+  }
+  // 其他字段
+  feedback?: string
   strengths?: string
   improvements?: string
 }
@@ -560,6 +604,16 @@ export class EvaluationService {
   }
 
   /**
+   * 16. 获取领导自评任务
+   */
+  async getLeaderSelfEvaluations(assessment_id?: number): Promise<ApiResponse<Evaluation[]>> {
+    const queryParams: Record<string, any> = {}
+    if (assessment_id) queryParams.assessment_id = assessment_id
+    
+    return apiClient.get<Evaluation[]>('/evaluations/my', queryParams)
+  }
+
+  /**
    * 16. 获取下属列表（老板视角）
    */
   async getSubordinatesForBoss(assessmentId: number): Promise<ApiResponse<SubordinateInfo[]>> {
@@ -574,7 +628,7 @@ export class EvaluationService {
   }
 
   /**
-   * 18. 提交老板简化评分
+   * 18. 提交Boss评分（支持星级评分和传统评分）
    */
   async submitBossEvaluation(data: SubmitBossEvaluationRequest): Promise<ApiResponse<Evaluation>> {
     return apiClient.post<Evaluation>('/evaluations/boss', data)
@@ -633,13 +687,6 @@ export class EvaluationService {
    */
   async submitDetailedBossEvaluation(data: SubmitDetailedBossRequest): Promise<ApiResponse<DetailedEvaluation>> {
     return apiClient.post<DetailedEvaluation>('/evaluations/detailed-boss', data)
-  }
-
-  /**
-   * 20. 提交简单Boss评分
-   */
-  async submitBossEvaluation(data: SubmitBossEvaluationRequest): Promise<ApiResponse<Evaluation>> {
-    return apiClient.post<Evaluation>('/evaluations/boss', data)
   }
 
   /**

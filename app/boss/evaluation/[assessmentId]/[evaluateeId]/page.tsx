@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, Loader2, AlertTriangle, Crown, Send, User, Award } from "lucide-react"
+import { ArrowLeft, Loader2, AlertTriangle, Crown, Send, User, Award, ChevronDown, ChevronUp } from "lucide-react"
 import { StarRating, starToScore, scoreToStars } from "@/components/ui/star-rating"
 import { toast } from "sonner"
 import BossHeader from "@/components/boss-header"
@@ -33,11 +33,18 @@ export default function BossEvaluationFormPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 表单数据 - 使用星级评分
+  // 表单数据 - 支持两种评分模式
+  const [evaluationMode, setEvaluationMode] = useState<'traditional' | 'star_rating'>('traditional')
+  // 传统评分模式
   const [starRating, setStarRating] = useState<number>(4) // 默认4星(良好)
+  // 星级评分模式
+  const [categoryRatings, setCategoryRatings] = useState<Record<string, number>>({})
+  // 通用字段
   const [feedback, setFeedback] = useState<string>('')
   const [strengths, setStrengths] = useState<string>('')
   const [improvements, setImprovements] = useState<string>('')
+  // UI状态
+  const [showOptionalFields, setShowOptionalFields] = useState<boolean>(false)
 
   useEffect(() => {
     const user = safeParseUserInfo()
@@ -71,9 +78,19 @@ export default function BossEvaluationFormPage() {
       if (templateResponse.code === 200 && templateResponse.data) {
         const templateData = templateResponse.data
         
-        // 检查是否是简化模式
-        if (!templateData.is_boss_simplified) {
-          throw new Error('该考核不支持Boss简化评分模式')
+        // 检查评分模式
+        if (templateData.boss_rating_config && !templateData.is_boss_simplified) {
+          // 星级评分模式
+          setEvaluationMode('star_rating')
+          // 初始化星级评分数据
+          const initialRatings: Record<string, number> = {}
+          templateData.boss_rating_config.categories.forEach(category => {
+            initialRatings[category.id] = 3 // 默认3星(符合期望)
+          })
+          setCategoryRatings(initialRatings)
+        } else {
+          // 传统评分模式
+          setEvaluationMode('traditional')
         }
         
         setTemplate(templateData)
@@ -121,11 +138,27 @@ export default function BossEvaluationFormPage() {
   const handleSubmit = async () => {
     try {
       // 验证表单数据
-      const score = starToScore(starRating) // 将星级转换为分数
-      
-      if (starRating < 1 || starRating > 5) {
-        toast.error('请选择评分星级')
-        return
+      if (evaluationMode === 'star_rating') {
+        // 星级评分模式验证
+        if (!template?.boss_rating_config) {
+          toast.error('评分配置错误')
+          return
+        }
+        
+        // 检查所有必需分类是否均已评分
+        const requiredCategories = template.boss_rating_config.categories.filter(cat => cat.required)
+        for (const category of requiredCategories) {
+          if (!categoryRatings[category.id] || categoryRatings[category.id] < 1) {
+            toast.error(`请为“${category.name}”分类进行评分`)
+            return
+          }
+        }
+      } else {
+        // 传统评分模式验证
+        if (starRating < 1 || starRating > 5) {
+          toast.error('请选择评分星级')
+          return
+        }
       }
 
       if (!feedback.trim()) {
@@ -138,10 +171,17 @@ export default function BossEvaluationFormPage() {
       const submitData: SubmitBossEvaluationRequest = {
         assessment_id: assessmentId,
         evaluatee_id: evaluateeId,
-        score: score, // 使用转换后的分数
         feedback: feedback.trim(),
         strengths: strengths.trim() || undefined,
         improvements: improvements.trim() || undefined
+      }
+
+      if (evaluationMode === 'star_rating') {
+        // 星级评分模式
+        submitData.star_ratings = categoryRatings
+      } else {
+        // 传统评分模式
+        submitData.score = starToScore(starRating)
       }
 
       const response = await evaluationService.submitBossEvaluation(submitData)
@@ -172,7 +212,34 @@ export default function BossEvaluationFormPage() {
   }
 
   // 获取当前分数 (从星级转换)
-  const getCurrentScore = () => starToScore(starRating)
+  const getCurrentScore = () => {
+    if (evaluationMode === 'star_rating' && template?.boss_rating_config) {
+      // 计算星级评分总分
+      let totalScore = 0
+      template.boss_rating_config.categories.forEach(category => {
+        const rating = categoryRatings[category.id] || 3
+        const score = category.star_to_score_mapping[rating.toString()] || 0
+        totalScore += score
+      })
+      return totalScore
+    } else {
+      // 传统评分模式使用固定映射
+      return starToScore(starRating)
+    }
+  }
+
+  // 检查表单是否可提交
+  const isFormValid = () => {
+    if (!feedback.trim()) return false
+    
+    if (evaluationMode === 'star_rating' && template?.boss_rating_config) {
+      // 检查所有必需分类是否均已评分
+      const requiredCategories = template.boss_rating_config.categories.filter(cat => cat.required)
+      return requiredCategories.every(category => categoryRatings[category.id] && categoryRatings[category.id] >= 1)
+    } else {
+      return starRating >= 1
+    }
+  }
 
   if (!userInfo) {
     return (
@@ -262,7 +329,7 @@ export default function BossEvaluationFormPage() {
           <div className="text-center bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-200">
             <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-2">
               <Crown className="w-8 h-8 text-yellow-600" />
-              Boss 简化评分
+              Boss {evaluationMode === 'star_rating' ? '星级评分' : '简化评分'}
             </h1>
             <p className="text-gray-600 text-lg">
               {template.assessment_title} · 考核周期
@@ -278,6 +345,12 @@ export default function BossEvaluationFormPage() {
                 <span className="font-medium text-yellow-700">满分:</span>
                 <span className="ml-1 font-bold text-yellow-800">{template.total_score}分</span>
               </div>
+              {evaluationMode === 'star_rating' && (
+                <div className="bg-white/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-yellow-300">
+                  <span className="font-medium text-yellow-700">评分模式:</span>
+                  <span className="ml-1 font-bold text-yellow-800">星级评分</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -313,15 +386,16 @@ export default function BossEvaluationFormPage() {
           </CardContent>
         </Card>
 
-        {/* Boss简化评分说明 */}
+        {/* Boss评分说明 */}
         <Alert className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <Crown className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            <strong>简化评分说明：</strong>{template.boss_evaluation_note}
+            <strong>{evaluationMode === 'star_rating' ? '星级评分说明：' : '简化评分说明：'}</strong>
+            {template.boss_evaluation_note}
           </AlertDescription>
         </Alert>
 
-        {/* 简化评分表单 */}
+        {/* 评分表单 */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -330,35 +404,88 @@ export default function BossEvaluationFormPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* 五角星评分 */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-base font-medium">Boss 评分</Label>
-                <div className="text-right">
-                  <span className="text-lg text-gray-500">当前分数: </span>
-                  <span className="text-2xl font-bold text-blue-600">
-                    {getCurrentScore()}
-                  </span>
-                  <span className="text-lg text-gray-500 ml-1">分</span>
+            {evaluationMode === 'star_rating' && template?.boss_rating_config ? (
+              /* 星级评分模式 */
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-medium">星级评分 - 分类评分</Label>
+                  <div className="text-right">
+                    <span className="text-lg text-gray-500">总分: </span>
+                    <span className="text-2xl font-bold text-blue-600">
+                      {getCurrentScore()}
+                    </span>
+                    <span className="text-lg text-gray-500 ml-1">分</span>
+                  </div>
+                </div>
+
+                {/* 分类评分 */}
+                <div className="space-y-4">
+                  {template.boss_rating_config.categories
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((category) => (
+                    <div key={category.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium">{category.name}</h4>
+                          <p className="text-sm text-gray-600">{category.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">权重: {category.weight}%</div>
+                          <div className="text-lg font-bold text-blue-600">
+                            {category.star_to_score_mapping[categoryRatings[category.id]?.toString()] || 0}分
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-center">
+                        <StarRating
+                          value={categoryRatings[category.id] || 3}
+                          onChange={(rating) => {
+                            setCategoryRatings(prev => ({
+                              ...prev,
+                              [category.id]: rating
+                            }))
+                          }}
+                          disabled={submitting}
+                          showLabel={false}
+                          className="justify-center"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              
-              <div className="flex flex-col items-center space-y-4 py-6 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600 mb-2">
-                  请选择您对该员工的总体评价
+            ) : (
+              /* 传统评分模式 */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-medium">Boss 评分</Label>
+                  <div className="text-right">
+                    <span className="text-lg text-gray-500">当前分数: </span>
+                    <span className="text-2xl font-bold text-blue-600">
+                      {getCurrentScore()}
+                    </span>
+                    <span className="text-lg text-gray-500 ml-1">分</span>
+                  </div>
                 </div>
-                <StarRating
-                  value={starRating}
-                  onChange={setStarRating}
-                  disabled={submitting}
-                  showLabel={true}
-                  className="justify-center"
-                />
-                <div className="text-xs text-gray-500 text-center max-w-md">
-                  五星评分制：优秀(95分) · 良好(85分) · 中等(75分) · 需改进(65分) · 不合格(50分)
+                
+                <div className="flex flex-col items-center space-y-4 py-6 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600 mb-2">
+                    请选择您对该员工的总体评价
+                  </div>
+                  <StarRating
+                    value={starRating}
+                    onChange={setStarRating}
+                    disabled={submitting}
+                    showLabel={true}
+                    className="justify-center"
+                  />
+                  <div className="text-xs text-gray-500 text-center max-w-md">
+                    五星评分制：优秀(95分) · 良好(85分) · 中等(75分) · 需改进(65分) · 不合格(50分)
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* 评价意见 */}
             <div className="space-y-2">
@@ -379,37 +506,61 @@ export default function BossEvaluationFormPage() {
               </p>
             </div>
 
-            {/* 优势亮点 */}
-            <div className="space-y-2">
-              <Label htmlFor="strengths" className="text-base font-medium">
-                优势亮点 <span className="text-gray-400">(可选)</span>
-              </Label>
-              <Textarea
-                id="strengths"
-                placeholder="请列举该员工的主要优势和突出表现..."
-                value={strengths}
-                onChange={(e) => setStrengths(e.target.value)}
-                rows={3}
-                className="resize-none"
-                disabled={submitting}
-              />
+            {/* 可选字段展开按钮 */}
+            <div className="border-t pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowOptionalFields(!showOptionalFields)}
+                className="w-full justify-between text-gray-600 hover:text-gray-900"
+              >
+                <span className="text-sm">
+                  {showOptionalFields ? '收起详细评价' : '展开详细评价（可选）'}
+                </span>
+                {showOptionalFields ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </Button>
             </div>
 
-            {/* 改进建议 */}
-            <div className="space-y-2">
-              <Label htmlFor="improvements" className="text-base font-medium">
-                改进建议 <span className="text-gray-400">(可选)</span>
-              </Label>
-              <Textarea
-                id="improvements"
-                placeholder="请提出改进建议和发展方向..."
-                value={improvements}
-                onChange={(e) => setImprovements(e.target.value)}
-                rows={3}
-                className="resize-none"
-                disabled={submitting}
-              />
-            </div>
+            {/* 可选字段（默认隐藏） */}
+            {showOptionalFields && (
+              <div className="space-y-6 border-t pt-4">
+                {/* 优势亮点 */}
+                <div className="space-y-2">
+                  <Label htmlFor="strengths" className="text-base font-medium">
+                    优势亮点 <span className="text-gray-400">(可选)</span>
+                  </Label>
+                  <Textarea
+                    id="strengths"
+                    placeholder="请列举该员工的主要优势和突出表现..."
+                    value={strengths}
+                    onChange={(e) => setStrengths(e.target.value)}
+                    rows={3}
+                    className="resize-none"
+                    disabled={submitting}
+                  />
+                </div>
+
+                {/* 改进建议 */}
+                <div className="space-y-2">
+                  <Label htmlFor="improvements" className="text-base font-medium">
+                    改进建议 <span className="text-gray-400">(可选)</span>
+                  </Label>
+                  <Textarea
+                    id="improvements"
+                    placeholder="请提出改进建议和发展方向..."
+                    value={improvements}
+                    onChange={(e) => setImprovements(e.target.value)}
+                    rows={3}
+                    className="resize-none"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -431,7 +582,7 @@ export default function BossEvaluationFormPage() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={submitting || !feedback.trim() || starRating === 0}
+                  disabled={submitting || !isFormValid()}
                   className="bg-yellow-600 hover:bg-yellow-700"
                 >
                   {submitting ? (
