@@ -105,7 +105,83 @@ export default function TemplateManagement() {
       // 老板评分配置
       boss_rating_config: {
         enabled: false,
-        categories: [],
+        categories: [
+          {
+            id: "boss_cat_goal_achievement",
+            name: "目标达成",
+            weight: 20,
+            required: true,
+            sort_order: 1,
+            description: "KPI/OKR完成情况",
+            star_to_score_mapping: {
+              "1": 4,
+              "2": 8,
+              "3": 12,
+              "4": 16,
+              "5": 20
+            }
+          },
+          {
+            id: "boss_cat_work_quality",
+            name: "工作质量",
+            weight: 20,
+            required: true,
+            sort_order: 2,
+            description: "交付物的质量水准",
+            star_to_score_mapping: {
+              "1": 4,
+              "2": 8,
+              "3": 12,
+              "4": 16,
+              "5": 20
+            }
+          },
+          {
+            id: "boss_cat_efficiency",
+            name: "效率表现",
+            weight: 20,
+            required: true,
+            sort_order: 3,
+            description: "工作速度和依从性",
+            star_to_score_mapping: {
+              "1": 4,
+              "2": 8,
+              "3": 12,
+              "4": 16,
+              "5": 20
+            }
+          },
+          {
+            id: "boss_cat_innovation",
+            name: "创新贡献",
+            weight: 20,
+            required: true,
+            sort_order: 4,
+            description: "改进建议和创新实践",
+            star_to_score_mapping: {
+              "1": 4,
+              "2": 8,
+              "3": 12,
+              "4": 16,
+              "5": 20
+            }
+          },
+          {
+            id: "boss_cat_team_impact",
+            name: "团队影响",
+            weight: 20,
+            required: true,
+            sort_order: 5,
+            description: "对团队的正面影响",
+            star_to_score_mapping: {
+              "1": 4,
+              "2": 8,
+              "3": 12,
+              "4": 16,
+              "5": 20
+            }
+          }
+        ],
         star_scale: 5,
         rating_mode: "star_category",
         total_weight: 100,
