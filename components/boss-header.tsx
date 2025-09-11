@@ -15,7 +15,7 @@ import {
 import { LogOut, Crown, Home, UserCheck, Bell, BarChart3, Settings, Key } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { evaluationService } from "@/lib/evaluation"
+import { evaluationService, evaluationUtils } from "@/lib/evaluation"
 import ChangePasswordDialog from "@/components/change-password-dialog"
 
 interface BossHeaderProps {
@@ -50,7 +50,11 @@ export default function BossHeader({ userInfo, pendingTasksCount = 0 }: BossHead
       setLoading(true)
       const response = await evaluationService.getBossTasks()
       if (response.code === 200 && response.data) {
-        const pendingTasks = response.data.filter(task => task.status === 'pending')
+        const tasksWithOverdueFlag = response.data.map((t: any) => ({
+          ...t,
+          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
+        }))
+        const pendingTasks = tasksWithOverdueFlag.filter(task => task.status === 'pending' && !task.is_overdue)
         setActualTasksCount(pendingTasks.length)
       }
     } catch (error) {
