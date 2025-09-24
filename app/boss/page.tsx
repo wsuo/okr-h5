@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+// Removed Popover for month filter to show inline Select
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
 import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight, CalendarIcon } from "lucide-react"
 import BossHeader from "@/components/boss-header"
@@ -30,7 +30,7 @@ export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined) // 改为Date对象
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined) // 选择的月份（为空表示不过滤）
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const router = useRouter()
@@ -45,21 +45,27 @@ export default function BossDashboard() {
   const [bossTasks, setBossTasks] = useState<BossTask[]>([])
   const [pendingTasksCount, setPendingTasksCount] = useState(0)
 
-  // Date range for API queries
-  const [dateRange, setDateRange] = useState({
-    start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days ago
-    end_date: new Date().toISOString().split('T')[0] // today
-  })
+  // Date range for API queries（默认不筛选月份，查询全部数据）
+  const [dateRange, setDateRange] = useState<{ start_date: string; end_date: string } | undefined>(undefined)
 
   useEffect(() => {
     const user = safeParseUserInfo()
-    if (user) {
-      setUserInfo(user)
-      loadAllStatistics()
-    } else {
+    if (!user) {
       router.push('/')
       return
     }
+    setUserInfo(user)
+
+    // 恢复本地存储的月份筛选（记忆功能）
+    try {
+      const savedMonth = localStorage.getItem('bossSelectedMonth')
+      if (savedMonth) {
+        const [y, m] = savedMonth.split('-').map(Number)
+        if (y && m) setSelectedDate(new Date(y, m - 1))
+      }
+    } catch (_) {}
+
+    loadAllStatistics()
   }, [])
 
   // 当选择日期改变时重新加载数据
@@ -67,6 +73,18 @@ export default function BossDashboard() {
     if (userInfo) {
       loadAllStatistics()
     }
+  }, [selectedDate])
+
+  // 持久化筛选到本地存储
+  useEffect(() => {
+    try {
+      if (selectedDate) {
+        const v = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
+        localStorage.setItem('bossSelectedMonth', v)
+      } else {
+        localStorage.removeItem('bossSelectedMonth')
+      }
+    } catch (_) {}
   }, [selectedDate])
 
   const loadAllStatistics = async () => {
@@ -87,11 +105,11 @@ export default function BossDashboard() {
         userStatsDetailResponse,
         bossTasksResponse
       ] = await Promise.all([
-        statisticsService.getDashboardStatistics(queryParams),
-        statisticsService.getDepartmentStatistics(queryParams),
-        statisticsService.getPerformanceList(selectedDate ? queryParams : dateRange),
+        statisticsService.getDashboardStatistics(selectedDate ? queryParams : undefined),
+        statisticsService.getDepartmentStatistics(selectedDate ? queryParams : undefined),
+        statisticsService.getPerformanceList(selectedDate ? queryParams : undefined),
         statisticsService.getUserStatisticsDetail({
-          ...(selectedDate ? queryParams : dateRange),
+          ...(selectedDate ? queryParams : {}),
           time_dimension: 'week',
           group_by: 'user'
         }),
@@ -236,7 +254,6 @@ export default function BossDashboard() {
 
   const processUserStatsDetailData = () => {
     if (!userStatsDetail || userStatsDetail.length === 0) {
-      console.log('用户统计详细数据为空')
       return []
     }
 
@@ -263,28 +280,11 @@ export default function BossDashboard() {
         leaderCompletionRate
       }
 
-      // 调试信息：输出处理后的数据
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`处理用户数据 - ${user.user_name}:`, {
-          原始数据: {
-            total_assessments: user.total_assessments,
-            self_completed: user.self_completed,
-            leader_completed: user.leader_completed
-          },
-          处理后数据: {
-            totalAssessments,
-            selfCompleted,
-            leaderCompleted,
-            selfCompletionRate: selfCompletionRate.toFixed(1),
-            leaderCompletionRate: leaderCompletionRate.toFixed(1)
-          }
-        })
-      }
+      // 调试日志已移除
 
       return processedUser
     })
 
-    console.log('处理后的用户统计数据总数:', processedData.length)
     return processedData
   }
 
@@ -381,81 +381,52 @@ export default function BossDashboard() {
             </p>
           </div>
           
-          {/* 月份选择器 */}
+          {/* 月份选择器（直接展示，无需二次点击） */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 whitespace-nowrap">筛选月份:</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="w-48 justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formatSelectedMonth(selectedDate)}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <div className="p-4">
-                  <h4 className="font-medium mb-3">选择年月</h4>
-                  <div className="space-y-4">
-                    {/* 年份选择 */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 min-w-0">年份:</span>
-                      <Select 
-                        value={selectedDate ? selectedDate.getFullYear().toString() : new Date().getFullYear().toString()} 
-                        onValueChange={(year) => {
-                          const currentMonth = selectedDate ? selectedDate.getMonth() : new Date().getMonth()
-                          setSelectedDate(new Date(parseInt(year), currentMonth))
-                        }}
-                      >
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: new Date().getFullYear() - 2020 + 1 }, (_, i) => 2020 + i).map(year => (
-                            <SelectItem key={year} value={year.toString()}>{year}年</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* 月份选择 */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 min-w-0">月份:</span>
-                      <Select 
-                        value={selectedDate ? (selectedDate.getMonth() + 1).toString() : (new Date().getMonth() + 1).toString()} 
-                        onValueChange={(month) => {
-                          const currentYear = selectedDate ? selectedDate.getFullYear() : new Date().getFullYear()
-                          setSelectedDate(new Date(currentYear, parseInt(month) - 1))
-                        }}
-                      >
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                            <SelectItem key={month} value={month.toString()}>{month}月</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  {selectedDate && (
-                    <div className="mt-4 pt-3 border-t">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setSelectedDate(undefined)}
-                        className="w-full"
-                      >
-                        清除选择
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Select
+              value={selectedDate ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}` : ""}
+              onValueChange={(val) => {
+                if (val === '__clear__' || val === '') {
+                  setSelectedDate(undefined)
+                  return
+                }
+                if (!val) return
+                const [y, m] = val.split('-').map(Number)
+                if (y && m) setSelectedDate(new Date(y, m - 1))
+              }}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="选择月份（默认全部）" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__clear__">全部月份</SelectItem>
+                {(() => {
+                  const items: JSX.Element[] = []
+                  const current = new Date()
+                  const currentYear = current.getFullYear()
+                  const currentMonth = current.getMonth() + 1
+                  const startYear = 2025
+                  const startMonth = 8
+                  for (let y = startYear; y <= currentYear; y++) {
+                    const beginMonth = y === startYear ? startMonth : 1
+                    const endMonth = y === currentYear ? currentMonth : 12
+                    for (let m = beginMonth; m <= endMonth; m++) {
+                      const value = `${y}-${String(m).padStart(2, '0')}`
+                      items.push(
+                        <SelectItem key={value} value={value}>{`${y}年${m}月`}</SelectItem>
+                      )
+                    }
+                  }
+                  return items.reverse()
+                })()}
+              </SelectContent>
+            </Select>
+            {selectedDate && (
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(undefined)}>
+                清除
+              </Button>
+            )}
           </div>
         </div>
 
