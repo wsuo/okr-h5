@@ -65,6 +65,30 @@ export default function BossEvaluationPage() {
     }
   }
 
+  // 根据任务数据选择第一个有数据的tab作为默认
+  useEffect(() => {
+    if (loading) return
+    const validTabs = ['pending', 'in_progress', 'completed', 'overdue'] as const
+    const tabParam = searchParams.get('tab')
+    if (tabParam && validTabs.includes(tabParam as any)) {
+      // URL 指定了 tab，尊重该选项
+      return
+    }
+    const categorized = {
+      pending: tasks.filter(t => t.status === 'pending' && !t.is_overdue),
+      in_progress: tasks.filter(t => t.status === 'in_progress' && !t.is_overdue),
+      completed: tasks.filter(t => t.status === 'completed'),
+      overdue: tasks.filter(t => t.is_overdue && t.status !== 'completed'),
+    }
+    const nextTab =
+      (categorized.pending.length > 0 && 'pending') ||
+      (categorized.in_progress.length > 0 && 'in_progress') ||
+      (categorized.completed.length > 0 && 'completed') ||
+      (categorized.overdue.length > 0 && 'overdue') ||
+      'pending'
+    setActiveTab(nextTab)
+  }, [loading, tasks, searchParams])
+
   // 检查权限
   if (!userInfo) {
     return (
