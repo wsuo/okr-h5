@@ -44,7 +44,6 @@ export RSYNC_EXCLUDES=(
     'logs'
     '.env.local'
     'deploy'
-    'pnpm-lock.yaml'
     '*.log'
     '.DS_Store'
     'Thumbs.db'

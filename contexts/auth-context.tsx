@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
 import { authService, User } from '@/lib/auth'
-import { sentryOKR } from '@/lib/sentry'
 
 // 认证状态接口
 interface AuthState {
@@ -145,51 +144,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true })
       dispatch({ type: 'CLEAR_ERROR' })
 
-      sentryOKR.addBreadcrumb('login', `用户尝试登录: ${username}`)
-
       const response = await authService.login({ username, password })
       
       if (response.data && response.data.user) {
         dispatch({ type: 'SET_USER', payload: response.data.user })
-        
-        // 设置Sentry用户上下文
-        sentryOKR.setUserContext({
-          id: response.data.user.id,
-          username: response.data.user.username,
-          name: response.data.user.name,
-          role: response.data.user.role as any,
-          department: response.data.user.department
-        })
-
-        sentryOKR.addBreadcrumb('login', `用户登录成功: ${username}`, {
-          userId: response.data.user.id,
-          role: response.data.user.role
-        })
-
         return true
       } else {
         const errorMsg = '登录失败：未收到用户信息'
         dispatch({ type: 'SET_ERROR', payload: errorMsg })
-        
-        sentryOKR.captureBusinessError(
-          new Error(errorMsg), 
-          'login',
-          { userId: username }
-        )
-        
         return false
       }
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请稍后重试'
       dispatch({ type: 'SET_ERROR', payload: errorMessage })
-      
-      // 记录登录错误到Sentry
-      sentryOKR.captureBusinessError(
-        error,
-        'login',
-        { userId: username }
-      )
-      
       return false
     }
   }
@@ -197,23 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 登出函数
   const logout = async (): Promise<void> => {
     try {
-      const currentUser = state.user
-      
-      sentryOKR.addBreadcrumb('logout', `用户登出: ${currentUser?.username || 'unknown'}`)
-      
       await authService.logout()
-      
-      sentryOKR.addBreadcrumb('logout', `用户登出成功: ${currentUser?.username || 'unknown'}`)
     } catch (error) {
       console.error('Logout failed:', error)
-      sentryOKR.captureBusinessError(
-        error as Error,
-        'logout',
-        { userId: state.user?.id }
-      )
     } finally {
-      // 清除Sentry用户上下文
-      sentryOKR.clearUserContext()
       dispatch({ type: 'LOGOUT' })
     }
   }

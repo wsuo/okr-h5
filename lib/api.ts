@@ -2,8 +2,6 @@
  * API 客户端配置
  */
 
-import { sentryOKR } from './sentry'
-
 // API 基础配置
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || ''
 export const API_PREFIX = '/api/v1'
@@ -132,28 +130,6 @@ class ApiClient {
       return data
     } catch (error) {
       console.error('API request failed:', error)
-      
-      // 记录API错误到Sentry
-      const method = options.method || 'GET'
-      let statusCode: number | undefined
-      let responseData: any
-      
-      if (error instanceof Error) {
-        // 尝试从错误信息中提取状态码
-        const statusMatch = error.message.match(/status: (\d+)/)
-        if (statusMatch) {
-          statusCode = parseInt(statusMatch[1])
-        }
-        
-        sentryOKR.captureAPIError(
-          error,
-          endpoint,
-          method,
-          statusCode,
-          responseData
-        )
-      }
-      
       throw error
     }
   }

@@ -1,8 +1,5 @@
 'use client'
 
-import * as Sentry from '@sentry/nextjs'
-import { useEffect } from 'react'
-
 export default function GlobalError({
   error,
   reset,
@@ -10,11 +7,6 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  useEffect(() => {
-    // 记录错误到Sentry
-    Sentry.captureException(error)
-  }, [error])
-
   return (
     <html>
       <body>
@@ -24,7 +16,7 @@ export default function GlobalError({
               <div className="text-6xl mb-4">😵</div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">系统出现错误</h1>
               <p className="text-gray-600 mb-6">
-                很抱歉，OKR绩效评估系统遇到了一个意外错误。我们已经收到错误报告，将尽快修复。
+                很抱歉，OKR绩效评估系统遇到了一个意外错误。请稍后重试或联系系统管理员。
               </p>
             </div>
             

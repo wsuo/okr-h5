@@ -93,7 +93,7 @@ backup_server() {
         # 备份前端
         if [ -d '$FRONTEND_DIR' ]; then
             cp -r $FRONTEND_DIR $BACKUP_DIR/\$(date +%Y%m%d_%H%M%S)/frontend
-            log_info '前端备份完成'
+            echo '前端备份完成'
         fi
         
         # 保留最近5个备份
@@ -128,22 +128,22 @@ deploy_on_server() {
         cd $FRONTEND_DIR
         
         # 安装依赖
-        log_info '安装/更新依赖...'
+        echo '[INFO] 安装/更新依赖...'
         eval "$INSTALL_COMMAND"
         
         # 构建项目
-        log_info '构建项目...'
+        echo '[INFO] 构建项目...'
         npm run build
         
         # 重启PM2服务
-        log_info '重启前端服务...'
+        echo '[INFO] 重启前端服务...'
         pm2 restart $FRONTEND_PM2_NAME || pm2 start ecosystem.config.js
         
         # 检查服务状态
         sleep 5
         pm2 show $FRONTEND_PM2_NAME
         
-        log_info '部署完成，正在检查服务状态...'
+        echo '[INFO] 部署完成，正在检查服务状态...'
         
         # 检查服务是否正常运行
         if pm2 list | grep -q '$FRONTEND_PM2_NAME.*online'; then
@@ -198,9 +198,9 @@ rollback() {
             cd $FRONTEND_DIR
             pm2 start ecosystem.config.js
             
-            log_success '回滚完成'
+            echo '[SUCCESS] 回滚完成'
         else
-            log_error '未找到备份文件，无法回滚'
+            echo '[ERROR] 未找到备份文件，无法回滚'
             exit 1
         fi
     "
