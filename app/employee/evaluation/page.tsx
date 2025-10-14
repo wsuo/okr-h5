@@ -74,7 +74,7 @@ export default function EmployeeEvaluationCenter() {
       if (tasksResponse.code === 200 && tasksResponse.data) {
         const tasks = tasksResponse.data.map((t: EvaluationTask) => ({
           ...t,
-          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
+          is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline, t.status) : false,
         }))
         setEvaluationTasks(tasks)
       }
@@ -188,7 +188,7 @@ export default function EmployeeEvaluationCenter() {
         count = evaluationTasks.filter(task => task.status === 'pending' || task.status === 'in_progress').length
         break
       case 'completed':
-        count = evaluationStatus.selfOnly.length + evaluationStatus.selfLeader.length + evaluationStatus.allCompleted.length + completedAssessments.length
+        count = evaluationStatus.selfOnly.length + evaluationStatus.selfLeader.length + evaluationStatus.allCompleted.length
         break
       case 'overdue':
         count = evaluationTasks.filter(task => task.is_overdue).length
