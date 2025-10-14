@@ -85,7 +85,7 @@ class ApiClient {
       let data: ApiResponse<T>
       try {
         const text = await response.text()
-        if (text) {
+        if (text && text.trim()) {
           data = JSON.parse(text)
         } else {
           // 空响应体但状态码表示成功
