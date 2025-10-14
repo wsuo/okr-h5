@@ -819,8 +819,14 @@ export const evaluationUtils = {
 
   /**
    * 检查是否逾期
+   * 逾期条件：截止时间已过 且 任务状态不是已完成
    */
-  isOverdue(deadline: string): boolean {
+  isOverdue(deadline: string, status?: string): boolean {
+    // 如果状态是已完成，则不算逾期
+    if (status === 'completed') {
+      return false
+    }
+    // 检查截止时间是否已过
     return new Date(deadline) < new Date()
   },
 
