@@ -880,7 +880,7 @@ export default function EmployeeEvaluationResultPage() {
                         {getScoreLevel(Number(comparisonData.boss_evaluation.score))}
                       </div>
                     </div>
-                    {comparisonData.boss_evaluation.detailed_scores ? (
+                    {comparisonData.boss_evaluation.detailed_scores && Array.isArray(comparisonData.boss_evaluation.detailed_scores) ? (
                     <div className="space-y-4">
                       {comparisonData.boss_evaluation.detailed_scores.map((category) => (
                         <div key={category.categoryId} className="border rounded-lg p-4">
@@ -903,8 +903,8 @@ export default function EmployeeEvaluationResultPage() {
                                       <span className="font-medium truncate">
                                         {getItemName(category.categoryId, item.itemId)}
                                       </span>
-                                      <Badge 
-                                        variant="outline" 
+                                      <Badge
+                                        variant="outline"
                                         className={`text-xs whitespace-nowrap ${itemLevel.bgColor} ${itemLevel.color} ${itemLevel.borderColor}`}
                                       >
                                         {itemLevel.level}
@@ -917,7 +917,7 @@ export default function EmployeeEvaluationResultPage() {
                                       <span className="text-xs text-gray-500 ml-1">分</span>
                                     </div>
                                   </div>
-                                  
+
                                   {/* 等级描述和评论 */}
                                   <div className="space-y-1">
                                     {itemLevel.description && (
@@ -938,47 +938,65 @@ export default function EmployeeEvaluationResultPage() {
                     </div>
                     ) : (
                     <div className="space-y-4">
-                      {/* 显示反馈信息，无详细分项 */}
+                      {/* 星级评分模式：显示反馈信息，无详细分项 */}
                       <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                         <h3 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
-                          <MessageSquare className="w-4 h-4" />
-                          评估反馈
+                          <Star className="w-4 h-4" />
+                          星级评分详情
                         </h3>
-                        
-                        <div className="space-y-3">
-                          {comparisonData.boss_evaluation.feedback && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">总体反馈</label>
-                              <p className="text-gray-600 bg-white p-3 rounded border">
-                                {comparisonData.boss_evaluation.feedback}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {comparisonData.boss_evaluation.strengths && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">优势与亮点</label>
-                              <p className="text-gray-600 bg-white p-3 rounded border">
-                                {comparisonData.boss_evaluation.strengths}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {comparisonData.boss_evaluation.improvements && (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">改进建议</label>
-                              <p className="text-gray-600 bg-white p-3 rounded border">
-                                {comparisonData.boss_evaluation.improvements}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {comparisonData.boss_evaluation.submitted_at && (
-                            <div className="text-sm text-gray-500 pt-2 border-t">
-                              提交时间：{new Date(comparisonData.boss_evaluation.submitted_at).toLocaleString('zh-CN')}
-                            </div>
-                          )}
-                        </div>
+
+                        {/* 显示星级评分的分类结果 */}
+                        {comparisonData.boss_evaluation.detailed_scores && typeof comparisonData.boss_evaluation.detailed_scores === 'object' && (
+                          <div className="space-y-3 mb-4">
+                            {Object.entries((comparisonData.boss_evaluation.detailed_scores as any)?.boss_star_ratings || {}).map(([key, rating]: [string, any]) => (
+                              <div key={key} className="p-3 bg-white rounded-lg border border-purple-200">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium text-gray-800">{rating.category_name}</div>
+                                    <div className="text-sm text-gray-500">星级: {rating.star_rating}/5</div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-lg font-bold text-purple-600">{rating.score}</div>
+                                    <div className="text-xs text-gray-500">/{rating.max_score}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {comparisonData.boss_evaluation.feedback && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">总体反馈</label>
+                            <p className="text-gray-600 bg-white p-3 rounded border">
+                              {comparisonData.boss_evaluation.feedback}
+                            </p>
+                          </div>
+                        )}
+
+                        {comparisonData.boss_evaluation.strengths && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">优势与亮点</label>
+                            <p className="text-gray-600 bg-white p-3 rounded border">
+                              {comparisonData.boss_evaluation.strengths}
+                            </p>
+                          </div>
+                        )}
+
+                        {comparisonData.boss_evaluation.improvements && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">改进建议</label>
+                            <p className="text-gray-600 bg-white p-3 rounded border">
+                              {comparisonData.boss_evaluation.improvements}
+                            </p>
+                          </div>
+                        )}
+
+                        {comparisonData.boss_evaluation.submitted_at && (
+                          <div className="text-sm text-gray-500 pt-2 border-t">
+                            提交时间：{new Date(comparisonData.boss_evaluation.submitted_at).toLocaleString('zh-CN')}
+                          </div>
+                        )}
                       </div>
                     </div>
                     )}
