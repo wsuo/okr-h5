@@ -508,13 +508,41 @@ export default function BossReportsPage() {
                     fontSize={10}
                     className="text-xs"
                   />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'completionRate' ? `${(value as number).toFixed(1)}%` : `${(value as number).toFixed(1)}分`,
-                      name === 'selfScore' ? '自评分' :
-                      name === 'leaderScore' ? '领导评分' :
-                      name === 'bossScore' ? 'Boss评分' : '完成率'
-                    ]}
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload || payload.length === 0) {
+                        return null
+                      }
+
+                      return (
+                        <div className="bg-white p-2 border border-gray-300 rounded shadow-lg">
+                          {payload.map((entry, index) => {
+                            const dataKey = entry.dataKey
+                            let label = ''
+
+                            if (dataKey === 'selfScore') {
+                              label = '自评平均分'
+                            } else if (dataKey === 'leaderScore') {
+                              label = '领导评分'
+                            } else if (dataKey === 'bossScore') {
+                              label = 'Boss评分'
+                            }
+
+                            return (
+                              <div key={index} className="flex items-center mb-1 last:mb-0 text-xs sm:text-sm">
+                                <div
+                                  className="w-2 h-2 mr-2 rounded-sm"
+                                  style={{ backgroundColor: entry.color }}
+                                />
+                                <span>
+                                  {label}: {(entry.value as number).toFixed(1)}分
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    }}
                     labelStyle={{ fontSize: '12px' }}
                     contentStyle={{ fontSize: '12px' }}
                   />
