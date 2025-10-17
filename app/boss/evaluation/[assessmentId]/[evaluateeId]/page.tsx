@@ -185,13 +185,19 @@ export default function BossEvaluationFormPage() {
       }
 
       const response = await evaluationService.submitBossEvaluation(submitData)
-      
+
       if (response.code === 200) {
         toast.success('Boss评分提交成功！', {
           description: '系统将自动计算最终加权得分'
         })
-        // 跳转到已完成tab
-        router.push('/boss/evaluation?tab=completed')
+        // 获取评分记录ID，跳转到查看详情页
+        const evaluationId = response.data?.id
+        if (evaluationId) {
+          router.push(`/boss/evaluation/view/${evaluationId}`)
+        } else {
+          // 如果没有评分ID，跳转到已完成tab
+          router.push('/boss/evaluation?tab=completed')
+        }
       } else {
         throw new Error(response.message || '提交失败')
       }
