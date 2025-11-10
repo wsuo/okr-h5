@@ -601,14 +601,14 @@ export default function AssessmentDetailPage() {
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>得分统计</CardTitle>
-                </CardHeader>
-                <CardContent>
+            <Card>
+              <CardHeader>
+                <CardTitle>得分统计</CardTitle>
+              </CardHeader>
+              <CardContent>
                   {assessmentDetail.status === "completed" ? (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -639,6 +639,70 @@ export default function AssessmentDetailPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* 排名榜：前三名 / 后三名（仅显示姓名，不展示分数） */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>排名榜</CardTitle>
+                <CardDescription>仅展示姓名，不显示分数</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const participantsWithScore = (assessmentDetail?.participants || [])
+                    .filter(p => typeof p.final_score === 'number')
+                  if (participantsWithScore.length === 0) {
+                    return (
+                      <div className="text-center py-6 text-gray-500">暂无排名数据</div>
+                    )
+                  }
+                  const sortedDesc = [...participantsWithScore].sort((a, b) => (b.final_score || 0) - (a.final_score || 0))
+                  const sortedAsc = [...participantsWithScore].sort((a, b) => (a.final_score || 0) - (b.final_score || 0))
+                  const top3 = sortedDesc.slice(0, 3)
+                  const bottom3 = sortedAsc.slice(0, 3)
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* 前三名 */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">前三名</h4>
+                        <div className="space-y-2">
+                          {top3.map((p, idx) => (
+                            <div key={p.id} className="flex items-center justify-between rounded-md border p-3">
+                              <div className="flex items-center gap-3">
+                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold 
+                                  ${idx === 0 ? 'bg-yellow-100 text-yellow-800' : idx === 1 ? 'bg-gray-100 text-gray-800' : 'bg-orange-100 text-orange-800'}`}
+                                >{idx + 1}</span>
+                                <span className="font-medium text-gray-900">{p.user.name}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {top3.length === 0 && (
+                            <div className="text-sm text-gray-500">暂无数据</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 后三名 */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">后三名</h4>
+                        <div className="space-y-2">
+                          {bottom3.map((p, idx) => (
+                            <div key={p.id} className="flex items-center justify-between rounded-md border p-3">
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-red-100 text-red-800">{idx + 1}</span>
+                                <span className="font-medium text-gray-900">{p.user.name}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {bottom3.length === 0 && (
+                            <div className="text-sm text-gray-500">暂无数据</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="score-preview">
@@ -739,6 +803,8 @@ export default function AssessmentDetailPage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* 排名榜已移至“数据统计”Tab下方展示 */}
           </TabsContent>
         </Tabs>
       </div>
