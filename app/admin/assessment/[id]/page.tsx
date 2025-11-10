@@ -644,38 +644,45 @@ export default function AssessmentDetailPage() {
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle>排名榜</CardTitle>
-                <CardDescription>仅展示姓名，不显示分数</CardDescription>
+                <div className="inline-flex items-center gap-2 text-sm text-yellow-900 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="font-medium">排名不分先后</span>
+                </div>
               </CardHeader>
               <CardContent>
                 {(() => {
+                  const toNumber = (v: any) => {
+                    const n = typeof v === 'number' ? v : parseFloat(v)
+                    return Number.isFinite(n) ? n : NaN
+                  }
                   const participantsWithScore = (assessmentDetail?.participants || [])
-                    .filter(p => typeof p.final_score === 'number')
+                    .map(p => ({ ...p, _final: toNumber((p as any).final_score) }))
+                    .filter(p => Number.isFinite((p as any)._final))
                   if (participantsWithScore.length === 0) {
                     return (
                       <div className="text-center py-6 text-gray-500">暂无排名数据</div>
                     )
                   }
-                  const sortedDesc = [...participantsWithScore].sort((a, b) => (b.final_score || 0) - (a.final_score || 0))
-                  const sortedAsc = [...participantsWithScore].sort((a, b) => (a.final_score || 0) - (b.final_score || 0))
+                  const sortedDesc = [...participantsWithScore].sort((a: any, b: any) => b._final - a._final)
+                  const sortedAsc = [...participantsWithScore].sort((a: any, b: any) => a._final - b._final)
                   const top3 = sortedDesc.slice(0, 3)
                   const bottom3 = sortedAsc.slice(0, 3)
+                  // 名单不分先后，按姓名排序展示，弱化顺序感
+                  const displayTop = [...top3].sort((a: any, b: any) => (a.user?.name || '').localeCompare(b.user?.name || '', 'zh-CN'))
+                  const displayBottom = [...bottom3].sort((a: any, b: any) => (a.user?.name || '').localeCompare(b.user?.name || '', 'zh-CN'))
                   return (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* 前三名 */}
                       <div>
                         <h4 className="text-sm font-medium text-gray-700 mb-3">前三名</h4>
                         <div className="space-y-2">
-                          {top3.map((p, idx) => (
-                            <div key={p.id} className="flex items-center justify-between rounded-md border p-3">
-                              <div className="flex items-center gap-3">
-                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold 
-                                  ${idx === 0 ? 'bg-yellow-100 text-yellow-800' : idx === 1 ? 'bg-gray-100 text-gray-800' : 'bg-orange-100 text-orange-800'}`}
-                                >{idx + 1}</span>
-                                <span className="font-medium text-gray-900">{p.user.name}</span>
-                              </div>
+                          {displayTop.map((p) => (
+                            <div key={p.id} className="flex items-center rounded-md border p-3">
+                              <span className="inline-block w-2 h-2 rounded-full bg-gray-300 mr-3" />
+                              <span className="font-medium text-gray-900">{p.user.name}</span>
                             </div>
                           ))}
-                          {top3.length === 0 && (
+                          {displayTop.length === 0 && (
                             <div className="text-sm text-gray-500">暂无数据</div>
                           )}
                         </div>
@@ -685,15 +692,13 @@ export default function AssessmentDetailPage() {
                       <div>
                         <h4 className="text-sm font-medium text-gray-700 mb-3">后三名</h4>
                         <div className="space-y-2">
-                          {bottom3.map((p, idx) => (
-                            <div key={p.id} className="flex items-center justify-between rounded-md border p-3">
-                              <div className="flex items-center gap-3">
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold bg-red-100 text-red-800">{idx + 1}</span>
-                                <span className="font-medium text-gray-900">{p.user.name}</span>
-                              </div>
+                          {displayBottom.map((p) => (
+                            <div key={p.id} className="flex items-center rounded-md border p-3">
+                              <span className="inline-block w-2 h-2 rounded-full bg-gray-300 mr-3" />
+                              <span className="font-medium text-gray-900">{p.user.name}</span>
                             </div>
                           ))}
-                          {bottom3.length === 0 && (
+                          {displayBottom.length === 0 && (
                             <div className="text-sm text-gray-500">暂无数据</div>
                           )}
                         </div>
