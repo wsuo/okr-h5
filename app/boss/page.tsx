@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 // Removed Popover for month filter to show inline Select
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight, CalendarIcon } from "lucide-react"
+import { TrendingUp, Users, User, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, Crown, Clock, UserCheck, ArrowRight } from "lucide-react"
 import BossHeader from "@/components/boss-header"
+import { MonthFilter } from "@/components/month-filter"
 import { useRouter } from "next/navigation"
-import { safeParseUserInfo, isBossUser } from "@/lib/utils"
+import { safeParseUserInfo, isBossUser, formatYearMonth, getPreviousMonthDate, parseYearMonth } from "@/lib/utils"
 import {
   statisticsService,
   DashboardStatistics,
@@ -30,7 +31,7 @@ export default function BossDashboard() {
   const [userInfo, setUserInfo] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined) // 选择的月份（为空表示不过滤）
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => getPreviousMonthDate()) // 选择的月份（为空表示不过滤）
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const router = useRouter()
@@ -58,14 +59,11 @@ export default function BossDashboard() {
 
     // 恢复本地存储的月份筛选（记忆功能）
     try {
-      const savedMonth = localStorage.getItem('bossSelectedMonth')
+      const savedMonth = parseYearMonth(localStorage.getItem('bossSelectedMonth'))
       if (savedMonth) {
-        const [y, m] = savedMonth.split('-').map(Number)
-        if (y && m) setSelectedDate(new Date(y, m - 1))
+        setSelectedDate(savedMonth)
       }
     } catch (_) {}
-
-    loadAllStatistics()
   }, [])
 
   // 当选择日期改变时重新加载数据
@@ -73,14 +71,13 @@ export default function BossDashboard() {
     if (userInfo) {
       loadAllStatistics()
     }
-  }, [selectedDate])
+  }, [selectedDate, userInfo])
 
   // 持久化筛选到本地存储
   useEffect(() => {
     try {
       if (selectedDate) {
-        const v = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`
-        localStorage.setItem('bossSelectedMonth', v)
+        localStorage.setItem('bossSelectedMonth', formatYearMonth(selectedDate))
       } else {
         localStorage.removeItem('bossSelectedMonth')
       }
@@ -93,9 +90,8 @@ export default function BossDashboard() {
       setError("")
 
       // 构建查询参数，包括月份过滤
-      const queryParams = selectedDate ? { 
-        month: `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}` 
-      } : undefined
+      const monthValue = selectedDate ? formatYearMonth(selectedDate) : undefined
+      const monthQuery = monthValue ? { month: monthValue } : undefined
 
       // Load all statistics data and boss tasks in parallel
       const [
@@ -105,11 +101,11 @@ export default function BossDashboard() {
         userStatsDetailResponse,
         bossTasksResponse
       ] = await Promise.all([
-        statisticsService.getDashboardStatistics(selectedDate ? queryParams : undefined),
-        statisticsService.getDepartmentStatistics(selectedDate ? queryParams : undefined),
-        statisticsService.getPerformanceList(selectedDate ? queryParams : undefined),
+        statisticsService.getDashboardStatistics(monthQuery),
+        statisticsService.getDepartmentStatistics(monthQuery),
+        statisticsService.getPerformanceList(monthQuery),
         statisticsService.getUserStatisticsDetail({
-          ...(selectedDate ? queryParams : {}),
+          ...(monthQuery || {}),
           time_dimension: 'week',
           group_by: 'user'
         }),
@@ -381,53 +377,14 @@ export default function BossDashboard() {
             </p>
           </div>
           
-          {/* 月份选择器（直接展示，无需二次点击） */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 whitespace-nowrap">筛选月份:</span>
-            <Select
-              value={selectedDate ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}` : ""}
-              onValueChange={(val) => {
-                if (val === '__clear__' || val === '') {
-                  setSelectedDate(undefined)
-                  return
-                }
-                if (!val) return
-                const [y, m] = val.split('-').map(Number)
-                if (y && m) setSelectedDate(new Date(y, m - 1))
-              }}
-            >
-              <SelectTrigger className="w-56">
-                <SelectValue placeholder="选择月份（默认全部）" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__clear__">全部月份</SelectItem>
-                {(() => {
-                  const items: JSX.Element[] = []
-                  const current = new Date()
-                  const currentYear = current.getFullYear()
-                  const currentMonth = current.getMonth() + 1
-                  const startYear = 2025
-                  const startMonth = 8
-                  for (let y = startYear; y <= currentYear; y++) {
-                    const beginMonth = y === startYear ? startMonth : 1
-                    const endMonth = y === currentYear ? currentMonth : 12
-                    for (let m = beginMonth; m <= endMonth; m++) {
-                      const value = `${y}-${String(m).padStart(2, '0')}`
-                      items.push(
-                        <SelectItem key={value} value={value}>{`${y}年${m}月`}</SelectItem>
-                      )
-                    }
-                  }
-                  return items.reverse()
-                })()}
-              </SelectContent>
-            </Select>
-            {selectedDate && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDate(undefined)}>
-                清除
-              </Button>
-            )}
-          </div>
+          <MonthFilter
+            value={selectedDate}
+            onChange={setSelectedDate}
+            label="筛选月份"
+            includeAllOption
+            showClear
+            selectClassName="w-56"
+          />
         </div>
 
         {/* Boss 待办任务卡片 */}
