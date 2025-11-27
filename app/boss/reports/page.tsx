@@ -7,10 +7,11 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { TrendingUp, TrendingDown, Users, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, BarChart3, Calendar, Filter } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Award, Building2, Search, Activity, Target, CheckCircle, AlertCircle, Loader2, BarChart3, Filter } from "lucide-react"
 import BossHeader from "@/components/boss-header"
+import { MonthFilter } from "@/components/month-filter"
 import { useRouter } from "next/navigation"
-import { safeParseUserInfo } from "@/lib/utils"
+import { safeParseUserInfo, formatYearMonth, getPreviousMonthDate, parseYearMonth } from "@/lib/utils"
 import {
   statisticsService,
   DashboardStatistics,
@@ -22,15 +23,6 @@ import {
 } from "@/lib/statistics"
 import { toast } from "sonner"
 
-// 时间快速选择选项
-const timeRangeOptions = [
-  { label: "近7天", value: "7d", days: 7 },
-  { label: "近30天", value: "30d", days: 30 },
-  { label: "近3个月", value: "3m", days: 90 },
-  { label: "近半年", value: "6m", days: 180 },
-  { label: "近一年", value: "1y", days: 365 }
-]
-
 export default function BossReportsPage() {
   const router = useRouter()
   const [userInfo, setUserInfo] = useState<any>(null)
@@ -38,7 +30,7 @@ export default function BossReportsPage() {
   const [error, setError] = useState("")
 
   // 筛选状态
-  const [timeRange, setTimeRange] = useState("30d")
+  const [selectedMonth, setSelectedMonth] = useState<Date | undefined>(() => getPreviousMonthDate())
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -48,44 +40,45 @@ export default function BossReportsPage() {
   const [performanceList, setPerformanceList] = useState<PerformanceListItem[]>([])
   const [trendsData, setTrendsData] = useState<PerformanceTrends | null>(null)
 
-  // 获取当前时间范围的日期
-  const getDateRange = (range: string) => {
-    const endDate = new Date()
-    const startDate = new Date()
-    
-    const option = timeRangeOptions.find(opt => opt.value === range)
-    if (option) {
-      startDate.setDate(endDate.getDate() - option.days)
-    }
-
-    return {
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0]
-    }
-  }
-
   useEffect(() => {
     const user = safeParseUserInfo()
     if (user) {
       setUserInfo(user)
-      loadAllData()
+      try {
+        const savedMonth = parseYearMonth(localStorage.getItem('bossReportsSelectedMonth'))
+        if (savedMonth) {
+          setSelectedMonth(savedMonth)
+        }
+      } catch (_) {}
     } else {
       router.push('/')
       return
     }
-  }, [timeRange, departmentFilter])
+  }, [])
+
+  useEffect(() => {
+    if (userInfo) {
+      loadAllData()
+    }
+  }, [selectedMonth, userInfo])
+
+  useEffect(() => {
+    try {
+      if (selectedMonth) {
+        localStorage.setItem('bossReportsSelectedMonth', formatYearMonth(selectedMonth))
+      } else {
+        localStorage.removeItem('bossReportsSelectedMonth')
+      }
+    } catch (_) {}
+  }, [selectedMonth])
 
   const loadAllData = async () => {
     try {
       setLoading(true)
       setError("")
 
-      const dateRange = getDateRange(timeRange)
-      const queryParams: StatisticsQueryParams = {
-        ...dateRange
-        // 注意：不传 department_id，改为在前端进行部门筛选
-        // 因为 departmentFilter 是部门名称而不是ID
-      }
+      const monthValue = selectedMonth ? formatYearMonth(selectedMonth) : undefined
+      const queryParams: StatisticsQueryParams | undefined = monthValue ? { month: monthValue } : undefined
 
       // 并行加载所有数据
       const [
@@ -94,8 +87,8 @@ export default function BossReportsPage() {
         performanceListResponse,
         trendsResponse
       ] = await Promise.all([
-        statisticsService.getDashboardStatistics(),
-        statisticsService.getDepartmentStatistics(),
+        statisticsService.getDashboardStatistics(queryParams),
+        statisticsService.getDepartmentStatistics(queryParams),
         statisticsService.getPerformanceList(queryParams),
         statisticsService.getPerformanceTrends(queryParams)
       ])
@@ -325,22 +318,15 @@ export default function BossReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                {/* 时间范围筛选 */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <Select value={timeRange} onValueChange={setTimeRange}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeRangeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <MonthFilter
+                  value={selectedMonth}
+                  onChange={setSelectedMonth}
+                  label="筛选月份"
+                  includeAllOption
+                  showClear
+                  className="min-w-0"
+                  selectClassName="w-full sm:w-40"
+                />
 
                 {/* 部门筛选 */}
                 <div className="flex items-center gap-2 min-w-0">
