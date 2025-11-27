@@ -52,3 +52,20 @@ export function isBossUser(userInfo: any): boolean {
          userInfo.name === '公司老板' ||
          hasRole(userInfo, 'boss')
 }
+
+export function getPreviousMonthDate(baseDate: Date = new Date()): Date {
+  return new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1)
+}
+
+export function formatYearMonth(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+export function parseYearMonth(value: string | null | undefined): Date | undefined {
+  if (!value) return undefined
+  const [yearStr, monthStr] = value.split('-')
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  if (!year || !month) return undefined
+  return new Date(year, month - 1, 1)
+}
