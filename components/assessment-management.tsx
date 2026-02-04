@@ -49,6 +49,13 @@ export default function AssessmentManagement() {
   const [currentPublishAssessment, setCurrentPublishAssessment] = useState<AssessmentListItem | null>(null)
   const [publishValidation, setPublishValidation] = useState<PublishValidationResult | null>(null)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
+
+  // 一键默认老板评分（两层加权模式）
+  const [defaultBossDialogOpen, setDefaultBossDialogOpen] = useState(false)
+  const [defaultBossConfirmOpen, setDefaultBossConfirmOpen] = useState(false)
+  const [defaultBossTarget, setDefaultBossTarget] = useState<AssessmentListItem | null>(null)
+  const [defaultBossScore, setDefaultBossScore] = useState<string>("90")
+  const [defaultingBossId, setDefaultingBossId] = useState<number | null>(null)
   
   // 检查URL参数中是否有编辑ID
   useEffect(() => {
@@ -195,6 +202,44 @@ export default function AssessmentManagement() {
       toast.error('加载数据失败，请刷新页面重试')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const openDefaultBossDialog = (assessment: AssessmentListItem) => {
+    setDefaultBossTarget(assessment)
+    setDefaultBossScore("90")
+    setDefaultBossConfirmOpen(false)
+    setDefaultBossDialogOpen(true)
+  }
+
+  const submitDefaultBossScore = async () => {
+    if (!defaultBossTarget) return
+
+    const scoreNum = Number(defaultBossScore)
+    if (!Number.isFinite(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+      toast.error("请输入 0~100 之间的老板评分")
+      return
+    }
+
+    try {
+      setDefaultingBossId(defaultBossTarget.id)
+      const res = await assessmentService.defaultBossScore(defaultBossTarget.id, scoreNum)
+      if (res.code === 200) {
+        toast.success("默认评分成功", {
+          description: `已对「${defaultBossTarget.title}」执行老板默认评分（${scoreNum}分）`
+        })
+        setDefaultBossConfirmOpen(false)
+        setDefaultBossDialogOpen(false)
+        setDefaultBossTarget(null)
+        await loadData()
+      } else {
+        toast.error("默认评分失败", { description: res.message || "请稍后重试" })
+      }
+    } catch (error: any) {
+      console.error("默认评分失败:", error)
+      toast.error("默认评分失败", { description: error.message || "服务器错误，请稍后重试" })
+    } finally {
+      setDefaultingBossId(null)
     }
   }
 
@@ -1016,6 +1061,23 @@ export default function AssessmentManagement() {
                         </AlertDialogContent>
                       </AlertDialog>
                     )}
+
+                    {assessmentUtils.canDefaultBossScore(assessment) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openDefaultBossDialog(assessment)}
+                        disabled={defaultingBossId === assessment.id}
+                        className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                      >
+                        {defaultingBossId === assessment.id ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <UserCheck className="w-4 h-4 mr-1" />
+                        )}
+                        默认评分
+                      </Button>
+                    )}
                     
                     {assessmentUtils.canDelete(assessment.status) && (
                       <AlertDialog>
@@ -1143,6 +1205,83 @@ export default function AssessmentManagement() {
             >
               {publishingId !== null && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {publishValidation && !publishValidation.canPublish ? '无法发布' : '确认发布'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 一键默认老板评分 - 输入对话框（第一层确认） */}
+      <Dialog open={defaultBossDialogOpen} onOpenChange={(open) => {
+        setDefaultBossDialogOpen(open)
+        if (!open) {
+          setDefaultBossConfirmOpen(false)
+          setDefaultBossTarget(null)
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>一键默认老板评分</DialogTitle>
+            <DialogDescription>
+              仅当所有员工都已完成自评与领导评时可执行。执行后会写入老板评分记录并计算最终得分，考核可能自动变为“已完成”。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>老板评分（默认 90）</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={defaultBossScore}
+                onChange={(e) => setDefaultBossScore(e.target.value)}
+              />
+            </div>
+
+            {defaultBossTarget && (
+              <div className="text-sm text-gray-600 space-y-1">
+                <div>考核：{defaultBossTarget.title}</div>
+                <div>
+                  参与者：{defaultBossTarget.statistics.total_participants} 人；
+                  自评完成：{defaultBossTarget.statistics.self_completed_count}；
+                  领导评完成：{defaultBossTarget.statistics.leader_completed_count}；
+                  Boss 完成：{defaultBossTarget.statistics.boss_completed_count}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDefaultBossDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                onClick={() => setDefaultBossConfirmOpen(true)}
+                disabled={!defaultBossTarget || defaultingBossId !== null}
+              >
+                下一步
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 二次确认 */}
+      <AlertDialog open={defaultBossConfirmOpen} onOpenChange={setDefaultBossConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认执行默认评分</AlertDialogTitle>
+            <AlertDialogDescription>
+              {defaultBossTarget
+                ? `将对「${defaultBossTarget.title}」的所有未完成 Boss 评分的参与者执行默认评分（${defaultBossScore} 分）。此操作不可撤销，确认继续？`
+                : "确认继续？"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={defaultingBossId !== null}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={submitDefaultBossScore} disabled={defaultingBossId !== null}>
+              {defaultingBossId !== null && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              确认执行
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

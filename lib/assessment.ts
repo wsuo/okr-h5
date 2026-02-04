@@ -274,6 +274,13 @@ export class AssessmentService {
   }
 
   /**
+   * 一键默认老板评分（需所有参与者完成自评+领导评）
+   */
+  async defaultBossScore(id: number, score: number = 90): Promise<ApiResponse<Assessment>> {
+    return apiClient.post<Assessment>(`/assessments/${id}/default-boss-score`, { score })
+  }
+
+  /**
    * 删除考核（软删除）
    */
   async deleteAssessment(id: number): Promise<ApiResponse<void>> {
@@ -402,6 +409,32 @@ export const assessmentUtils = {
    */
   canEnd(status: AssessmentStatus): boolean {
     return status === 'active'
+  },
+
+  /**
+   * 检查是否可以“一键默认老板评分”
+   *
+   * 规则：
+   * - 仅两层加权模式（two_tier_weighted）支持老板评分
+   * - 必须全员完成自评 + 领导评
+   * - 仍存在未完成的老板评分
+   */
+  canDefaultBossScore(assessment: AssessmentListItem): boolean {
+    if (assessment.status !== 'active') return false
+
+    const stats = assessment.statistics
+    if (!stats || stats.total_participants <= 0) return false
+
+    if (stats.self_completed_count !== stats.total_participants) return false
+    if (stats.leader_completed_count !== stats.total_participants) return false
+    if ((stats.boss_completed_count || 0) >= stats.total_participants) return false
+
+    const templateConfig = (assessment as any).template_config || assessment.template?.config
+    const scoringRules = templateConfig?.scoring_rules
+    if (!scoringRules) return false
+
+    if (scoringRules.scoring_mode !== 'two_tier_weighted') return false
+    return (scoringRules.two_tier_config?.boss_weight || 0) > 0
   },
 
   /**
