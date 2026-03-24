@@ -54,8 +54,7 @@ export default function BossHeader({ userInfo, pendingTasksCount = 0 }: BossHead
           ...t,
           is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
         }))
-        const pendingTasks = tasksWithOverdueFlag.filter(task => task.status === 'pending' && !task.is_overdue)
-        setActualTasksCount(pendingTasks.length)
+        setActualTasksCount(evaluationUtils.getActiveBossTasks(tasksWithOverdueFlag).length)
       }
     } catch (error) {
       console.error('加载待办任务失败:', error)

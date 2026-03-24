@@ -132,8 +132,7 @@ export default function BossDashboard() {
           is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
         }))
         setBossTasks(tasks)
-        const pendingTasks = tasks.filter(task => task.status === 'pending' && !task.is_overdue)
-        setPendingTasksCount(pendingTasks.length)
+        setPendingTasksCount(evaluationUtils.getActiveBossTasks(tasks).length)
       }
 
     } catch (error: any) {
@@ -313,6 +312,7 @@ export default function BossDashboard() {
 
   // Get unique departments for filter
   const availableDepartments = Array.from(new Set(allEmployees.map(emp => emp.department)))
+  const activeBossTasks = evaluationUtils.getActiveBossTasks(bossTasks)
 
   if (!userInfo) {
     return (
@@ -388,7 +388,7 @@ export default function BossDashboard() {
         </div>
 
         {/* Boss 待办任务卡片 */}
-        {pendingTasksCount > 0 && (
+        {activeBossTasks.length > 0 && (
           <Card className="mb-4 sm:mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-yellow-800">
@@ -396,12 +396,12 @@ export default function BossDashboard() {
                 Boss 待办任务
               </CardTitle>
               <CardDescription className="text-yellow-700">
-                您有 <strong className="text-yellow-800">{pendingTasksCount}</strong> 项待评分任务
+                您有 <strong className="text-yellow-800">{activeBossTasks.length}</strong> 项待处理任务
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {bossTasks.filter(task => task.status === 'pending' && !task.is_overdue).slice(0, 3).map((task) => (
+                {activeBossTasks.slice(0, 3).map((task) => (
                   <div key={task.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white/60 rounded-lg border border-yellow-300 space-y-2 sm:space-y-0">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -409,6 +409,9 @@ export default function BossDashboard() {
                         <span className="font-medium text-gray-900">{task.evaluatee_name}</span>
                         <Badge variant="outline" className="text-xs">
                           {task.evaluatee_department}
+                        </Badge>
+                        <Badge className={evaluationUtils.getTaskStatusStyle(task.status)}>
+                          {evaluationUtils.getTaskStatusText(task.status)}
                         </Badge>
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
@@ -427,21 +430,21 @@ export default function BossDashboard() {
                           onClick={() => router.push(`/boss/evaluation/${task.assessment_id}/${task.evaluatee_id}`)}
                           className="bg-yellow-600 hover:bg-yellow-700"
                         >
-                          立即评分
+                          {task.status === 'in_progress' ? '继续评分' : '立即评分'}
                         </Button>
                       )}
                     </div>
                   </div>
                 ))}
                 
-                {pendingTasksCount > 3 && (
+                {activeBossTasks.length > 3 && (
                   <div className="text-center pt-2">
                     <Button
                       variant="outline"
                       onClick={() => router.push('/boss/evaluation')}
                       className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
                     >
-                      查看全部 {pendingTasksCount} 项任务
+                      查看全部 {activeBossTasks.length} 项任务
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </div>

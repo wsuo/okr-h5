@@ -597,7 +597,7 @@ export class EvaluationService {
    * 15. 获取老板待办任务
    */
   async getBossTasks(assessment_id?: number): Promise<ApiResponse<BossTask[]>> {
-    const queryParams: Record<string, any> = {}
+    const queryParams: Record<string, any> = { type: 'boss' }
     if (assessment_id) queryParams.assessment_id = assessment_id
     
     return apiClient.get<BossTask[]>('/evaluations/my-tasks', queryParams)
@@ -767,6 +767,17 @@ export const evaluationUtils = {
       overdue: 'bg-red-100 text-red-800 border-red-200'
     }
     return styleMap[status] || 'bg-gray-100 text-gray-800 border-gray-200'
+  },
+
+  /**
+   * 获取首页或导航中应展示的可处理 Boss 任务
+   */
+  getActiveBossTasks<T extends { status: TaskStatus; is_overdue?: boolean }>(tasks: T[]): T[] {
+    return tasks.filter(
+      (task) =>
+        (task.status === 'pending' || task.status === 'in_progress') &&
+        !task.is_overdue
+    )
   },
 
   /**

@@ -49,7 +49,9 @@ export default function BossEvaluationPage() {
       setLoading(true)
       const response = await evaluationService.getBossTasks()
       if (response.code === 200 && response.data) {
-        const mapped = response.data.map((t: BossTask) => ({
+        const mapped = response.data
+          .filter((t: BossTask) => t.type === 'boss')
+          .map((t: BossTask) => ({
           ...t,
           is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
         }))
