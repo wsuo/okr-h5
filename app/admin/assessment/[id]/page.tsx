@@ -37,6 +37,8 @@ export default function AssessmentDetailPage() {
   const [publishValidation, setPublishValidation] = useState<PublishValidationResult | null>(null)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
 
+  const hasScoreValue = (score?: number | null) => score !== null && score !== undefined
+
   useEffect(() => {
     const user = safeParseUserInfo()
     if (user) {
@@ -488,19 +490,19 @@ export default function AssessmentDetailPage() {
                             {participant.boss_completed ? "已完成" : "未完成"}
                           </span>
                         </div>
-                        {participant.self_score && (
+                        {hasScoreValue(participant.self_score) && (
                           <div>
                             <span className="text-gray-600">自评得分：</span>
                             <span className="font-medium">{participant.self_score}</span>
                           </div>
                         )}
-                        {participant.leader_score && (
+                        {hasScoreValue(participant.leader_score) && (
                           <div>
                             <span className="text-gray-600">领导得分：</span>
                             <span className="font-medium">{participant.leader_score}</span>
                           </div>
                         )}
-                        {participant.boss_score && (
+                        {hasScoreValue(participant.boss_score) && (
                           <div>
                             <span className="text-gray-600">老板得分：</span>
                             <span className="font-medium">{participant.boss_score}</span>
@@ -508,7 +510,7 @@ export default function AssessmentDetailPage() {
                         )}
                       </div>
                       
-                      {participant.final_score && (
+                      {hasScoreValue(participant.final_score) && (
                         <div className="mb-3">
                           <span className="text-gray-600">最终得分：</span>
                           <span className="font-medium text-blue-600 text-lg ml-2">{participant.final_score}</span>

@@ -35,6 +35,7 @@ import { assessmentService, AssessmentListItem, CreateAssessmentRequest, EditAss
 import { userService, User } from "@/lib/user"
 import { templateService, Template } from "@/lib/template"
 import { roleService, Role, roleUtils } from "@/lib/role"
+import { buildDefaultAssessmentFields } from "@/lib/assessment-defaults"
 
 export default function AssessmentManagement() {
   const router = useRouter()
@@ -74,27 +75,16 @@ export default function AssessmentManagement() {
     }
   }, [assessments])
   
-  // 生成默认考核标题
-  const generateDefaultTitle = (): string => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth() + 1
-    const monthName = month < 10 ? `0${month}` : `${month}`
-    
-    // 生成标题格式：年份 + 月份 + "月绩效考核"
-    return `${year}年${monthName}月绩效考核`
+  const buildDefaultAssessmentRequest = (): CreateAssessmentRequest => {
+    return {
+      ...buildDefaultAssessmentFields(),
+      description: "",
+      template_id: undefined,
+      participant_ids: [],
+    }
   }
 
-  const [newAssessment, setNewAssessment] = useState<CreateAssessmentRequest>({
-    title: generateDefaultTitle(), // 初始就设置默认标题
-    period: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    deadline: "",
-    template_id: undefined,
-    participant_ids: [],
-  })
+  const [newAssessment, setNewAssessment] = useState<CreateAssessmentRequest>(buildDefaultAssessmentRequest)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedParticipants, setSelectedParticipants] = useState<number[]>([])
@@ -334,16 +324,7 @@ export default function AssessmentManagement() {
   }
 
   const resetForm = () => {
-    setNewAssessment({
-      title: generateDefaultTitle(), // 自动生成标题
-      period: "",
-      description: "",
-      start_date: "",
-      end_date: "",
-      deadline: "",
-      template_id: undefined,
-      participant_ids: [],
-    })
+    setNewAssessment(buildDefaultAssessmentRequest())
     
     // 重置为默认状态：选中员工角色并全选所有员工
     setSelectedRole('employee')
@@ -463,7 +444,7 @@ export default function AssessmentManagement() {
       setSelectedParticipants(detail.participant_ids || [])
       
       // 打开对话框
-      handleDialogOpen(true)
+      setIsDialogOpen(true)
     } catch (error: any) {
       console.error('获取考核详情失败:', error)
       toast.error('加载失败', {
@@ -613,12 +594,6 @@ export default function AssessmentManagement() {
   // 处理对话框打开
   const handleDialogOpen = (open: boolean) => {
     setIsDialogOpen(open)
-    if (open) {
-      // 对话框打开时，确保标题是最新的
-      if (!newAssessment.title || newAssessment.title === "") {
-        setNewAssessment(prev => ({ ...prev, title: generateDefaultTitle() }))
-      }
-    }
   }
 
   // 快速选择所有员工
@@ -694,7 +669,7 @@ export default function AssessmentManagement() {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={handleDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={resetForm}>
                 <Plus className="w-4 h-4 mr-2" />
                 发布新考核
               </Button>
