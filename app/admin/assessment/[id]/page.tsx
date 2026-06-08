@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner"
 import { assessmentService, Assessment, assessmentUtils, ScorePreviewResult, PublishValidationResult } from "@/lib/assessment"
 import { safeParseUserInfo } from "@/lib/utils"
+import { isEvaluationCompleted, isParticipantFullyCompleted } from "@/lib/assessment-participant-status"
 
 export default function AssessmentDetailPage() {
   const router = useRouter()
@@ -463,7 +464,7 @@ export default function AssessmentDetailPage() {
                           </p>
                         </div>
                         <div className="flex gap-2">
-                          {participant.self_completed && participant.leader_completed && participant.boss_completed ? (
+                          {isParticipantFullyCompleted(participant) ? (
                             <Badge className="bg-green-100 text-green-800 border-green-200">已完成</Badge>
                           ) : (
                             <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">进行中</Badge>
@@ -474,20 +475,20 @@ export default function AssessmentDetailPage() {
                       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm mb-3">
                         <div>
                           <span className="text-gray-600">自评状态：</span>
-                          <span className={participant.self_completed ? "text-green-600 font-medium" : "text-red-600"}>
-                            {participant.self_completed ? "已完成" : "未完成"}
+                          <span className={isEvaluationCompleted(participant.self_completed) ? "text-green-600 font-medium" : "text-red-600"}>
+                            {isEvaluationCompleted(participant.self_completed) ? "已完成" : "未完成"}
                           </span>
                         </div>
                         <div>
                           <span className="text-gray-600">领导评分：</span>
-                          <span className={participant.leader_completed ? "text-green-600 font-medium" : "text-red-600"}>
-                            {participant.leader_completed ? "已完成" : "未完成"}
+                          <span className={isEvaluationCompleted(participant.leader_completed) ? "text-green-600 font-medium" : "text-red-600"}>
+                            {isEvaluationCompleted(participant.leader_completed) ? "已完成" : "未完成"}
                           </span>
                         </div>
                         <div>
                           <span className="text-gray-600">老板评分：</span>
-                          <span className={participant.boss_completed ? "text-green-600 font-medium" : "text-red-600"}>
-                            {participant.boss_completed ? "已完成" : "未完成"}
+                          <span className={isEvaluationCompleted(participant.boss_completed) ? "text-green-600 font-medium" : "text-red-600"}>
+                            {isEvaluationCompleted(participant.boss_completed) ? "已完成" : "未完成"}
                           </span>
                         </div>
                         {hasScoreValue(participant.self_score) && (
@@ -517,7 +518,7 @@ export default function AssessmentDetailPage() {
                         </div>
                       )}
 
-                      {participant.self_completed && participant.leader_completed && participant.boss_completed && (
+                      {isParticipantFullyCompleted(participant) && (
                         <div className="mt-3">
                           <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                             <span>完成进度</span>

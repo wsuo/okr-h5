@@ -26,7 +26,8 @@
     "test:e2e": "node scripts/test-template-management.js",
     "test:quick": "node scripts/quick-test.js",
     "test:user-leader-options": "node lib/user-leader-options.test.js",
-    "test:assessment-defaults": "node lib/assessment-defaults.test.js"
+    "test:assessment-defaults": "node lib/assessment-defaults.test.js",
+    "test:assessment-participant-status": "node lib/assessment-participant-status.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
