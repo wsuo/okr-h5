@@ -126,7 +126,7 @@ build_project() {
     # 安装依赖
     if [ ! -d "node_modules" ]; then
         log_info "安装依赖..."
-        npm install
+        eval "$INSTALL_COMMAND"
     fi
 
     # 构建项目
