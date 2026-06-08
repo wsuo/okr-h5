@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Plus, Calendar, Users, CheckCircle, Clock, Loader2, Trash2, AlertTriangle, UserCheck, UserMinus, Edit, Send, FileText } from "lucide-react"
+import { Plus, Calendar, Users, CheckCircle, Clock, Loader2, Trash2, AlertTriangle, UserCheck, UserMinus, Edit, Send, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { assessmentService, AssessmentListItem, CreateAssessmentRequest, EditAssessmentRequest, PublishValidationResult, assessmentUtils } from "@/lib/assessment"
@@ -47,6 +47,7 @@ export default function AssessmentManagement() {
   const [submitting, setSubmitting] = useState(false)
   const [editingAssessment, setEditingAssessment] = useState<AssessmentListItem | null>(null)
   const [publishingId, setPublishingId] = useState<number | null>(null)
+  const [exportingId, setExportingId] = useState<number | null>(null)
   const [currentPublishAssessment, setCurrentPublishAssessment] = useState<AssessmentListItem | null>(null)
   const [publishValidation, setPublishValidation] = useState<PublishValidationResult | null>(null)
   const [showPublishDialog, setShowPublishDialog] = useState(false)
@@ -230,6 +231,47 @@ export default function AssessmentManagement() {
       toast.error("默认评分失败", { description: error.message || "服务器错误，请稍后重试" })
     } finally {
       setDefaultingBossId(null)
+    }
+  }
+
+  const downloadAssessmentCSV = (title: string, csvContent: string) => {
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `${title}_考核数据.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportAssessment = async (assessment: AssessmentListItem) => {
+    try {
+      setExportingId(assessment.id)
+      const detailResponse = await assessmentService.getAssessmentById(assessment.id)
+
+      if (detailResponse.code !== 200 || !detailResponse.data) {
+        toast.error("导出失败", {
+          description: detailResponse.message || "无法获取考核详情"
+        })
+        return
+      }
+
+      const csvContent = assessmentUtils.generateCSVData(detailResponse.data)
+      downloadAssessmentCSV(detailResponse.data.title, csvContent)
+
+      toast.success("导出成功", {
+        description: "考核数据已导出为CSV文件"
+      })
+    } catch (error: any) {
+      console.error("导出考核数据失败:", error)
+      toast.error("导出失败", {
+        description: error.message || "服务器错误，请稍后重试"
+      })
+    } finally {
+      setExportingId(null)
     }
   }
 
@@ -973,7 +1015,17 @@ export default function AssessmentManagement() {
                     <Button variant="outline" size="sm" onClick={() => router.push(`/admin/assessment/${assessment.id}`)}>
                       查看详情
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportAssessment(assessment)}
+                      disabled={exportingId === assessment.id}
+                    >
+                      {exportingId === assessment.id ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4 mr-1" />
+                      )}
                       导出数据
                     </Button>
                   </div>

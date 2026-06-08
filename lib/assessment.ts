@@ -3,6 +3,7 @@
  */
 
 import { apiClient, ApiResponse, PaginatedResponse } from './api'
+import { generateAssessmentRankingCSV } from './assessment-export'
 
 // 考核状态类型
 export type AssessmentStatus = 'draft' | 'active' | 'completed' | 'ended'
@@ -484,20 +485,6 @@ export const assessmentUtils = {
    * 生成CSV数据
    */
   generateCSVData(assessment: Assessment): string {
-    const headers = ['姓名', '部门', '职位', '自评完成', '领导评分完成', '自评得分', '领导得分', '最终得分']
-    const rows = assessment.participants.map(participant => [
-      participant.user.name,
-      participant.user.department?.name || '',
-      participant.user.position || '',
-      participant.self_completed ? '是' : '否',
-      participant.leader_completed ? '是' : '否',
-      participant.self_score?.toString() || '',
-      participant.leader_score?.toString() || '',
-      participant.final_score?.toString() || ''
-    ])
-
-    return [headers, ...rows]
-      .map(row => row.join(','))
-      .join('\n')
+    return generateAssessmentRankingCSV(assessment)
   }
 }
