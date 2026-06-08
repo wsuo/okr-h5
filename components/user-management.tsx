@@ -33,6 +33,7 @@ import DepartmentManagement from "./department-management-simple"
 import { User, userService, userUtils, CreateUserDto, UpdateUserDto } from "@/lib/user"
 import { Role, roleService } from "@/lib/role"
 import { Department, departmentService } from "@/lib/department"
+import { getAssignableLeaders } from "@/lib/user-leader-options"
 import { toast } from "sonner"
 
 export default function UserManagement() {
@@ -386,21 +387,11 @@ export default function UserManagement() {
 
   // 获取可选领导列表
   const getAvailableLeaders = () => {
-    // 如果有从接口获取的领导数据，直接使用并按部门筛选
-    if (leaders && leaders.length > 0) {
-      return leaders.filter(leader => 
-        !formData.department_id || leader.department?.id === formData.department_id
-      )
-    }
-    
-    // 回退到原来的逻辑：从用户列表中筛选具有领导角色的用户
-    if (!users || users.length === 0) return []
-    return users.filter(user => 
-      user.roles && user.roles.length > 0 &&
-      // 角色代码修正为 'leader'
-      user.roles.some(role => role.code === 'leader') && 
-      (!formData.department_id || user.department?.id === formData.department_id)
-    )
+    return getAssignableLeaders({
+      leaders,
+      users,
+      departmentId: formData.department_id,
+    })
   }
 
   // 获取角色Badge

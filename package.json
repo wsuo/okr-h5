@@ -24,7 +24,8 @@
     "test:template": "node scripts/test-template-management.js",
     "test:template:light": "node scripts/test-template-lightweight.js",
     "test:e2e": "node scripts/test-template-management.js",
-    "test:quick": "node scripts/quick-test.js"
+    "test:quick": "node scripts/quick-test.js",
+    "test:user-leader-options": "node lib/user-leader-options.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
