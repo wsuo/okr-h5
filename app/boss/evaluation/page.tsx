@@ -17,6 +17,7 @@ import {
   evaluationUtils,
   type TaskStatus 
 } from "@/lib/evaluation"
+import { sortBossTasksByLatestAssessment } from "@/lib/boss-task-order"
 
 export default function BossEvaluationPage() {
   const router = useRouter()
@@ -55,7 +56,7 @@ export default function BossEvaluationPage() {
           ...t,
           is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
         }))
-        setTasks(mapped)
+        setTasks(sortBossTasksByLatestAssessment(mapped))
       }
     } catch (error: any) {
       console.error('加载Boss评估任务失败:', error)

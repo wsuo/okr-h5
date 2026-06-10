@@ -29,7 +29,8 @@
     "test:assessment-defaults": "node lib/assessment-defaults.test.js",
     "test:assessment-participant-status": "node lib/assessment-participant-status.test.js",
     "test:assessment-export": "node lib/assessment-export.test.js",
-    "test:boss-navigation": "node lib/boss-navigation.test.js"
+    "test:boss-navigation": "node lib/boss-navigation.test.js",
+    "test:boss-task-order": "node lib/boss-task-order.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
