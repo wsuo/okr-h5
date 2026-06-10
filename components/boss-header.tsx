@@ -12,11 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, Crown, Home, UserCheck, Bell, BarChart3, Settings, Key } from "lucide-react"
+import { LogOut, Crown, Home, UserCheck, Bell, BarChart3, Key, FileText } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { evaluationService, evaluationUtils } from "@/lib/evaluation"
 import ChangePasswordDialog from "@/components/change-password-dialog"
+import { buildBossNavigationItems } from "@/lib/boss-navigation"
 
 interface BossHeaderProps {
   userInfo?: {
@@ -31,6 +32,7 @@ export default function BossHeader({ userInfo, pendingTasksCount = 0 }: BossHead
   const pathname = usePathname()
   const { logout, user } = useAuth()
   const [actualTasksCount, setActualTasksCount] = useState(pendingTasksCount)
+  const [leaderTasksCount, setLeaderTasksCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [showChangePassword, setShowChangePassword] = useState(false)
 
@@ -48,13 +50,23 @@ export default function BossHeader({ userInfo, pendingTasksCount = 0 }: BossHead
   const loadTasks = async () => {
     try {
       setLoading(true)
-      const response = await evaluationService.getBossTasks()
-      if (response.code === 200 && response.data) {
-        const tasksWithOverdueFlag = response.data.map((t: any) => ({
+      const [bossResponse, leaderResponse] = await Promise.all([
+        evaluationService.getBossTasks(),
+        evaluationService.getEvaluationsToGive()
+      ])
+
+      if (bossResponse.code === 200 && bossResponse.data) {
+        const tasksWithOverdueFlag = bossResponse.data.map((t: any) => ({
           ...t,
           is_overdue: t?.deadline ? evaluationUtils.isOverdue(t.deadline) : false,
         }))
         setActualTasksCount(evaluationUtils.getActiveBossTasks(tasksWithOverdueFlag).length)
+      }
+
+      if (leaderResponse.code === 200 && leaderResponse.data) {
+        setLeaderTasksCount(
+          leaderResponse.data.filter((evaluation: any) => evaluation.status !== "submitted").length
+        )
       }
     } catch (error) {
       console.error('加载待办任务失败:', error)
@@ -73,28 +85,21 @@ export default function BossHeader({ userInfo, pendingTasksCount = 0 }: BossHead
     }
   }
 
-  // 导航项配置
-  const navigationItems = [
-    {
-      label: "工作台",
-      icon: Home,
-      path: "/boss",
-      isActive: pathname === "/boss"
-    },
-    {
-      label: "评分中心",
-      icon: UserCheck,
-      path: "/boss/evaluation",
-      isActive: pathname.startsWith("/boss/evaluation"),
-      badge: actualTasksCount > 0 ? actualTasksCount : undefined
-    },
-    {
-      label: "报表分析",
-      icon: BarChart3,
-      path: "/boss/reports",
-      isActive: pathname.startsWith("/boss/reports")
-    }
-  ]
+  const iconMap = {
+    workbench: Home,
+    "boss-evaluation": UserCheck,
+    "leader-evaluation": FileText,
+    reports: BarChart3
+  }
+
+  const navigationItems = buildBossNavigationItems({
+    pathname,
+    bossTasksCount: actualTasksCount,
+    leaderTasksCount
+  }).map((item) => ({
+    ...item,
+    icon: iconMap[item.key as keyof typeof iconMap]
+  }))
 
   return (
     <>
