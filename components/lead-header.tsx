@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, Users, FileText, Home, Key, Crown } from "lucide-react"
+import { LogOut, Users, FileText, Home, Key, Crown, User } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { evaluationService } from "@/lib/evaluation"
@@ -44,7 +44,8 @@ export default function LeadHeader({ userInfo, pendingTasksCount: propPendingTas
   const iconMap = {
     "lead-home": Home,
     "leader-evaluation": FileText,
-    "boss-evaluation": Crown
+    "boss-evaluation": Crown,
+    "employee-home": User
   }
 
   useEffect(() => {

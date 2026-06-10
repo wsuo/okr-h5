@@ -31,7 +31,8 @@
     "test:assessment-export": "node lib/assessment-export.test.js",
     "test:boss-navigation": "node lib/boss-navigation.test.js",
     "test:boss-task-order": "node lib/boss-task-order.test.js",
-    "test:lead-navigation": "node lib/lead-navigation.test.js"
+    "test:lead-navigation": "node lib/lead-navigation.test.js",
+    "test:employee-navigation": "node lib/employee-navigation.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

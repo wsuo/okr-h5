@@ -11,12 +11,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, User, FileText, Home, Key } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { LogOut, User, FileText, Home, Key, Users } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { evaluationService } from "@/lib/evaluation"
 import { useAuth } from "@/contexts/auth-context"
 import ChangePasswordDialog from "@/components/change-password-dialog"
+import { buildEmployeeNavigationItems } from "@/lib/employee-navigation"
 
 interface EmployeeHeaderProps {
   userInfo: {
@@ -28,11 +29,22 @@ interface EmployeeHeaderProps {
 
 export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { logout, user } = useAuth()
   const [pendingTasksCount, setPendingTasksCount] = useState(0)
   const [showChangePassword, setShowChangePassword] = useState(false)
 
   const currentUser = userInfo || user
+  const navigationItems = buildEmployeeNavigationItems({
+    roles: user?.roles || [],
+    pendingTasksCount,
+    pathname,
+  })
+  const iconMap = {
+    "employee-home": Home,
+    "employee-evaluation": FileText,
+    "leader-evaluation": Users,
+  }
 
   useEffect(() => {
     loadPendingTasksCount()
@@ -82,33 +94,29 @@ export default function EmployeeHeader({ userInfo }: EmployeeHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => handleNavigation('/employee')}
-            className="flex items-center gap-2"
-          >
-            <Home className="w-4 h-4" />
-            <span className="hidden sm:inline">首页</span>
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleNavigation('/employee/evaluation')}
-            className="flex items-center gap-2 relative"
-          >
-            <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">评估中心</span>
-            {pendingTasksCount > 0 && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
+          {navigationItems.map((item) => {
+            const Icon = iconMap[item.key as keyof typeof iconMap]
+            return (
+              <Button
+                key={item.path}
+                variant={item.isActive ? "default" : "ghost"}
+                size="sm"
+                onClick={() => handleNavigation(item.path)}
+                className="flex items-center gap-2 relative"
               >
-                {pendingTasksCount > 9 ? '9+' : pendingTasksCount}
-              </Badge>
-            )}
-          </Button>
+                <Icon className="w-4 h-4" />
+                <span className="hidden sm:inline">{item.label}</span>
+                {item.badge && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
+                  >
+                    {item.badge > 9 ? '9+' : item.badge}
+                  </Badge>
+                )}
+              </Button>
+            )
+          })}
 
           <div className="w-px h-6 bg-gray-200 hidden sm:block" />
           
