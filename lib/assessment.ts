@@ -3,7 +3,7 @@
  */
 
 import { apiClient, ApiResponse, PaginatedResponse } from './api'
-import { generateAssessmentRankingCSV } from './assessment-export'
+import { generateAssessmentRankingCSV, generateAssessmentRankingExcel } from './assessment-export'
 
 // 考核状态类型
 export type AssessmentStatus = 'draft' | 'active' | 'completed' | 'ended'
@@ -486,5 +486,12 @@ export const assessmentUtils = {
    */
   generateCSVData(assessment: Assessment): string {
     return generateAssessmentRankingCSV(assessment)
+  },
+
+  /**
+   * 生成带公式的 Excel 考核排名数据
+   */
+  generateExcelData(assessment: Assessment, defaultBossScore?: number): ArrayBuffer {
+    return generateAssessmentRankingExcel(assessment, defaultBossScore)
   }
 }

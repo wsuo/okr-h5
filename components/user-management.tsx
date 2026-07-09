@@ -18,6 +18,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -618,21 +624,34 @@ export default function UserManagement() {
                         </div>
                         <div>
                           <Label htmlFor="roles">角色 *</Label>
-                          <Select
-                            value={formData.role_ids[0]?.toString() || ""}
-                            onValueChange={(value) => setFormData({ ...formData, role_ids: value ? [parseInt(value)] : [] })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="选择角色" />
-                            </SelectTrigger>
-                            <SelectContent>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" className="w-full justify-start font-normal" type="button">
+                                {formData.role_ids.length > 0
+                                  ? roles
+                                      .filter((role) => formData.role_ids.includes(role.id))
+                                      .map((role) => role.name)
+                                      .join("、")
+                                  : "选择角色"}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
                               {roles && roles.map((role) => (
-                                <SelectItem key={role.id} value={role.id.toString()}>
+                                <DropdownMenuCheckboxItem
+                                  key={role.id}
+                                  checked={formData.role_ids.includes(role.id)}
+                                  onCheckedChange={(checked) => {
+                                    const newRoleIds = checked
+                                      ? [...formData.role_ids, role.id]
+                                      : formData.role_ids.filter((id) => id !== role.id)
+                                    setFormData({ ...formData, role_ids: newRoleIds })
+                                  }}
+                                >
                                   {role.name}
-                                </SelectItem>
+                                </DropdownMenuCheckboxItem>
                               ))}
-                            </SelectContent>
-                          </Select>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                         <div>
                           <Label htmlFor="join_date">入职时间</Label>
@@ -888,21 +907,34 @@ export default function UserManagement() {
                       </div>
                       <div>
                         <Label htmlFor="edit-roles">角色 *</Label>
-                        <Select
-                          value={formData.role_ids[0]?.toString() || ""}
-                          onValueChange={(value) => setFormData({ ...formData, role_ids: value ? [parseInt(value)] : [] })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择角色" />
-                          </SelectTrigger>
-                          <SelectContent>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-start font-normal" type="button">
+                              {formData.role_ids.length > 0
+                                ? roles
+                                    .filter((role) => formData.role_ids.includes(role.id))
+                                    .map((role) => role.name)
+                                    .join("、")
+                                : "选择角色"}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56">
                             {roles && roles.map((role) => (
-                              <SelectItem key={role.id} value={role.id.toString()}>
+                              <DropdownMenuCheckboxItem
+                                key={role.id}
+                                checked={formData.role_ids.includes(role.id)}
+                                onCheckedChange={(checked) => {
+                                  const newRoleIds = checked
+                                    ? [...formData.role_ids, role.id]
+                                    : formData.role_ids.filter((id) => id !== role.id)
+                                  setFormData({ ...formData, role_ids: newRoleIds })
+                                }}
+                              >
                                 {role.name}
-                              </SelectItem>
+                              </DropdownMenuCheckboxItem>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                       <div>
                         <Label htmlFor="edit-join_date">入职时间</Label>

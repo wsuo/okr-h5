@@ -58,6 +58,12 @@ export default function AssessmentManagement() {
   const [defaultBossTarget, setDefaultBossTarget] = useState<AssessmentListItem | null>(null)
   const [defaultBossScore, setDefaultBossScore] = useState<string>("90")
   const [defaultingBossId, setDefaultingBossId] = useState<number | null>(null)
+
+  // 导出考核数据：默认老板评分弹窗
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportTarget, setExportTarget] = useState<AssessmentListItem | null>(null)
+  const [exportDefaultBossScore, setExportDefaultBossScore] = useState<string>("90")
+  const [exportDetail, setExportDetail] = useState<Assessment | null>(null)
   
   // 检查URL参数中是否有编辑ID
   useEffect(() => {
@@ -247,32 +253,74 @@ export default function AssessmentManagement() {
     URL.revokeObjectURL(url)
   }
 
-  const handleExportAssessment = async (assessment: AssessmentListItem) => {
+  const downloadAssessmentExcel = (title: string, data: ArrayBuffer) => {
+    const blob = new Blob([data], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `${title}_考核排名.xlsx`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const openExportDialog = async (assessment: AssessmentListItem) => {
     try {
       setExportingId(assessment.id)
       const detailResponse = await assessmentService.getAssessmentById(assessment.id)
-
       if (detailResponse.code !== 200 || !detailResponse.data) {
         toast.error("导出失败", {
           description: detailResponse.message || "无法获取考核详情"
         })
         return
       }
-
-      const csvContent = assessmentUtils.generateCSVData(detailResponse.data)
-      downloadAssessmentCSV(detailResponse.data.title, csvContent)
-
-      toast.success("导出成功", {
-        description: "考核数据已导出为CSV文件"
-      })
+      setExportTarget(assessment)
+      setExportDetail(detailResponse.data)
+      setExportDefaultBossScore("90")
+      setExportDialogOpen(true)
     } catch (error: any) {
-      console.error("导出考核数据失败:", error)
+      console.error("获取考核详情失败:", error)
       toast.error("导出失败", {
         description: error.message || "服务器错误，请稍后重试"
       })
     } finally {
       setExportingId(null)
     }
+  }
+
+  const confirmExportAssessment = () => {
+    if (!exportTarget || !exportDetail) return
+
+    const scoreNum = Number(exportDefaultBossScore)
+    if (!Number.isFinite(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+      toast.error("请输入 0~100 之间的默认老板评分")
+      return
+    }
+
+    try {
+      setExportingId(exportTarget.id)
+      const excelData = assessmentUtils.generateExcelData(exportDetail, scoreNum)
+      downloadAssessmentExcel(exportDetail.title, excelData)
+      toast.success("导出成功", {
+        description: "考核排名已导出为 Excel 文件，可在表格中修改评分自动计算"
+      })
+      setExportDialogOpen(false)
+      setExportTarget(null)
+      setExportDetail(null)
+    } catch (error: any) {
+      console.error("导出 Excel 失败:", error)
+      toast.error("导出失败", {
+        description: error.message || "生成 Excel 文件失败"
+      })
+    } finally {
+      setExportingId(null)
+    }
+  }
+
+  const handleExportAssessment = async (assessment: AssessmentListItem) => {
+    await openExportDialog(assessment)
   }
 
   const handleCreateAssessment = async () => {
@@ -1236,6 +1284,68 @@ export default function AssessmentManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 导出考核数据 - 默认老板评分弹窗 */}
+      <Dialog open={exportDialogOpen} onOpenChange={(open) => {
+        setExportDialogOpen(open)
+        if (!open) {
+          setExportTarget(null)
+          setExportDetail(null)
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>导出考核排名</DialogTitle>
+            <DialogDescription>
+              如果部分参与者尚未完成老板评分，可使用默认老板评分参与加权计算并导出排名。
+              Excel 中将包含计算公式，修改评分后最终得分与排名会自动更新。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>默认老板评分</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                value={exportDefaultBossScore}
+                onChange={(e) => setExportDefaultBossScore(e.target.value)}
+                placeholder="例如：90"
+              />
+              <p className="text-xs text-gray-500">
+                仅当参与者没有实际老板评分时，才会使用此默认值计算最终得分。
+              </p>
+            </div>
+
+            {exportTarget && (
+              <div className="text-sm text-gray-600 space-y-1">
+                <div>考核：{exportTarget.title}</div>
+                <div>
+                  参与者：{exportTarget.statistics.total_participants} 人；
+                  自评完成：{exportTarget.statistics.self_completed_count}；
+                  领导评完成：{exportTarget.statistics.leader_completed_count}；
+                  Boss 完成：{exportTarget.statistics.boss_completed_count}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                onClick={confirmExportAssessment}
+                disabled={!exportTarget || exportingId !== null}
+              >
+                {exportingId !== null && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                确认导出
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 一键默认老板评分 - 输入对话框（第一层确认） */}
       <Dialog open={defaultBossDialogOpen} onOpenChange={(open) => {
