@@ -88,7 +88,7 @@ server2.conf             服务器: 47.243.127.167 (测试/备用服务器)
 
 ```bash
 # 部署到生产环境主服务器
-cd /Users/wshuo/Developer/my/okr/okr-h5
+cd /Users/rui/Developer/nova/okr/okr-h5
 ./deploy/deploy.sh deploy
 
 # 或显式指定配置
